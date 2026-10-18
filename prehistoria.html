@@ -755,7 +755,7 @@
         metricas(["Orientación del corredor: " + az + "°", "Mira hacia el " + cardinal(az), "Sol del equinoccio: 90° (este)", "Diferencia: " + Math.min(Math.abs(az - 90), 360 - Math.abs(az - 90)) + "°"]);
         if (hecho) return;
         if (az === 90) { hecho = true; completar(3, "¡El sol del equinoccio entra por el corredor hasta la cámara! El corredor mira al este: 90° desde el norte, un ángulo recto."); }
-        else estado("El corredor mira hacia el " + cardinal(az) + " (" + az + "°). Gíralo para que el sol del equinoccio entre hasta la cámara.", "status-warn", "p4-" + cardinal(az));
+        else estado("El corredor mira hacia el " + cardinal(az) + " (" + az + "°). Gíralo para que el sol del equinoccio entre hasta la cámara.", "status-warn", "p4-" + az);
       }
       poner(az);
       return {
@@ -791,8 +791,11 @@
       const texF = new THREE.CanvasTexture(cara), texI = new THREE.CanvasTexture(imp);
       texF.colorSpace = texI.colorSpace = THREE.SRGBColorSpace;
       const matBarro = new THREE.MeshStandardMaterial({ color: 0xa8714a, roughness: 0.85 });
-      const sello = new THREE.Mesh(new THREE.CylinderGeometry(RS, RS, 0.24, 64), [matBarro, new THREE.MeshStandardMaterial({ map: texF, roughness: 0.85 }), matBarro]);
-      sello.rotation.x = Math.PI / 2; sello.position.set(XS, CY, 0); g.add(sello);
+      // Cuerpo del sello y cara de dibujo (CircleGeometry: la textura se ve sin girar, así la impresión es su reflejo exacto)
+      const cuerpo = new THREE.Mesh(new THREE.CylinderGeometry(RS, RS, 0.24, 64), matBarro);
+      cuerpo.rotation.x = Math.PI / 2; cuerpo.position.set(XS, CY, 0); g.add(cuerpo);
+      const sello = new THREE.Mesh(new THREE.CircleGeometry(RS, 64), new THREE.MeshStandardMaterial({ map: texF, roughness: 0.85 }));
+      sello.position.set(XS, CY, 0.125); g.add(sello);
       const lamina = new THREE.Mesh(new THREE.PlaneGeometry(2.1, 2.1), new THREE.MeshStandardMaterial({ map: texI, roughness: 0.95 }));
       lamina.position.set(XI, CY, 0); g.add(lamina);
       let orden = 6, trazo = null, largo = 0, impresiones = 0, hecho = false;
@@ -849,7 +852,7 @@
         },
         down(x, y) {
           const s = uv(sello, x, y);
-          if (s && s.h.face && s.h.face.materialIndex === 1) { trazo = [s.uv.x * T, (1 - s.uv.y) * T]; return true; }
+          if (s) { trazo = [s.uv.x * T, (1 - s.uv.y) * T]; return true; }
           const l = uv(lamina, x, y);
           if (l) estampar(l.uv.x, l.uv.y);
           return false;
@@ -857,7 +860,7 @@
         move(x, y) {
           if (!trazo) return;
           const s = uv(sello, x, y);
-          if (s && s.h.face && s.h.face.materialIndex === 1) { const p = [s.uv.x * T, (1 - s.uv.y) * T]; if (Math.hypot(p[0] - trazo[0], p[1] - trazo[1]) > 4) { segmento(trazo, p); trazo = p; } }
+          if (s) { const p = [s.uv.x * T, (1 - s.uv.y) * T]; if (Math.hypot(p[0] - trazo[0], p[1] - trazo[1]) > 4) { segmento(trazo, p); trazo = p; } }
         },
         up() { trazo = null; },
         tick() {}

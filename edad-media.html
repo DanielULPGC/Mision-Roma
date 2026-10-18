@@ -1,0 +1,1234 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>El compás y la piedra · Las manos que construyeron la historia</title>
+  <!--
+    El compás y la piedra · Edad Media · capítulo del proyecto «Las manos que construyeron la historia»
+    Geometría, patrimonio histórico y realidad aumentada en Educación Primaria (5.º-6.º)
+    Mismo motor que Misión Roma v3.2.1. Cinco etapas en orden cronológico:
+      1. El astrolabio (al-Andalus, s. XI): medir ángulos; ángulos complementarios.
+      2. Del medio punto al arco apuntado (románico → gótico): compás, radio, triángulo equilátero.
+      3. El rosetón (gótico): hexágono regular con el compás; simetría de rotación.
+      4. La lacería de la Alhambra (nazarí, s. XIV): giros de 45°, estrella de 8 puntas, teselado.
+      5. Canarias: el portulano (1339): rumbos, rosa de los vientos y escala.
+    Instrumentos, arcos, patrones y mapa son modelos simplificados con fines didácticos (declarado).
+  -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./lib/three.module.js",
+      "@mediapipe/tasks-vision": "./lib/vision_bundle.mjs"
+    },
+    "integrity": {
+      "./lib/three.module.js": "sha384-61S/Nu32S3E5+n+KpCOTb2eRYps6fVKm+9Gz1QBvSePFthb46f063Aa/qe/lykFZ",
+      "./lib/vision_bundle.mjs": "sha384-9MVwqhzThi8MIJU3B3BxQi92VYFPzYDEWSYI5vJig77g7vjdK+y/gG9EQ/sjWmdU"
+    }
+  }
+  </script>
+  <style>
+    :root{
+      --ocre:#c2843a; --noche:#1c1917; --panel:rgba(28,25,23,.9); --texto:#faf7f2;
+      --ok:#4ade80; --aviso:#facc15; --error:#f87171; --agua:#38bdf8;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%;overflow:hidden;background:var(--noche);color:var(--texto);
+      font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-user-select:none;user-select:none}
+    #escena{position:fixed;inset:0;background:linear-gradient(#cfe3ec 0%,#e9dfcc 62%,#b89c78 100%)}
+    #video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);opacity:0;transition:opacity .3s}
+    #video.visible{opacity:1}
+    #lienzo3d,#lienzoManos{position:absolute;inset:0;width:100%;height:100%}
+    #lienzo3d{touch-action:none}
+    #lienzoManos{pointer-events:none}
+    .etq{position:absolute;transform:translate(-50%,-100%);background:var(--panel);color:var(--texto);font-variant-numeric:tabular-nums;
+      font-size:.76rem;padding:3px 7px;border-radius:6px;white-space:nowrap;pointer-events:none}
+    .etq.geo{background:rgba(194,132,58,.95);color:#1c1917;font-weight:600}
+    .etq.abajo{transform:translate(-50%,0)}
+    .etq.agua{background:rgba(2,132,199,.92)}
+    #hud{position:absolute;top:max(10px,env(safe-area-inset-top));left:10px;right:10px;max-width:460px;
+      background:var(--panel);border:1px solid rgba(255,255,255,.2);border-radius:12px;padding:9px 12px;z-index:5}
+    #hud .lema{font-size:.72rem;opacity:.8;margin:0}
+    #hud h1{font-size:1rem;margin:1px 0 5px}
+    #etapas{display:flex;gap:4px;list-style:none;margin:0 0 6px;padding:0}
+    #etapas li{flex:1}
+    #etapas button{width:100%;padding:5px 2px;font-size:.68rem;border-radius:7px;line-height:1.15}
+    #etapas button[aria-current="step"]{background:var(--ocre);color:#1c1917}
+    #etapas button.hecha::after{content:" ✓"}
+    #etapas button:disabled{opacity:.4;cursor:not-allowed}
+    .metricas{display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;font-size:.82rem;font-weight:600}
+    #estado{margin-top:6px;font-size:.85rem;font-weight:700}
+    .status-ok{color:var(--ok)} .status-warn{color:var(--aviso)} .status-error{color:var(--error)}
+    #nota{font-size:.68rem;opacity:.75;margin-top:4px}
+    #camara{margin-top:5px;font-size:.76rem;font-weight:700;padding:3px 8px;border-radius:6px;background:rgba(255,255,255,.08)}
+    #camara.ok{color:var(--ok)} #camara.aviso{color:var(--aviso)} #camara.error{color:var(--error)}
+    .opcion{display:flex;gap:8px;align-items:flex-start;font-size:.9rem;margin-top:10px}
+    .opcion input{width:20px;height:20px;accent-color:var(--ocre);flex:none;margin-top:1px}
+    #lista-diag{list-style:none;padding:0;margin:8px 0}
+    #lista-diag li{padding:6px 0;border-bottom:1px solid rgba(255,255,255,.12);font-size:.88rem}
+    #lista-diag .r-ok::before{content:"✓ ";color:var(--ok);font-weight:700}
+    #lista-diag .r-aviso::before{content:"! ";color:var(--aviso);font-weight:700}
+    #lista-diag .r-error::before{content:"✗ ";color:var(--error);font-weight:700}
+    #lista-diag small{display:block;opacity:.8;margin-top:2px}
+    #controles{position:absolute;left:10px;right:10px;bottom:max(10px,env(safe-area-inset-bottom));
+      display:flex;flex-wrap:wrap;gap:8px;justify-content:center;z-index:5}
+    button{font:inherit;font-size:.86rem;font-weight:700;border-radius:10px;padding:9px 13px;
+      background:var(--panel);color:var(--texto);border:1px solid rgba(255,255,255,.25);cursor:pointer}
+    button[aria-pressed="true"],button.principal{background:var(--ocre);color:#1c1917}
+    button:disabled{opacity:.45;cursor:not-allowed}
+    button:focus-visible,input:focus-visible{outline:3px solid var(--agua);outline-offset:2px}
+    #alternativos{width:100%;display:flex;flex-direction:column;gap:6px;background:var(--panel);border-radius:10px;padding:8px 12px}
+    #alternativos .fila{display:flex;align-items:center;gap:8px;font-size:.82rem}
+    #alternativos .fila label{min-width:92px}
+    #alternativos input[type=range]{flex:1;accent-color:var(--ocre)}
+    #portada,#inicio,.panel{position:absolute;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;
+      background:rgba(28,25,23,.82);padding:16px}
+    .tarjeta{background:#292524;border:1px solid rgba(255,255,255,.2);border-radius:14px;padding:18px;max-width:540px;
+      max-height:88vh;overflow:auto;line-height:1.45;-webkit-user-select:text;user-select:text}
+    .tarjeta h2{margin:0 0 4px;font-size:1.25rem}
+    .tarjeta h3{margin:14px 0 4px;font-size:1rem;color:var(--ocre)}
+    .tarjeta p,.tarjeta li{margin:6px 0;font-size:.92rem}
+    .tarjeta .botones{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+    .privacidad,.fuente{font-size:.76rem;opacity:.8}
+    #portada{background:linear-gradient(rgba(28,25,23,.92),rgba(28,25,23,.97))}
+    #portada .tarjeta{max-width:620px}
+    .antetitulo{font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ocre);margin:0 0 2px;font-weight:700}
+    .linea{list-style:none;margin:10px 0 6px 6px;padding:0 0 0 14px;border-left:3px solid var(--ocre);display:flex;flex-direction:column;gap:8px}
+    .era{position:relative;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05)}
+    .era::before{content:"";position:absolute;left:-22px;top:13px;width:11px;height:11px;border-radius:50%;background:#44403c;border:2px solid var(--ocre)}
+    .era.activa{background:rgba(194,132,58,.16);border:1px solid var(--ocre)}
+    .era.activa::before{background:var(--ocre)}
+    .era-nombre{display:block;font-weight:700}
+    .era-fecha{display:block;font-size:.8rem;opacity:.8}
+    .era-estado{display:block;font-size:.78rem;opacity:.7;margin-top:2px}
+    .era button{width:100%;margin-top:8px}
+    .cabecera{display:flex;align-items:center;justify-content:space-between;gap:8px}
+    #btn-linea{padding:4px 9px;font-size:.72rem;border-radius:7px;flex:none}
+    [hidden]{display:none!important}
+    @media (prefers-reduced-motion: reduce){ #video{transition:none} }
+    @media (orientation: landscape) and (max-height: 520px){
+      #hud{right:auto;width:290px;padding:7px 10px}
+      #hud h1{font-size:.88rem} #hud .lema{visibility:hidden}
+      .metricas{font-size:.72rem} #estado{font-size:.74rem} #nota{display:none}
+      #controles{left:10px;right:auto;width:290px;justify-content:flex-start;gap:5px}
+      #controles button{padding:6px 9px;font-size:.76rem}
+      #alternativos{padding:5px 9px}
+    }
+  </style>
+</head>
+<body>
+  <main id="escena">
+    <video id="video" playsinline muted aria-hidden="true"></video>
+    <canvas id="lienzo3d" role="img" aria-label="Escena 3D de la etapa actual. Los elementos marcados se pueden mover con la pinza, con el dedo o con los controles alternativos."></canvas>
+    <canvas id="lienzoManos" aria-hidden="true"></canvas>
+    <div id="etiquetas" aria-hidden="true"></div>
+  </main>
+
+  <header id="hud">
+    <div class="cabecera">
+      <p class="lema">Las manos que construyeron la historia</p>
+      <button type="button" id="btn-linea">← Línea del tiempo</button>
+    </div>
+    <h1 id="titulo-etapa">El compás y la piedra</h1>
+    <ol id="etapas" aria-label="Etapas del capítulo">
+      <li><button type="button" data-etapa="0">1 Astrolabio</button></li>
+      <li><button type="button" data-etapa="1">2 Arcos</button></li>
+      <li><button type="button" data-etapa="2">3 Rosetón</button></li>
+      <li><button type="button" data-etapa="3">4 Lacería</button></li>
+      <li><button type="button" data-etapa="4">5 Canarias</button></li>
+    </ol>
+    <div id="metricas" class="metricas"></div>
+    <div id="estado" class="status-warn" role="status" aria-live="polite">Elige cómo quieres construir.</div>
+    <div id="nota"></div>
+    <div id="camara" role="status" aria-live="polite" hidden></div>
+  </header>
+
+  <nav id="controles" aria-label="Herramientas">
+    <div id="alternativos" hidden></div>
+    <button type="button" id="btn-saber">Saber más</button>
+    <button type="button" id="btn-imagen" aria-pressed="false" hidden>Mostrar mi imagen</button>
+    <button type="button" id="btn-alternativo" aria-pressed="false">Otra forma de mover</button>
+    <button type="button" id="btn-anterior" disabled>← Etapa anterior</button>
+    <button type="button" id="btn-siguiente" class="principal" disabled>Siguiente etapa →</button>
+  </nav>
+
+  <section id="inicio" role="dialog" aria-modal="true" aria-labelledby="t-inicio">
+    <div class="tarjeta">
+      <p class="antetitulo">Edad Media</p>
+      <h2 id="t-inicio">El compás y la piedra</h2>
+      <p>Durante la Edad Media, en la península ibérica convivieron y se enfrentaron los reinos cristianos y al-Andalus. Astrónomos, maestros de obras, artesanos y marinos trabajaron con instrumentos sencillos —el astrolabio, el compás, la carta de navegar— y con sus manos midieron y levantaron el mundo.</p>
+      <p>Recorrerás cinco momentos: medir con un astrolabio de Toledo, trazar arcos románicos y góticos, dibujar un rosetón, completar una lacería de la Alhambra y, al final, navegar con un portulano hasta Canarias.</p>
+      <p>Con la cámara, junta el <strong>pulgar y el índice</strong> (haz pinza) sobre lo que quieras mover y desplaza la mano.</p>
+      <div class="botones">
+        <button type="button" class="principal" id="btn-manos">Construir con mis manos (cámara)</button>
+        <button type="button" id="btn-tactil">Construir con el dedo, el ratón o el teclado</button>
+        <button type="button" id="btn-diag">Comprobar cámara y manos</button>
+        <button type="button" id="btn-volver-portada">← Volver a la línea del tiempo</button>
+      </div>
+      <label class="opcion"><input type="checkbox" id="chk-imagen"> <span>Ver mi imagen de la cámara detrás de la escena (realidad aumentada). Si no lo marcas, solo se ven unas manos dibujadas.</span></label>
+      <p class="privacidad">La cámara se usa solo para localizar las manos. La imagen se procesa en este dispositivo: no se graba ni se envía. Tu imagen solo se muestra si marcas la casilla o pulsas «Mostrar mi imagen».</p>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-info" role="dialog" aria-modal="true" hidden aria-labelledby="t-info">
+    <div class="tarjeta">
+      <h2 id="t-info">Saber más</h2>
+      <div id="cuerpo-info"></div>
+      <div class="botones"><button type="button" class="principal" data-cerrar>Volver a la obra</button></div>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-diag" role="dialog" aria-modal="true" hidden aria-labelledby="t-diag">
+    <div class="tarjeta">
+      <h2 id="t-diag">Comprobar cámara y manos</h2>
+      <p>Este panel revisa qué hace falta para construir con las manos. Para la prueba real, pulsa el botón y muestra una mano a la cámara durante unos segundos.</p>
+      <ul id="lista-diag"></ul>
+      <div class="botones">
+        <button type="button" class="principal" id="btn-prueba">Probar la cámara ahora</button>
+        <button type="button" data-cerrar>Cerrar</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-final" role="dialog" aria-modal="true" hidden aria-labelledby="t-final">
+    <div class="tarjeta">
+      <h2 id="t-final">¡Capítulo completado!</h2>
+      <p>Tus manos han recorrido la Edad Media:</p>
+      <ol>
+        <li><strong>Astrolabio:</strong> mediste la altura del sol y descubriste los ángulos complementarios.</li>
+        <li><strong>Arcos:</strong> trazaste con el compás un arco de medio punto y uno apuntado con un triángulo equilátero.</li>
+        <li><strong>Rosetón:</strong> comprobaste que el radio cabe seis veces en la circunferencia.</li>
+        <li><strong>Lacería:</strong> giraste piezas 45° para formar estrellas de ocho puntas y un teselado.</li>
+        <li><strong>Canarias:</strong> buscaste el rumbo de Mallorca a Lanzarote y calculaste la distancia con una escala.</li>
+      </ol>
+      <p>Con un compás, una regla y mucha paciencia, las manos medievales trazaron catedrales, palacios y mapas. El siguiente capítulo de la línea del tiempo, la Edad Moderna, está en preparación.</p>
+      <div class="botones">
+        <button type="button" class="principal" id="btn-fin-linea">← Volver a la línea del tiempo</button>
+        <button type="button" data-cerrar>Volver a la obra</button>
+      </div>
+    </div>
+  </section>
+
+  <script type="module">
+    import * as THREE from "three";
+
+    // =====================================================================
+    // 0. UTILIDADES Y DOM
+    // =====================================================================
+    const $ = (id) => document.getElementById(id);
+    const escena = $("escena"), video = $("video"), lienzo3d = $("lienzo3d"), lienzoManos = $("lienzoManos");
+    const ctxM = lienzoManos.getContext("2d");
+    const estadoTxt = $("estado"), metricasDiv = $("metricas"), notaDiv = $("nota"), alternativos = $("alternativos");
+    const fmt = (n, d = 2) => n.toFixed(d).replace(".", ",");
+    const fmtSigno = (n, d = 1) => (n > 0.0499 ? "+" : n < -0.0499 ? "−" : "") + fmt(Math.abs(n), d);
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+    const MOV_REDUCIDO = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const DOCENTE = new URLSearchParams(location.search).has("docente");
+
+    let categoriaPrevia = "";
+    let actual = -1, etapa = null;
+    function estado(texto, clase = "status-warn", categoria = texto) {
+      if (categoria === categoriaPrevia) return;
+      categoriaPrevia = categoria;
+      estadoTxt.textContent = texto;
+      estadoTxt.className = clase;
+    }
+    function metricas(lineas) {
+      while (metricasDiv.children.length < lineas.length) metricasDiv.appendChild(document.createElement("div"));
+      while (metricasDiv.children.length > lineas.length) metricasDiv.lastChild.remove();
+      lineas.forEach((t, i) => { if (metricasDiv.children[i].textContent !== t) metricasDiv.children[i].textContent = t; });
+    }
+
+    // =====================================================================
+    // 1. THREE.JS BÁSICO
+    // =====================================================================
+    const renderer = new THREE.WebGLRenderer({ canvas: lienzo3d, alpha: true, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.9));
+    const luz = new THREE.DirectionalLight(0xffffff, 1.2);
+    luz.position.set(2, 5, 4);
+    scene.add(luz);
+
+    const M = {
+      piedra: new THREE.MeshStandardMaterial({ color: 0xd6d3d1, roughness: 0.7 }),
+      seleccion: new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.4 }),
+      correcto: new THREE.MeshStandardMaterial({ color: 0x4ade80, roughness: 0.4 }),
+      canal: new THREE.MeshStandardMaterial({ color: 0x0284c7 }),
+      suelo: new THREE.MeshStandardMaterial({ color: 0x8b7355, roughness: 1, transparent: true, opacity: 0.9 }),
+      tierra: new THREE.MeshStandardMaterial({ color: 0x9c7b55, roughness: 1 }),
+      madera: new THREE.MeshStandardMaterial({ color: 0x8a5a2b, roughness: 0.8 }),
+      aguaM: new THREE.MeshStandardMaterial({ color: 0x7dd3fc, roughness: 0.2, transparent: true, opacity: 0.85 }),
+      fantasma: new THREE.LineBasicMaterial({ color: 0x1c1917, transparent: true, opacity: 0.5 }),
+      cota: new THREE.LineBasicMaterial({ color: 0xc2843a }),
+      lineaAgua: new THREE.LineBasicMaterial({ color: 0x0284c7 }),
+      oscuro: new THREE.LineBasicMaterial({ color: 0x1c1917 })
+    };
+    const caja = (w, h, d, mat) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    const linea = (puntos, mat) => new THREE.Line(new THREE.BufferGeometry().setFromPoints(puntos.map((p) => new THREE.Vector3(p[0], p[1], p[2] || 0))), mat);
+    function suelo(ancho, x = 0) { const s = caja(ancho, 0.1, 2, M.suelo); s.position.set(x, -0.05, 0); return s; }
+
+    // Arco de medio punto: intradós de radio r (la luz es el diámetro)
+    function geometriaArco(r, grosor = 0.2, fondo = 0.8) {
+      const f = new THREE.Shape();
+      f.absarc(0, 0, r + grosor, 0, Math.PI, false);
+      f.absarc(0, 0, r, Math.PI, 0, true);
+      const g = new THREE.ExtrudeGeometry(f, { depth: fondo, bevelEnabled: false, curveSegments: 32 });
+      g.translate(0, 0, -fondo / 2);
+      return g;
+    }
+
+    // Partículas de agua reutilizables
+    function crearAgua(n, radio = 0.07) {
+      const m = new THREE.InstancedMesh(new THREE.SphereGeometry(radio, 8, 6), new THREE.MeshStandardMaterial({ color: 0x7dd3fc, roughness: 0.2 }), n);
+      m.frustumCulled = false;
+      return m;
+    }
+    const VEL_AGUA = MOV_REDUCIDO ? 0.15 : 0.4;
+    const ficticio = new THREE.Object3D();
+    function situarGota(malla, i, x, y, z = 0) { ficticio.position.set(x, y, z); ficticio.updateMatrix(); malla.setMatrixAt(i, ficticio.matrix); }
+
+    // =====================================================================
+    // 2. ENCUADRE, PROYECCIÓN Y ETIQUETAS
+    // =====================================================================
+    let marco = { ancho: 7.6, alto: 5.0, cy: 1.8 };
+    function encuadrar() {
+      const W = escena.clientWidth, H = escena.clientHeight;
+      renderer.setSize(W, H, false);
+      camera.aspect = W / H;
+      const lateral = window.matchMedia("(orientation: landscape) and (max-height: 520px)").matches;
+      // En horizontal, HUD y controles comparten columna: el HUD se limita al espacio libre y se desplaza
+      const hudEl = $("hud");
+      if (lateral) { hudEl.style.maxHeight = Math.max(110, $("controles").getBoundingClientRect().top - hudEl.offsetTop - 10) + "px"; hudEl.style.overflowY = "auto"; }
+      else { hudEl.style.maxHeight = ""; hudEl.style.overflowY = ""; }
+      const hud = hudEl.getBoundingClientRect(), ctr = $("controles").getBoundingClientRect();
+      const z = lateral
+        ? { x0: Math.max(hud.right, ctr.right) + 8, x1: W - 8, y0: 8, y1: H - 8 }
+        : { x0: 8, x1: W - 8, y0: hud.bottom + 8, y1: ctr.top - 8 };
+      const libreW = Math.max(z.x1 - z.x0, W * 0.3), libreH = Math.max(z.y1 - z.y0, H * 0.25);
+      const t = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+      const d = Math.max((marco.ancho / 2) / (t * camera.aspect) * (W / libreW), (marco.alto / 2) / t * (H / libreH));
+      camera.position.set(0, marco.cy + 0.5, d);
+      camera.lookAt(0, marco.cy, 0);
+      camera.setViewOffset(W, H, W / 2 - (z.x0 + libreW / 2), H / 2 - (z.y0 + libreH / 2), W, H);
+      camera.updateProjectionMatrix();
+      const dpr = Math.min(window.devicePixelRatio, 2);
+      lienzoManos.width = W * dpr; lienzoManos.height = H * dpr;
+      ctxM.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    window.addEventListener("resize", encuadrar);
+    new ResizeObserver(encuadrar).observe($("hud"));
+    new ResizeObserver(encuadrar).observe($("controles"));
+
+    const v3 = new THREE.Vector3();
+    function aPantalla(x, y, z = 0) {
+      v3.set(x, y, z).project(camera);
+      return { x: (v3.x * 0.5 + 0.5) * escena.clientWidth, y: (-v3.y * 0.5 + 0.5) * escena.clientHeight };
+    }
+    function pixelesPorMetro() {
+      const a = aPantalla(0, 0), b = aPantalla(0, 1);
+      return Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    }
+    const raycaster = new THREE.Raycaster(), ndc = new THREE.Vector2();
+    function rayo(sx, sy) {
+      ndc.set((sx / escena.clientWidth) * 2 - 1, -(sy / escena.clientHeight) * 2 + 1);
+      raycaster.setFromCamera(ndc, camera);
+      return raycaster;
+    }
+    function toca(sx, sy, objetos) { return rayo(sx, sy).intersectObjects([].concat(objetos), true).length > 0; }
+    const planoZ0 = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+    function enPlano(sx, sy) { const p = new THREE.Vector3(); return rayo(sx, sy).ray.intersectPlane(planoZ0, p) ? p : null; }
+
+    let etiquetas = [];
+    function etiqueta(texto, clase, posFn) {
+      const el = document.createElement("span");
+      el.className = "etq " + (clase || "");
+      el.textContent = texto;
+      $("etiquetas").appendChild(el);
+      const e = { el, posFn, set texto(t) { if (el.textContent !== t) el.textContent = t; } };
+      etiquetas.push(e);
+      return e;
+    }
+    function limpiarEtiquetas() { etiquetas.forEach((e) => e.el.remove()); etiquetas = []; }
+    function actualizarEtiquetas() {
+      for (const e of etiquetas) {
+        const p = e.posFn();
+        if (!p) { e.el.hidden = true; continue; }
+        e.el.hidden = false;
+        const s = aPantalla(p[0], p[1], p[2] || 0);
+        e.el.style.left = s.x + "px"; e.el.style.top = s.y + "px";
+      }
+    }
+
+    // Controles alternativos (DUA)
+    function filaRango(etq, min, max, paso, valor, alCambiar, texto) {
+      const id = "alt-" + Math.random().toString(36).slice(2, 8);
+      const fila = document.createElement("div"); fila.className = "fila";
+      const l = document.createElement("label"); l.htmlFor = id; l.textContent = etq;
+      const r = document.createElement("input"); r.type = "range"; r.id = id; r.min = min; r.max = max; r.step = paso; r.value = valor;
+      const sinc = () => r.setAttribute("aria-valuetext", texto(parseFloat(r.value)));
+      r.addEventListener("input", () => { alCambiar(parseFloat(r.value)); sinc(); });
+      sinc();
+      fila.append(l, r); alternativos.appendChild(fila);
+      return { poner(v) { r.value = v; sinc(); } };
+    }
+    function filaBotones(lista) {
+      const fila = document.createElement("div"); fila.className = "fila";
+      for (const [txt, fn] of lista) {
+        const b = document.createElement("button"); b.type = "button"; b.textContent = txt; b.addEventListener("click", fn); fila.appendChild(b);
+      }
+      alternativos.appendChild(fila);
+    }
+
+    // =====================================================================
+    // 3. ETAPA 1 · EL ASTROLABIO (al-Andalus, s. XI) — medir ángulos; complementarios
+    // =====================================================================
+    const M1 = (() => {
+      const g = new THREE.Group();
+      const CX = -0.4, CY = 1.45, R = 1.25, SOL = 50;          // Toledo ≈ 39,9° N → sol de mediodía en el equinoccio ≈ 50°
+      const T = 512, cv = document.createElement("canvas"); cv.width = cv.height = T;
+      (() => {
+        const c = cv.getContext("2d"), m = T / 2, k = (T / 2) / R;
+        const gr = c.createRadialGradient(m, m, 20, m, m, m); gr.addColorStop(0, "#d9b45a"); gr.addColorStop(1, "#9a7428");
+        c.fillStyle = gr; c.beginPath(); c.arc(m, m, m, 0, Math.PI * 2); c.fill();
+        c.strokeStyle = "#5a4012"; c.lineWidth = 3;
+        for (const rr of [0.97, 0.82, 0.62]) { c.beginPath(); c.arc(m, m, rr * m, 0, Math.PI * 2); c.stroke(); }
+        c.beginPath(); c.moveTo(0.03 * T, m); c.lineTo(0.97 * T, m); c.moveTo(m, 0.03 * T); c.lineTo(m, 0.97 * T); c.stroke();
+        c.fillStyle = "#3a2a0c"; c.font = "bold 22px system-ui"; c.textAlign = "center"; c.textBaseline = "middle";
+        for (let a = 0; a <= 90; a += 5) {
+          const t = a * Math.PI / 180, r1 = 0.97 * m, r2 = (a % 10 === 0 ? 0.86 : 0.91) * m;
+          c.beginPath(); c.moveTo(m + Math.cos(t) * r1, m - Math.sin(t) * r1); c.lineTo(m + Math.cos(t) * r2, m - Math.sin(t) * r2); c.stroke();
+          if (a % 10 === 0) c.fillText(String(a), m + Math.cos(t) * 0.74 * m, m - Math.sin(t) * 0.74 * m);
+        }
+      })();
+      const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+      const borde = new THREE.Mesh(new THREE.CylinderGeometry(R, R, 0.08, 64), new THREE.MeshStandardMaterial({ color: 0x8a6420, roughness: 0.4, metalness: 0.6 }));
+      borde.rotation.x = Math.PI / 2; borde.position.set(CX, CY, 0); g.add(borde);
+      const cara = new THREE.Mesh(new THREE.CircleGeometry(R, 64), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.45, metalness: 0.35 }));
+      cara.position.set(CX, CY, 0.045); g.add(cara);
+      const argolla = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.035, 8, 24), borde.material); argolla.position.set(CX, CY + R + 0.12, 0); g.add(argolla);
+      const alidada = new THREE.Group(); alidada.position.set(CX, CY, 0.1); g.add(alidada);
+      const matAli = new THREE.MeshStandardMaterial({ color: 0x5a4012, roughness: 0.5, metalness: 0.5 });
+      const regla = caja(2 * R * 0.96, 0.09, 0.03, matAli); alidada.add(regla);
+      for (const x of [-0.75, 0.75]) { const p = caja(0.05, 0.22, 0.05, matAli); p.position.set(x, 0, 0.03); alidada.add(p); }
+      const sol = new THREE.Mesh(new THREE.SphereGeometry(0.2, 20, 14), new THREE.MeshBasicMaterial({ color: 0xfbbf24 }));
+      const DS = 2.35; sol.position.set(CX + Math.cos(SOL * Math.PI / 180) * DS, CY + Math.sin(SOL * Math.PI / 180) * DS, 0); g.add(sol);
+      const rayo3 = new THREE.Mesh(new THREE.PlaneGeometry(1, 0.08), new THREE.MeshBasicMaterial({ color: 0xfde68a, transparent: true, opacity: 0, depthWrite: false }));
+      g.add(rayo3);
+      const OPC = [["40°", 40], ["50°", 50], ["90°", 90]];
+      const tablillas = OPC.map((o, i) => { const t = caja(0.9, 0.45, 0.08, new THREE.MeshStandardMaterial({ color: 0x8a5a2b, roughness: 0.8 })); t.position.set(2.35, CY + 0.75 - i * 0.75, 0.05); t.visible = false; t.userData.v = o[1]; g.add(t); return t; });
+      let ang = 15, fase = "medir", arrastre = false, hecho = false, ctrl = null, luz = 0;
+      function poner(v) {
+        ang = clamp(Math.round(v * 2) / 2, 0, 90);
+        if (Math.abs(ang - SOL) <= 2) ang = SOL;
+        alidada.rotation.z = THREE.MathUtils.degToRad(ang);
+        ctrl && ctrl.poner(ang);
+        if (actual !== 0) return;
+        refrescar();
+        if (fase !== "medir") return;
+        if (ang === SOL) {
+          fase = "pregunta"; tablillas.forEach((t) => (t.visible = true));
+          estado("¡La luz pasa por los dos agujeros de la alidada! El sol está a 50° de altura. ¿Cuántos grados le faltan para llegar a 90°? Haz pinza sobre una tablilla.", "status-ok", "m1-preg");
+        } else estado("La alidada marca " + fmt(ang, ang % 1 ? 1 : 0) + "°. " + (ang < SOL ? "Súbela" : "Bájala") + " hasta que la luz del sol pase por sus dos agujeros.", "status-warn", "m1-" + ang);
+      }
+      function responder(v) {
+        if (hecho || fase !== "pregunta") return;
+        if (v === 40) { hecho = true; fase = "hecho"; completar(0, "¡Correcto! 50° + 40° = 90°: son ángulos complementarios. Esos 40° son, aproximadamente, la latitud de Toledo."); }
+        else estado("No es " + v + "°. Piensa: 50° + ¿cuánto? = 90°.", "status-error", "m1-mal-" + v);
+        refrescar();
+      }
+      function refrescar() {
+        if (actual !== 0) return;
+        metricas(["Altura medida: " + fmt(ang, ang % 1 ? 1 : 0) + "°", "Ángulo recto: 90°", "Lugar: Toledo (≈ 40° N)", "Fecha: equinoccio, a mediodía"]);
+      }
+      poner(ang);
+      return {
+        nombre: "Medir con el astrolabio", grupo: g, marco: { ancho: 6.0, alto: 3.6, cy: 1.55 },
+        nota: "Simplificación: altura del sol a mediodía en un equinoccio, en Toledo. El astrolabio de la actividad es un modelo inspirado en los andalusíes.",
+        entrar() {
+          etiqueta("sol", "", () => [sol.position.x - 0.5, sol.position.y + 0.1]);
+          etiqueta("alidada", "geo", () => { const t = THREE.MathUtils.degToRad(ang); return [CX - Math.cos(t) * 0.9, CY - Math.sin(t) * 0.9 - 0.15, 0.2]; });
+          OPC.forEach((o, i) => etiqueta(o[0], "geo", () => (fase !== "medir" ? [2.35, CY + 0.75 - i * 0.75 + 0.4, 0.1] : null)));
+          if (fase === "medir") estado("Haz pinza sobre el astrolabio y gira la mano para mover la alidada, la regla que gira, hasta apuntar al sol.", "status-warn", "m1-ini");
+          poner(ang);
+        },
+        alternativos() {
+          ctrl = filaRango("Alidada (°)", 0, 90, 0.5, ang, poner, (v) => v + " grados de altura");
+          filaBotones(OPC.map((o) => ["Le faltan " + o[0], () => responder(o[1])]));
+        },
+        down(x, y) {
+          if (fase === "pregunta") { const h = rayo(x, y).intersectObjects(tablillas, false)[0]; if (h) responder(h.object.userData.v); return false; }
+          const p = enPlano(x, y); if (!p || Math.hypot(p.x - CX, p.y - CY) > R + 0.3) return false;
+          arrastre = true; poner(THREE.MathUtils.radToDeg(Math.atan2(p.y - CY, Math.abs(p.x - CX)))); return true;
+        },
+        move(x, y) { if (!arrastre) return; const p = enPlano(x, y); if (p) poner(THREE.MathUtils.radToDeg(Math.atan2(p.y - CY, Math.abs(p.x - CX)))); },
+        up() { arrastre = false; },
+        tick(dt) {
+          luz = clamp(luz + (ang === SOL ? dt : -dt) * 1.5, 0, 0.7);
+          const t = SOL * Math.PI / 180, L = DS + R;
+          rayo3.scale.x = L; rayo3.rotation.z = t;
+          rayo3.position.set(CX + Math.cos(t) * (DS - L / 2), CY + Math.sin(t) * (DS - L / 2), 0.15);
+          rayo3.material.opacity = luz;
+        }
+      };
+    })();
+
+    // =====================================================================
+    // 4. ETAPA 2 · DEL ARCO DE MEDIO PUNTO AL APUNTADO (románico → gótico) — compás, radio, triángulo equilátero
+    // =====================================================================
+    const M2 = (() => {
+      const g = new THREE.Group();
+      g.add(suelo(6));
+      const Y = 1.0, A = new THREE.Vector2(-1, Y), B = new THREE.Vector2(1, Y);
+      const matPiedra = new THREE.MeshStandardMaterial({ color: 0xcbbf9f, roughness: 0.8 });
+      for (const x of [-1.15, 1.15]) { const j = caja(0.3, Y, 0.5, matPiedra); j.position.set(x, Y / 2, 0); g.add(j); }
+      const matLapiz = new THREE.LineBasicMaterial({ color: 0x1c1917, depthTest: false });
+      const trazos = new THREE.Group(); g.add(trazos);
+      const compas = new THREE.Group(); g.add(compas);
+      const brazo1 = linea([[0, 0, 0.3], [0, 0.9, 0.3]], matLapiz), brazo2 = linea([[0, 0.9, 0.3], [0.5, 0, 0.3]], matLapiz);
+      compas.add(brazo1, brazo2); compas.visible = false; brazo1.renderOrder = brazo2.renderOrder = 7;
+      const puntos = [A, B].map((p) => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 8), new THREE.MeshBasicMaterial({ color: 0xc2843a, depthTest: false })); m.position.set(p.x, p.y, 0.3); m.renderOrder = 6; g.add(m); return m; });
+      const matDovela = new THREE.MeshStandardMaterial({ color: 0xbfae86, roughness: 0.85 });
+      let fase = "romanico", dibujando = null, hecho = false, gotA = false, gotB = false, ctrl = null, xSel = -0.6, intentos = 0;
+      function arco(c, r, a0, a1, mat = matLapiz) {
+        const pts = []; for (let i = 0; i <= 48; i++) { const a = a0 + (a1 - a0) * (i / 48); pts.push([c.x + Math.cos(a) * r, c.y + Math.sin(a) * r, 0.28]); }
+        const l = linea(pts, mat); l.renderOrder = 6; return l;
+      }
+      function dovelas(c, r, a0, a1, n) {
+        for (let i = 0; i < n; i++) {
+          const a = a0 + (a1 - a0) * ((i + 0.5) / n), d = caja(0.26, (Math.abs(a1 - a0) * r) / n - 0.025, 0.45, matDovela);
+          d.position.set(c.x + Math.cos(a) * (r + 0.13), c.y + Math.sin(a) * (r + 0.13), 0); d.rotation.z = a; trazos.add(d);
+        }
+      }
+      function animar(c, r, a0, a1, alAcabar) { dibujando = { c, r, a0, a1, t: 0, t0: performance.now(), alAcabar }; compas.visible = true; }
+      function clavar(px) {
+        if (dibujando || hecho) return;
+        if (fase === "romanico") {
+          let cx = px; if (Math.abs(cx) <= 0.12) cx = 0;
+          const c = new THREE.Vector2(cx, Y), r = c.distanceTo(A), fin = cx + r;
+          intentos++;
+          while (trazos.children.length) trazos.remove(trazos.children[0]);
+          animar(c, r, Math.PI, 0, () => {
+            if (cx === 0) {
+              dovelas(c, r, Math.PI, 0, 9); fase = "gotico";
+              estado("¡Arco de medio punto! El centro está en el punto medio y el radio es la mitad de la luz. Ahora el gótico: clava el compás en A con la abertura de toda la luz.", "status-ok", "m2-gotico");
+            } else {
+              estado("El arco cae a " + fmt(Math.abs(fin - B.x), 2) + " m del apoyo B. El centro tiene que estar a la misma distancia de A que de B.", "status-error", "m2-mal-" + intentos);
+            }
+            refrescar();
+          });
+          return;
+        }
+        if (fase === "gotico") {
+          const lado = Math.abs(px - A.x) <= 0.2 ? "A" : Math.abs(px - B.x) <= 0.2 ? "B" : null;
+          if (!lado) { estado("Para el arco apuntado, el compás se clava en los apoyos: en A o en B.", "status-warn", "m2-donde"); return; }
+          if ((lado === "A" && gotA) || (lado === "B" && gotB)) return;
+          const c = lado === "A" ? A : B, r = 2;
+          animar(c, r, lado === "A" ? 0 : Math.PI, lado === "A" ? Math.PI / 3 : (2 * Math.PI) / 3, () => {
+            if (lado === "A") gotA = true; else gotB = true;
+            if (gotA && gotB) {
+              hecho = true; fase = "hecho";
+              dovelas(A, 2, 0, Math.PI / 3, 6); dovelas(B, 2, Math.PI, (2 * Math.PI) / 3, 6);
+              const tri = linea([[A.x, A.y, 0.29], [0, Y + Math.sqrt(3), 0.29], [B.x, B.y, 0.29], [A.x, A.y, 0.29]], M.cota.clone()); tri.material.depthTest = false; tri.renderOrder = 6; trazos.add(tri);
+              completar(1, "¡Arco apuntado! Los dos arcos se cortan en la clave. A, B y la clave forman un triángulo equilátero: sus tres lados miden 2 m.");
+            } else estado("Bien. Ahora clava el compás en " + (lado === "A" ? "B" : "A") + " con la misma abertura.", "status-ok", "m2-otro-" + lado);
+            refrescar();
+          });
+        }
+      }
+      function refrescar() {
+        if (actual !== 1) return;
+        metricas(["Luz (de A a B): 2 m", fase === "romanico" ? "Arco: medio punto (románico)" : "Arco: apuntado (gótico)", "Altura medio punto: 1 m", "Altura apuntado: " + (hecho ? fmt(Math.sqrt(3), 2) + " m" : "—")]);
+        ctrl && ctrl.poner(xSel);
+      }
+      return {
+        nombre: "Del medio punto al arco apuntado", grupo: g, marco: { ancho: 5.0, alto: 3.4, cy: 1.65 },
+        nota: "Modelo: luz de 2 m (1 unidad = 1 m). El arco apuntado de la actividad es el «equilátero»; había otros con más o menos apuntamiento.",
+        entrar() {
+          etiqueta("A", "geo", () => [A.x - 0.15, A.y + 0.2, 0.3]);
+          etiqueta("B", "geo", () => [B.x + 0.15, B.y + 0.2, 0.3]);
+          etiqueta("clave", "", () => (hecho ? [0, Y + Math.sqrt(3) + 0.42, 0.3] : null));
+          if (fase === "romanico") estado("Románico: haz pinza en el punto donde clavarías el compás para trazar un arco que vaya de A a B.", "status-warn", "m2-ini");
+          refrescar();
+        },
+        alternativos() {
+          ctrl = filaRango("Dónde clavas el compás", -1.5, 1.5, 0.05, xSel, (v) => (xSel = v), (v) => (v === 0 ? "en el punto medio" : fmt(Math.abs(v), 2) + " metros a la " + (v < 0 ? "izquierda" : "derecha") + " del centro"));
+          filaBotones([["Trazar con el compás", () => clavar(xSel)]]);
+        },
+        down(x, y) { const p = enPlano(x, y); if (p && Math.abs(p.y - Y) < 0.35 && Math.abs(p.x) < 1.7) clavar(p.x); return false; },
+        move() {}, up() {},
+        tick(dt) {
+          if (!dibujando) return;
+          const d = dibujando; d.t = Math.min(1, (performance.now() - d.t0) / (MOV_REDUCIDO ? 300 : 800));
+          const a = d.a0 + (d.a1 - d.a0) * d.t, px = d.c.x + Math.cos(a) * d.r, py = d.c.y + Math.sin(a) * d.r;
+          const top = [(d.c.x + px) / 2, Math.max(d.c.y, py) + 0.6];
+          brazo1.geometry.setFromPoints([new THREE.Vector3(d.c.x, d.c.y, 0.3), new THREE.Vector3(top[0], top[1], 0.3)]);
+          brazo2.geometry.setFromPoints([new THREE.Vector3(top[0], top[1], 0.3), new THREE.Vector3(px, py, 0.3)]);
+          if (d.l) trazos.remove(d.l);
+          d.l = arco(d.c, d.r, d.a0, a); trazos.add(d.l);
+          if (d.t >= 1) { dibujando = null; compas.visible = false; d.alAcabar(); }
+        }
+      };
+    })();
+
+    // =====================================================================
+    // 5. ETAPA 3 · EL ROSETÓN (gótico) — el radio cabe 6 veces: hexágono regular
+    // =====================================================================
+    const M3 = (() => {
+      const g = new THREE.Group();
+      const C = new THREE.Vector2(0, 1.55), r = 1.1;
+      const muro = caja(3.2, 3.0, 0.2, new THREE.MeshStandardMaterial({ color: 0xcbbf9f, roughness: 0.85 })); muro.position.set(0, 1.55, -0.12); g.add(muro);
+      const fondo = new THREE.Mesh(new THREE.CircleGeometry(r + 0.06, 64), new THREE.MeshStandardMaterial({ color: 0x2a2f3a, roughness: 0.6 })); fondo.position.set(C.x, C.y, 0); g.add(fondo);
+      const matLin = new THREE.LineBasicMaterial({ color: 0xe7e1d6, depthTest: false });
+      const circ = []; for (let i = 0; i <= 96; i++) { const a = (i / 96) * Math.PI * 2; circ.push([C.x + Math.cos(a) * r, C.y + Math.sin(a) * r, 0.05]); }
+      const lc = linea(circ, matLin); lc.renderOrder = 6; g.add(lc);
+      const trazos = new THREE.Group(); g.add(trazos);
+      const marca = (p, col = 0xc2843a) => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 8), new THREE.MeshBasicMaterial({ color: col, depthTest: false })); m.position.set(p.x, p.y, 0.08); m.renderOrder = 7; trazos.add(m); return m; };
+      const ang = (k) => Math.PI / 2 - (k * Math.PI) / 3;
+      const V = Array.from({ length: 6 }, (_, k) => new THREE.Vector2(C.x + Math.cos(ang(k)) * r, C.y + Math.sin(ang(k)) * r));
+      let pendiente = false, pasos = 0, fase = "compas", petalos = [], colores = Array(6).fill(-1), hecho = false, anim = null;
+      const VIDRIO = [0x1d4ed8, 0xb91c1c, 0xeab308, 0x15803d];
+      marca(V[0], 0x38bdf8);
+      function lente(i) {
+        const a = V[(i + 5) % 6], b = V[(i + 1) % 6], o = C, v = V[i], pts = [];
+        const sweep = (cen, p0, p1) => { let a0 = Math.atan2(p0.y - cen.y, p0.x - cen.x), a1 = Math.atan2(p1.y - cen.y, p1.x - cen.x); let d = a1 - a0; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; for (let s = 0; s <= 16; s++) { const t = a0 + d * (s / 16); pts.push(new THREE.Vector2(cen.x + Math.cos(t) * r, cen.y + Math.sin(t) * r)); } };
+        sweep(b, o, v); sweep(a, v, o);
+        return pts;
+      }
+      function paso() {
+        if (fase !== "compas") return;
+        if (anim) { pendiente = true; return; }
+        const p0 = V[pasos % 6], p1 = V[(pasos + 1) % 6];
+        anim = { p0, p1, t: 0, t0: performance.now() };
+      }
+      function terminarPaso() {
+        const { p0, p1 } = anim; anim = null; pasos++;
+        const l = linea([[p0.x, p0.y, 0.07], [p1.x, p1.y, 0.07]], matLin); l.renderOrder = 6; trazos.add(l);
+        if (pasos < 6) { marca(p1); estado("Punto " + (pasos + 1) + ". El compás conserva la abertura del radio: haz pinza en el último punto para marcar el siguiente.", "status-warn", "m3-p" + pasos); }
+        else {
+          fase = "color";
+          for (let i = 0; i < 6; i++) {
+            const m = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape(lente(i))), new THREE.MeshBasicMaterial({ color: 0x3f4654 }));
+            m.position.z = 0.03; m.userData.i = i; trazos.add(m); petalos.push(m);
+            const borde = linea(lente(i).map((p) => [p.x, p.y, 0.06]).concat([[lente(i)[0].x, lente(i)[0].y, 0.06]]), matLin); borde.renderOrder = 6; trazos.add(borde);
+          }
+          estado("¡El radio cabe exactamente 6 veces en la circunferencia: has trazado un hexágono regular y una flor de seis pétalos! Haz pinza en cada pétalo para ponerle vidrio de color.", "status-ok", "m3-color");
+        }
+        refrescar();
+      }
+      function colorear(i) {
+        if (fase !== "color" && fase !== "hecho") return;
+        colores[i] = (colores[i] + 1) % VIDRIO.length; petalos[i].material.color.setHex(VIDRIO[colores[i]]);
+        const alterna = colores.every((c, k) => c >= 0 && c === colores[(k + 2) % 6]) && colores[0] !== colores[1];
+        if (!hecho && colores.every((c) => c >= 0)) { hecho = true; fase = "hecho"; completar(2, "¡Rosetón terminado!" + (alterna ? " Has alternado dos colores: ahora la simetría es de orden 3." : " Prueba a alternar dos colores: la simetría pasará de orden 6 a orden 3.")); }
+        else if (hecho) estado(alterna ? "Dos colores alternos: simetría de orden 3 (giros de 120°)." : colores.every((c) => c === colores[0]) ? "Un solo color: simetría de orden 6 (giros de 60°)." : "Prueba a alternar dos colores para obtener simetría de orden 3.", "status-ok", "m3-sim-" + colores.join(""));
+        refrescar();
+      }
+      function refrescar() {
+        if (actual !== 2) return;
+        metricas(["Radio: " + fmt(r, 1) + " m", "Puntos marcados: " + Math.min(pasos + 1, 6) + " de 6", "Lado del hexágono = radio", "Pétalos con vidrio: " + colores.filter((c) => c >= 0).length + " de 6"]);
+      }
+      return {
+        nombre: "Trazar el rosetón", grupo: g, marco: { ancho: 3.6, alto: 3.2, cy: 1.55 },
+        nota: "Con el compás abierto como el radio se marcan 6 puntos sobre la circunferencia. El rosetón de la actividad es un modelo.",
+        entrar() {
+          etiqueta("centro", "", () => [C.x, C.y - 0.12]).el.classList.add("abajo");
+          if (fase === "compas") estado("Haz pinza sobre el punto azul: el compás, abierto como el radio, marcará el siguiente punto de la circunferencia.", "status-warn", "m3-ini");
+          refrescar();
+        },
+        alternativos() { filaBotones([["Marcar el siguiente punto", paso], ["Colorear el siguiente pétalo", () => { const i = colores.findIndex((c) => c < 0); colorear(i < 0 ? 0 : i); }]]); },
+        down(x, y) {
+          if (fase === "compas") { const p = enPlano(x, y), v = V[pasos % 6], w = V[(pasos + 1) % 6]; if (p && (Math.hypot(p.x - v.x, p.y - v.y) < 0.35 || (anim && Math.hypot(p.x - w.x, p.y - w.y) < 0.35))) paso(); return false; }
+          const h = rayo(x, y).intersectObjects(petalos, false)[0]; if (h) colorear(h.object.userData.i);
+          return false;
+        },
+        move() {}, up() {},
+        tick(dt) {
+          if (!anim) return;
+          anim.t = Math.min(1, (performance.now() - anim.t0) / (MOV_REDUCIDO ? 250 : 600));
+          if (anim.l) trazos.remove(anim.l);
+          // arco del compás centrado en el punto anterior, de radio r, que corta la circunferencia en el punto siguiente
+          const ai = Math.atan2(anim.p1.y - anim.p0.y, anim.p1.x - anim.p0.x), pts = [];
+          for (let s = 0; s <= 20; s++) { const t = ai - 0.35 + 0.7 * (s / 20) * anim.t; pts.push([anim.p0.x + Math.cos(t) * r, anim.p0.y + Math.sin(t) * r, 0.07]); }
+          anim.l = linea(pts, matLin); anim.l.renderOrder = 6; trazos.add(anim.l);
+          if (anim.t >= 1) { terminarPaso(); if (pendiente) { pendiente = false; paso(); } }
+        }
+      };
+    })();
+
+    // =====================================================================
+    // 6. ETAPA 4 · LA LACERÍA DE LA ALHAMBRA (nazarí, s. XIV) — giros de 45°, estrella de 8 puntas, teselado
+    // =====================================================================
+    const M4 = (() => {
+      const g = new THREE.Group();
+      const L = 0.95, CENT = [[-0.85, 2.4], [0.85, 2.4], [-0.85, 0.7], [0.85, 0.7]], INI = [18, 70, 5, 33];
+      const fondo = caja(3.6, 3.6, 0.1, new THREE.MeshStandardMaterial({ color: 0xf2ead8, roughness: 0.7 })); fondo.position.set(0, 1.55, -0.08); g.add(fondo);
+      const matFijo = new THREE.MeshStandardMaterial({ color: 0x166534, roughness: 0.4 }), matSuelto = new THREE.MeshStandardMaterial({ color: 0x1e3a8a, roughness: 0.4 }), matSel = new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.4 });
+      const geoCuad = new THREE.BoxGeometry(L, L, 0.06);
+      const piezas = CENT.map(([x, y], i) => {
+        const f = new THREE.Mesh(geoCuad, matFijo); f.position.set(x, y, 0); g.add(f);
+        const s = new THREE.Mesh(geoCuad, matSuelto); s.position.set(x, y, 0.04); s.rotation.z = THREE.MathUtils.degToRad(INI[i]); s.userData = { i, ang: INI[i] }; g.add(s);
+        return s;
+      });
+      const cruces = new THREE.Group(); cruces.visible = false; g.add(cruces);
+      const matCruz = new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.5 });
+      for (const [x, y] of [[0, 1.55], [0, 2.4 + 0.85], [0, 0.7 - 0.85], [-1.7, 1.55], [1.7, 1.55]]) { const a = caja(0.42, 0.13, 0.05, matCruz), b = caja(0.13, 0.42, 0.05, matCruz); a.position.set(x, y, 0.02); b.position.set(x, y, 0.02); cruces.add(a, b); }
+      let sel = 0, arrastre = null, hechas = 0, hecho = false, ctrlP = null, ctrlG = null;
+      const correcta = (a) => Math.abs(((a % 90) + 90) % 90 - 45) < 0.01;
+      function girar(i, a) {
+        a = ((a % 360) + 360) % 360;
+        const m = ((a % 90) + 90) % 90; if (Math.abs(m - 45) <= 5) a = a - m + 45;
+        piezas[i].userData.ang = Math.round(a * 10) / 10; piezas[i].rotation.z = THREE.MathUtils.degToRad(piezas[i].userData.ang);
+        hechas = piezas.filter((p) => correcta(p.userData.ang)).length;
+        if (hechas === 4 && !hecho) { hecho = true; cruces.visible = true; completar(3, "¡Las cuatro estrellas de ocho puntas están completas y entre ellas aparecen cruces: un teselado que podría repetirse sin fin!"); }
+        else if (!hecho) estado(correcta(piezas[i].userData.ang) ? "¡Estrella " + (i + 1) + " completa! El cuadrado azul está girado 45°. Estrellas: " + hechas + " de 4." : "Gira el cuadrado azul hasta formar una estrella de ocho puntas con el verde.", correcta(piezas[i].userData.ang) ? "status-ok" : "status-warn", "m4-" + i + "-" + correcta(piezas[i].userData.ang) + "-" + hechas);
+        refrescar();
+      }
+      function elegir(i) { sel = i; piezas.forEach((p, k) => (p.material = k === i ? matSel : matSuelto)); refrescar(); }
+      function refrescar() {
+        if (actual !== 3) return;
+        metricas(["Estrellas completas: " + hechas + " de 4", "Pieza elegida: " + (sel + 1) + " · giro " + fmt(piezas[sel].userData.ang, 0) + "°", "Estrella de 8 puntas: 360° : 8 = 45°", "Giro necesario: 45° (o 135°, 225°…)"]);
+        ctrlP && ctrlP.poner(sel + 1); ctrlG && ctrlG.poner(((piezas[sel].userData.ang % 90) + 90) % 90);
+      }
+      elegir(0);
+      return {
+        nombre: "La lacería de la Alhambra", grupo: g, marco: { ancho: 3.8, alto: 3.8, cy: 1.55 },
+        nota: "Patrón simplificado inspirado en los alicatados nazaríes: dos cuadrados iguales, uno girado 45°, forman una estrella de ocho puntas.",
+        entrar() {
+          if (!hecho) estado("Haz pinza sobre un cuadrado azul y gira la mano como si giraras una llave, hasta formar una estrella de ocho puntas.", "status-warn", "m4-ini");
+          refrescar();
+        },
+        alternativos() {
+          ctrlP = filaRango("Pieza", 1, 4, 1, sel + 1, (v) => elegir(v - 1), (v) => "pieza " + v);
+          ctrlG = filaRango("Giro (°)", 0, 89, 1, 0, (v) => girar(sel, v), (v) => v + " grados");
+        },
+        down(x, y) {
+          const p = enPlano(x, y); if (!p) return false;
+          let mejor = -1, dm = 1e9; CENT.forEach(([cx, cy], i) => { const d = Math.hypot(p.x - cx, p.y - cy); if (d < dm) { dm = d; mejor = i; } });
+          if (dm > 0.8) return false;
+          elegir(mejor);
+          const [cx, cy] = CENT[mejor];
+          arrastre = { a0: Math.atan2(p.y - cy, p.x - cx), g0: piezas[mejor].userData.ang };
+          return true;
+        },
+        move(x, y) {
+          if (!arrastre) return; const p = enPlano(x, y); if (!p) return;
+          const [cx, cy] = CENT[sel]; let d = Math.atan2(p.y - cy, p.x - cx) - arrastre.a0;
+          girar(sel, arrastre.g0 + THREE.MathUtils.radToDeg(d));
+        },
+        up() { arrastre = null; },
+        tick() {}
+      };
+    })();
+
+    // =====================================================================
+    // 7. ETAPA 5 · CANARIAS: el portulano (1339) — rumbos, rosa de los vientos y escala
+    // =====================================================================
+    const M5 = (() => {
+      const g = new THREE.Group();
+      const LON0 = -19.5, LON1 = 5.5, LAT0 = 25.5, LAT1 = 45.0, KX = Math.cos(34 * Math.PI / 180);
+      const W = 4.4, Hm = W * (LAT1 - LAT0) / ((LON1 - LON0) * KX);
+      const CWp = 768, CHp = Math.round(CWp * Hm / W);
+      const aMapa = (lon, lat) => [(lon - LON0) / (LON1 - LON0) * W - W / 2, (lat - LAT0) / (LAT1 - LAT0) * Hm];      // coordenadas del plano (y desde abajo)
+      const aPx = (lon, lat) => [(lon - LON0) / (LON1 - LON0) * CWp, (1 - (lat - LAT0) / (LAT1 - LAT0)) * CHp];
+      const Y0 = 0.15;
+      const cv = document.createElement("canvas"); cv.width = CWp; cv.height = CHp;
+      const PALMA = [2.65, 39.57], LANZA = [-13.6, 29.0];
+      const KM_U = (W / ((LON1 - LON0) * KX)) / 111.2;                                     // unidades de plano por km
+      (() => {
+        const c = cv.getContext("2d");
+        c.fillStyle = "#ead7a8"; c.fillRect(0, 0, CWp, CHp);
+        const poli = (pts, col, linea = "#6b4f22") => { c.beginPath(); pts.forEach(([lo, la], i) => { const [x, y] = aPx(lo, la); if (i) c.lineTo(x, y); else c.moveTo(x, y); }); c.closePath(); c.fillStyle = col; c.fill(); c.strokeStyle = linea; c.lineWidth = 2; c.stroke(); };
+        // Esquema muy simplificado de costas (orientativo)
+        poli([[-9.3, 43.1], [-8.0, 43.7], [-5.8, 43.6], [-3.8, 43.5], [-1.8, 43.4], [1.5, 42.6], [3.2, 42.3], [3.2, 41.9], [0.9, 41.0], [-0.3, 39.5], [0.2, 38.8], [-0.9, 37.6], [-2.0, 36.8], [-4.4, 36.7], [-5.6, 36.0], [-6.3, 36.6], [-7.4, 37.2], [-8.9, 37.0], [-8.9, 38.0], [-9.5, 38.7], [-8.7, 40.6], [-8.8, 41.9]], "#d2b47a");
+        poli([[1.5, 42.6], [3.2, 42.3], [4.5, 43.4], [5.5, 43.2], [5.5, 45], [-1.3, 45], [-1.8, 43.4]], "#d2b47a");
+        poli([[-5.9, 35.8], [-5.3, 35.9], [-2.9, 35.3], [-1.0, 35.7], [3.0, 36.8], [5.5, 36.9], [5.5, 25.5], [-14.8, 25.5], [-14.5, 26.1], [-13.0, 27.6], [-11.0, 28.5], [-9.6, 30.4], [-9.8, 31.5], [-8.5, 33.3], [-6.8, 34.0]], "#d2b47a");
+        poli([[2.35, 39.55], [2.75, 39.95], [3.2, 39.9], [3.45, 39.7], [3.3, 39.35], [2.75, 39.35]], "#c9a364");
+        poli([[1.2, 38.9], [1.6, 39.1], [1.55, 38.85]], "#c9a364");
+        for (const [lo, la, rx, ry] of [[-13.6, 29.05, 0.28, 0.3], [-14.05, 28.4, 0.32, 0.4], [-15.6, 27.95, 0.3, 0.3], [-16.6, 28.3, 0.38, 0.28], [-17.2, 28.1, 0.13, 0.13], [-17.85, 28.65, 0.18, 0.28], [-18.0, 27.75, 0.15, 0.12]]) {
+          const [x, y] = aPx(lo, la), sx = rx / (LON1 - LON0) * CWp, sy = ry / (LAT1 - LAT0) * CHp;
+          c.beginPath(); c.ellipse(x, y, Math.max(sx, 3), Math.max(sy, 3), 0, 0, Math.PI * 2); c.fillStyle = "#c9a364"; c.fill(); c.stroke();
+        }
+        // Rosa de 16 vientos centrada en Mallorca, con sus rumbos prolongados (como en los portulanos)
+        const [mx, my] = aPx(PALMA[0], PALMA[1]);
+        for (let k = 0; k < 16; k++) {
+          const a = (k * 22.5) * Math.PI / 180, L2 = 900;
+          c.strokeStyle = k % 4 === 0 ? "rgba(120,30,20,.55)" : k % 2 === 0 ? "rgba(30,90,40,.45)" : "rgba(60,60,60,.3)"; c.lineWidth = k % 4 === 0 ? 1.6 : 1;
+          c.beginPath(); c.moveTo(mx, my); c.lineTo(mx + Math.sin(a) * L2, my - Math.cos(a) * L2); c.stroke();
+        }
+        // Barra de escala: 500 km
+        const px500 = 500 * KM_U / W * CWp, bx = CWp - px500 - 40, by = CHp - 28;
+        c.fillStyle = "#3a2a0c"; c.font = "bold 16px system-ui";
+        for (let i = 0; i < 2; i++) { c.fillStyle = i % 2 ? "#ead7a8" : "#3a2a0c"; c.fillRect(bx + i * px500 / 2, by, px500 / 2, 8); }
+        c.strokeStyle = "#3a2a0c"; c.strokeRect(bx, by, px500, 8); c.fillStyle = "#3a2a0c"; c.fillText("0", bx - 4, by - 6); c.fillText("500 km", bx + px500 - 24, by - 6);
+      })();
+      const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+      const mapa = new THREE.Mesh(new THREE.PlaneGeometry(W, Hm), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95 }));
+      mapa.position.set(0, Y0 + Hm / 2, 0); g.add(mapa);
+      const P3 = (ll) => { const [x, y] = aMapa(ll[0], ll[1]); return new THREE.Vector3(x, y + Y0, 0.05); };
+      const pMallorca = P3(PALMA), pLanza = P3(LANZA);
+      const rumboReal = (() => { const d = pLanza.clone().sub(pMallorca); return (THREE.MathUtils.radToDeg(Math.atan2(d.x, d.y)) + 360) % 360; })();
+      const distKm = pLanza.distanceTo(pMallorca) / KM_U;
+      const matRegla = new THREE.MeshBasicMaterial({ color: 0x7c2d12, depthTest: false });
+      const regla = new THREE.Mesh(new THREE.PlaneGeometry(1, 0.035), matRegla); regla.renderOrder = 7; g.add(regla);
+      const pin = (p, col) => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 8), new THREE.MeshBasicMaterial({ color: col, depthTest: false })); m.position.copy(p); m.renderOrder = 8; g.add(m); };
+      pin(pMallorca, 0x7c2d12); pin(pLanza, 0x1d4ed8);
+      const OPC = [["500 km", 500], ["2000 km", 2000], ["8000 km", 8000]];
+      const tablillas = OPC.map((o, i) => { const t = caja(0.95, 0.42, 0.06, new THREE.MeshStandardMaterial({ color: 0x8a5a2b, roughness: 0.8 })); t.position.set(-1.55, Y0 + Hm - 0.45 - i * 0.62, 0.08); t.visible = false; t.userData.v = o[1]; g.add(t); return t; });
+      let rumbo = 120, fase = "rumbo", arrastre = false, hecho = false, ctrl = null;
+      const VIENTOS = ["norte", "nornordeste", "nordeste", "estenordeste", "este", "estesudeste", "sudeste", "sudsudeste", "sur", "sudsudoeste", "sudoeste", "oestesudoeste", "oeste", "oestenoroeste", "noroeste", "nornoroeste"];
+      const viento = (a) => VIENTOS[Math.round(a / 22.5) % 16];
+      function ponerRegla() {
+        const t = THREE.MathUtils.degToRad(rumbo), L2 = 3.2;
+        regla.scale.x = L2; regla.rotation.z = Math.PI / 2 - t;
+        regla.position.set(pMallorca.x + Math.sin(t) * L2 / 2, pMallorca.y + Math.cos(t) * L2 / 2, 0.06);
+      }
+      function poner(v) {
+        rumbo = ((Math.round(v) % 360) + 360) % 360;
+        if (Math.abs(rumbo - rumboReal) <= 3) rumbo = Math.round(rumboReal);
+        ponerRegla(); ctrl && ctrl.poner(rumbo);
+        if (actual !== 4) return;
+        refrescar();
+        if (fase !== "rumbo") return;
+        if (rumbo === Math.round(rumboReal)) {
+          fase = "distancia"; tablillas.forEach((t) => (t.visible = true));
+          estado("¡Rumbo encontrado: " + rumbo + "°, hacia el " + viento(rumbo) + "! Usa la barra de escala: ¿cuántos kilómetros hay, más o menos, de Mallorca a Lanzarote? Haz pinza sobre una tablilla.", "status-ok", "m5-dist");
+        } else estado("La regla marca " + rumbo + "° (" + viento(rumbo) + "). Gírala hasta que pase por Lanzarote.", "status-warn", "m5-" + rumbo);
+      }
+      function responder(v) {
+        if (hecho || fase !== "distancia") return;
+        if (v === 2000) { hecho = true; fase = "hecho"; completar(4, "¡Bien calculado! Son unos " + Math.round(distKm / 100) * 100 + " km: casi cuatro veces la barra de 500 km."); abrirPanel("panel-final"); }
+        else estado("No es " + v + " km. Cuenta cuántas veces cabe la barra de 500 km entre Mallorca y Lanzarote.", "status-error", "m5-mal-" + v);
+      }
+      function refrescar() {
+        if (actual !== 4) return;
+        metricas(["Rumbo de la regla: " + rumbo + "°", "Viento: " + viento(rumbo), "Rosa de 16 vientos: 360° : 16 = 22,5°", "Escala: barra de 500 km"]);
+      }
+      poner(rumbo);
+      return {
+        nombre: "El portulano y Canarias", grupo: g, marco: { ancho: 4.7, alto: Hm + 0.3, cy: Y0 + Hm / 2 },
+        nota: "Esquema simplificado inspirado en las cartas portulanas; las costas son orientativas. Los rumbos se miden en el plano del mapa.",
+        entrar() {
+          etiqueta("Mallorca", "", () => [pMallorca.x + 0.05, pMallorca.y + 0.22, 0.1]);
+          etiqueta("Lanzarote", "agua", () => [pLanza.x + 0.2, pLanza.y + 0.24, 0.1]);
+          etiqueta("Islas Canarias", "", () => [pLanza.x - 0.45, pLanza.y - 0.32, 0.1]).el.classList.add("abajo");
+          OPC.forEach((o, i) => etiqueta(o[0], "geo", () => (fase !== "rumbo" ? [-1.55, Y0 + Hm - 0.45 - i * 0.62 + 0.12, 0.15] : null)));
+          if (fase === "rumbo") estado("Haz pinza sobre el mapa y mueve la mano: la regla gira desde Mallorca. Haz que pase por Lanzarote.", "status-warn", "m5-ini");
+          poner(rumbo);
+        },
+        alternativos() {
+          ctrl = filaRango("Rumbo (°)", 0, 359, 1, rumbo, poner, (v) => v + " grados, hacia el " + viento(v));
+          filaBotones(OPC.map((o) => ["Unos " + o[0], () => responder(o[1])]));
+        },
+        down(x, y) {
+          if (fase === "distancia") { const h = rayo(x, y).intersectObjects(tablillas, false)[0]; if (h) responder(h.object.userData.v); return false; }
+          if (fase !== "rumbo") return false;
+          const p = enPlano(x, y); if (!p || !rayo(x, y).intersectObject(mapa, false)[0]) return false;
+          arrastre = true; poner(THREE.MathUtils.radToDeg(Math.atan2(p.x - pMallorca.x, p.y - pMallorca.y))); return true;
+        },
+        move(x, y) { if (!arrastre) return; const p = enPlano(x, y); if (p) poner(THREE.MathUtils.radToDeg(Math.atan2(p.x - pMallorca.x, p.y - pMallorca.y))); },
+        up() { arrastre = false; },
+        tick() {}
+      };
+    })();
+
+    // =====================================================================
+    // 8. GESTOR DE ETAPAS (proceso evolutivo)
+    // =====================================================================
+    const ETAPAS = [M1, M2, M3, M4, M5];
+    ETAPAS.forEach((e) => { e.grupo.visible = false; scene.add(e.grupo); });
+    const CLAVE = "lasManos.edadMedia.progreso";
+    let hechas = [false, false, false, false, false];
+    try { const s = JSON.parse(localStorage.getItem(CLAVE) || "null"); if (Array.isArray(s) && s.length === 5) hechas = s.map(Boolean); } catch (e) {}
+    const botonesEtapa = [...document.querySelectorAll("#etapas button")];
+
+    function disponible(i) { return DOCENTE || i === 0 || hechas[i - 1] || hechas[i]; }
+    function pintarProgreso() {
+      botonesEtapa.forEach((b, i) => {
+        b.disabled = !disponible(i);
+        b.classList.toggle("hecha", hechas[i]);
+        if (i === actual) b.setAttribute("aria-current", "step"); else b.removeAttribute("aria-current");
+        b.setAttribute("aria-label", "Etapa " + (i + 1) + ": " + ETAPAS[i].nombre + (hechas[i] ? ", completada" : "") + (b.disabled ? ", bloqueada" : ""));
+      });
+      $("btn-siguiente").disabled = !(actual < 4 && hechas[actual]);
+      $("btn-siguiente").textContent = actual < 4 ? "Siguiente etapa →" : "Capítulo terminado";
+      $("btn-anterior").disabled = actual <= 0;
+    }
+    function completar(i, mensaje) {
+      estado(mensaje, "status-ok", "completa-" + i);
+      if (!hechas[i]) { hechas[i] = true; try { localStorage.setItem(CLAVE, JSON.stringify(hechas)); } catch (e) {} }
+      pintarProgreso();
+    }
+    function irA(i, apilar = true) {
+      if (!disponible(i) || i === actual) return;
+      if (etapa) { etapa.grupo.visible = false; etapa.up && etapa.up(); }
+      captura = false; agarre = null;
+      actual = i; etapa = ETAPAS[i]; etapa.grupo.visible = true;
+      $("titulo-etapa").textContent = "Etapa " + (i + 1) + " · " + etapa.nombre;
+      notaDiv.textContent = etapa.nota;
+      limpiarEtiquetas();
+      alternativos.replaceChildren();
+      etapa.alternativos();
+      categoriaPrevia = "";
+      marco = etapa.marco;
+      etapa.entrar();
+      pintarProgreso();
+      encuadrar();
+      if (apilar) history.pushState({ p: "etapa", i }, "");
+    }
+    botonesEtapa.forEach((b, i) => b.addEventListener("click", () => irA(i)));
+    $("btn-siguiente").addEventListener("click", () => irA(actual + 1));
+    $("btn-anterior").addEventListener("click", () => irA(actual - 1));
+
+    // =====================================================================
+    // 9. PUNTERO COMÚN: pinza o dedo/ratón
+    // =====================================================================
+    let captura = false;
+    function pDown(x, y) { captura = !!(etapa && etapa.down(x, y)); return captura; }
+    function pMove(x, y) { if (!etapa) return; if (captura) etapa.move(x, y); else if (etapa.hover) etapa.hover(x, y); }
+    function pUp(x, y) { if (captura && etapa) etapa.up(x, y); captura = false; }
+
+    let punteroId = null;
+    lienzo3d.addEventListener("pointerdown", (e) => { if (pDown(e.clientX, e.clientY)) { punteroId = e.pointerId; lienzo3d.setPointerCapture(e.pointerId); } });
+    lienzo3d.addEventListener("pointermove", (e) => { if (punteroId === null || e.pointerId === punteroId) pMove(e.clientX, e.clientY); });
+    const soltar = (e) => { if (e.pointerId === punteroId) { pUp(e.clientX, e.clientY); punteroId = null; } };
+    lienzo3d.addEventListener("pointerup", soltar);
+    lienzo3d.addEventListener("pointercancel", soltar);
+
+    // =====================================================================
+    // 10. MANOS (MediaPipe, cámara frontal, RA «espejo»)
+    // =====================================================================
+    const PERMITIR_MODELO_REMOTO = false;   // con false, si falta modelo/hand_landmarker.task no se recurre a Google
+    const URL_TASKS = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
+    const URL_MODELO = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
+    const CONEX = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+    const PINZA_CIERRA = 0.33, PINZA_ABRE = 0.5;
+    let detector = null, modo = null, lastVideoTime = -1, lastTimestampMs = 0, agarre = null;
+    let delegado = "", erroresDeteccion = 0, ultimaClave = "", visionFS = null, rutaModeloUsada = "", recreando = false;
+    const camaraDiv = $("camara");
+    function indicadorCamara(texto, clase) {
+      camaraDiv.hidden = !texto;
+      if (camaraDiv.textContent !== texto) camaraDiv.textContent = texto;
+      camaraDiv.className = clase || "";
+    }
+    const pinza = {}, suav = {};
+
+    function videoAPantalla(nx, ny) {
+      const W = escena.clientWidth, H = escena.clientHeight, vw = video.videoWidth || 640, vh = video.videoHeight || 480;
+      const s = Math.max(W / vw, H / vh), dw = vw * s, dh = vh * s;
+      return { x: (W - dw) / 2 + (1 - nx) * dw, y: (H - dh) / 2 + ny * dh };
+    }
+    async function abrirCamara() {
+      if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        const e = new Error("la cámara solo funciona si la página se abre desde https o desde el propio equipo (localhost)"); e.name = "ContextoInseguro"; throw e;
+      }
+      video.srcObject = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
+      await video.play();
+    }
+    function cerrarCamara() {
+      if (modo === "manos") indicadorCamara("Cámara: en pausa", "aviso");
+      if (video.srcObject) { video.srcObject.getTracks().forEach((t) => t.stop()); video.srcObject = null; }
+      if (agarre) { pUp(0, 0); agarre = null; }
+      ctxM.clearRect(0, 0, escena.clientWidth, escena.clientHeight);
+    }
+    async function existeLocal(ruta) { try { return (await fetch(ruta, { method: "HEAD", cache: "no-store" })).ok; } catch (e) { return false; } }
+    async function iniciarManos() {
+      estado("Preparando la cámara y el detector de manos…", "status-warn", "cargando");
+      await abrirCamara();
+      const { FilesetResolver, HandLandmarker } = await import("@mediapipe/tasks-vision");
+      const wasmLocal = await existeLocal("./wasm/vision_wasm_internal.js");
+      if (!wasmLocal && !PERMITIR_MODELO_REMOTO) { const e = new Error("falta la carpeta wasm/ junto a la actividad"); e.name = "SinModelo"; throw e; }
+      const rutaWasm = wasmLocal ? "./wasm" : URL_TASKS + "/wasm";
+      const modeloLocal = await existeLocal("./modelo/hand_landmarker.task");
+      if (!modeloLocal && !PERMITIR_MODELO_REMOTO) { const e = new Error("falta el archivo modelo/hand_landmarker.task en la carpeta de la actividad"); e.name = "SinModelo"; throw e; }
+      indicadorCamara("Cámara: preparando el detector de manos…", "aviso");
+      visionFS = { FilesetResolver, HandLandmarker, vision: await FilesetResolver.forVisionTasks(rutaWasm) };
+      rutaModeloUsada = modeloLocal ? "./modelo/hand_landmarker.task" : URL_MODELO;
+      await crearDetector("GPU");
+      categoriaPrevia = ""; etapa.entrar();
+      estado("Cámara lista. Muestra una mano y junta el pulgar y el índice (pinza) sobre lo que quieras mover.", "status-ok", "camara-lista");
+    }
+    async function crearDetector(preferido) {
+      const { HandLandmarker, vision } = visionFS;
+      const opciones = (delegate) => ({ baseOptions: { modelAssetPath: rutaModeloUsada, delegate }, runningMode: "VIDEO", numHands: 2 });
+      if (detector) { try { detector.close(); } catch (e) {} detector = null; }
+      if (preferido === "GPU") {
+        try { detector = await HandLandmarker.createFromOptions(vision, opciones("GPU")); delegado = "GPU"; }
+        catch (e) { detector = await HandLandmarker.createFromOptions(vision, opciones("CPU")); delegado = "CPU"; }
+      } else { detector = await HandLandmarker.createFromOptions(vision, opciones("CPU")); delegado = "CPU"; }
+      erroresDeteccion = 0; lastTimestampMs = 0; lastVideoTime = -1; ultimaClave = "";
+      indicadorCamara("Cámara activa · buscando manos (" + delegado + ")", "ok");
+    }
+    // Si la detección falla repetidamente (frecuente con la GPU en algunas tabletas), se pasa a CPU
+    async function fallosDeteccion() {
+      if (recreando) return;
+      recreando = true;
+      try {
+        if (delegado === "GPU") { indicadorCamara("Cámara: la GPU falla; cambiando a CPU…", "aviso"); await crearDetector("CPU"); }
+        else throw new Error("CPU");
+      } catch (e) {
+        detector = null;
+        indicadorCamara("Cámara: el detector de manos no funciona en este dispositivo", "error");
+        empezarTactil("El detector de manos no funciona en este dispositivo. Puedes seguir con el dedo o con los controles.");
+      } finally { recreando = false; }
+    }
+    function dibujarMano(pts, cerrada, activa) {
+      ctxM.lineCap = "round"; ctxM.lineWidth = 7;
+      ctxM.strokeStyle = activa ? "rgba(74,222,128,.95)" : "rgba(194,132,58,.95)";
+      ctxM.beginPath();
+      for (const [a, b] of CONEX) { ctxM.moveTo(pts[a].x, pts[a].y); ctxM.lineTo(pts[b].x, pts[b].y); }
+      ctxM.stroke();
+      ctxM.fillStyle = "#faf7f2";
+      for (const p of pts) { ctxM.beginPath(); ctxM.arc(p.x, p.y, 3.5, 0, Math.PI * 2); ctxM.fill(); }
+      const m = { x: (pts[4].x + pts[8].x) / 2, y: (pts[4].y + pts[8].y) / 2 };
+      ctxM.beginPath(); ctxM.arc(m.x, m.y, 14, 0, Math.PI * 2); ctxM.lineWidth = 3; ctxM.strokeStyle = "#38bdf8"; ctxM.stroke();
+      if (cerrada) { ctxM.fillStyle = "rgba(56,189,248,.6)"; ctxM.fill(); }
+    }
+    function procesarManos() {
+      if (!detector || video.readyState < 2 || video.currentTime === lastVideoTime) return;
+      lastVideoTime = video.currentTime;
+      const nowMs = Math.max(lastTimestampMs + 1, Math.floor(performance.now())); lastTimestampMs = nowMs;
+      let res;
+      try { res = detector.detectForVideo(video, nowMs); erroresDeteccion = 0; }
+      catch (e) { if (++erroresDeteccion > 15) fallosDeteccion(); return; }
+      ctxM.clearRect(0, 0, escena.clientWidth, escena.clientHeight);
+      const lista = res.landmarks || [], lados = res.handednesses || res.handedness || [], vistas = new Set();
+      let primeraLibre = null;
+      lista.forEach((mano, i) => {
+        const lado = (lados[i] && lados[i][0] && lados[i][0].categoryName) || ("m" + i);
+        vistas.add(lado);
+        const vw = video.videoWidth || 640, vh = video.videoHeight || 480;
+        const d = (a, b) => Math.hypot((mano[a].x - mano[b].x) * vw, (mano[a].y - mano[b].y) * vh);
+        const antes = !!pinza[lado], ratio = d(4, 8) / (d(0, 9) || 1);
+        pinza[lado] = antes ? ratio < PINZA_ABRE : ratio < PINZA_CIERRA;
+        const pts = mano.map((p) => videoAPantalla(p.x, p.y));
+        const medio = { x: (pts[4].x + pts[8].x) / 2, y: (pts[4].y + pts[8].y) / 2 };
+        const s = suav[lado] || medio; suav[lado] = { x: s.x + (medio.x - s.x) * 0.5, y: s.y + (medio.y - s.y) * 0.5 };
+        const pm = suav[lado];
+        if (!agarre && pinza[lado] && !antes && pDown(pm.x, pm.y)) agarre = { lado, perdidas: 0 };
+        if (agarre && agarre.lado === lado) {
+          agarre.perdidas = 0;
+          if (pinza[lado]) pMove(pm.x, pm.y); else { pUp(pm.x, pm.y); agarre = null; }
+        } else if (!agarre && !primeraLibre) primeraLibre = pm;
+        dibujarMano(pts, pinza[lado], agarre && agarre.lado === lado);
+      });
+      if (!agarre && primeraLibre) pMove(primeraLibre.x, primeraLibre.y);
+      if (agarre && !vistas.has(agarre.lado) && ++agarre.perdidas > 8) { pUp(0, 0); agarre = null; }
+      for (const k of Object.keys(pinza)) if (!vistas.has(k)) { delete pinza[k]; delete suav[k]; }
+      const n = lista.length, clave = n + "|" + (agarre ? 1 : 0);
+      if (clave !== ultimaClave) {
+        ultimaClave = clave;
+        indicadorCamara("Cámara activa · " + (n === 0 ? "no veo ninguna mano" : n === 1 ? "1 mano" : n + " manos") + (agarre ? " · agarrando" : "") + " (" + delegado + ")", n === 0 ? "aviso" : "ok");
+      }
+    }
+
+    // =====================================================================
+    // 11. BUCLE Y CONTROLES GENERALES
+    // =====================================================================
+    const reloj = new THREE.Clock();
+    renderer.setAnimationLoop(() => {
+      const dt = Math.min(reloj.getDelta(), 0.1);
+      if (modo === "manos") procesarManos();
+      if (etapa) etapa.tick(dt);
+      actualizarEtiquetas();
+      renderer.render(scene, camera);
+    });
+
+    const INFO = [
+      `<h3>El astrolabio</h3><p>Es un instrumento para medir la altura del sol o de las estrellas sobre el horizonte. En su parte de atrás tiene una regla que gira, la <strong>alidada</strong>, con dos agujeros: cuando la luz del sol pasa por los dos, se lee la altura en grados.</p>
+       <h3>Al-Andalus</h3><p>En el siglo XI, Toledo era un gran centro de ciencia. Allí Ibrahim ibn Said al-Sahli construyó astrolabios de latón; uno de ellos, fechado en 1068, se conserva en el Museo de Historia de la Ciencia de Oxford.</p>
+       <h3>Ángulos complementarios</h3><p>Dos ángulos son complementarios si suman 90°. En un equinoccio, a mediodía, la altura del sol y la latitud del lugar son complementarias: 50° + 40° = 90°. Así se podía saber, más o menos, a qué latitud se estaba.</p>
+       <p class="fuente">History of Science Museum (Universidad de Oxford), Astrolabe Catalogue, inv. 55331: Ibrahim ibn Said al-Sahli, Toledo, 1068 · Museo Galileo, biografía de al-Sahli. El astrolabio de la actividad es un modelo simplificado.</p>`,
+      `<h3>Románico: el arco de medio punto</h3><p>Es media circunferencia: el compás se clava en el punto medio entre los dos apoyos y se abre la mitad de la luz. Lo usaron las iglesias románicas, como muchas del Camino de Santiago, Patrimonio Mundial desde 1993.</p>
+       <h3>Gótico: el arco apuntado</h3><p>Se traza con dos arcos de compás. En el arco «equilátero», el compás se clava en cada apoyo con una abertura igual a toda la luz; los dos arcos se cortan en la clave y forman un triángulo equilátero. Con la misma luz, el arco apuntado es más alto: 1,73 m frente a 1 m.</p>
+       <h3>Patrimonio</h3><p>La catedral de Burgos, comenzada en 1221, es una de las grandes obras góticas de la península y Patrimonio Mundial desde 1984.</p>
+       <p class="fuente">UNESCO, «Burgos Cathedral» (1984) y Caminos de Santiago (1993) · Turespaña, «Historia de la catedral de Burgos». Los arcos de la actividad son modelos (luz de 2 m).</p>`,
+      `<h3>El compás y el hexágono</h3><p>Con el compás abierto como el radio, la circunferencia se puede marcar en seis puntos iguales: el radio cabe exactamente seis veces. Al unir los puntos sale un hexágono regular, cuyo lado mide lo mismo que el radio.</p>
+       <h3>Rosetones</h3><p>Los rosetones de las catedrales góticas son grandes ventanas circulares con vidrieras de colores. Sus dibujos se repiten al girar: tienen simetría de rotación.</p>
+       <h3>Simetría y color</h3><p>Si los seis pétalos son iguales, el dibujo se repite cada 60° (orden 6). Si alternas dos colores, solo se repite cada 120° (orden 3).</p>
+       <p class="fuente">Construcción geométrica clásica del hexágono regular inscrito en una circunferencia. El rosetón de la actividad es un modelo.</p>`,
+      `<h3>Los alicatados nazaríes</h3><p>En la Alhambra de Granada se cortaban piezas de cerámica vidriada de colores y se encajaban formando dibujos geométricos. Esta técnica, el alicatado, alcanzó su esplendor en el siglo XIV.</p>
+       <h3>Estrellas de ocho puntas</h3><p>Entre sus motivos hay estrellas de ocho puntas. Una manera sencilla de obtener una es superponer dos cuadrados iguales, uno girado 45°. Como 360° : 8 = 45°, la estrella vuelve a coincidir consigo misma cada vez que gira 45°.</p>
+       <h3>Teselados</h3><p>Un teselado cubre una superficie con piezas que encajan sin huecos ni solapamientos y que se puede repetir sin fin.</p>
+       <h3>Una pregunta de historiadores</h3><p>Una investigación con documentos de archivo muestra que buena parte de los alicatados que hoy vemos en el Baño de Comares se hizo en el siglo XVI, después de la conquista cristiana, siguiendo las técnicas nazaríes. ¿Cómo distinguir lo original de lo rehecho?</p>
+       <p class="fuente">UNESCO, «Alhambra, Generalife and Albayzín, Granada» (1984) · Díez Jorge, M. E. (2007), «Los alicatados del Baño de Comares de la Alhambra, ¿islámicos o cristianos?», <em>Archivo Español de Arte</em>, 80(317), 25-43. El patrón de la actividad es una simplificación.</p>`,
+      `<h3>Las cartas portulanas</h3><p>En la Edad Media, los marinos del Mediterráneo usaban cartas con la costa dibujada y una red de líneas, los <strong>rumbos</strong>, que salen de rosas de los vientos. Para ir de un puerto a otro buscaban el rumbo que los unía.</p>
+       <h3>Canarias en los mapas</h3><p>El mapa de Angelino Dulcert, de 1339, es uno de los primeros que dibujan islas de Canarias. Una de ellas lleva el nombre del navegante genovés Lanzarotto Malocello, del que procede, según la explicación más aceptada, el nombre de Lanzarote. Un estudio de 2023 propone que otro mapa del mismo autor, conservado en la British Library, podría ser anterior.</p>
+       <h3>¿Un descubrimiento?</h3><p>Para los europeos fue un «redescubrimiento», pero las islas llevaban siglos habitadas por la población indígena. En 1402 comenzó en Lanzarote la conquista castellana, con Jean de Béthencourt y Gadifer de La Salle; no terminó hasta 1496, en Tenerife.</p>
+       <h3>Rumbos y escala</h3><p>Una rosa de 16 vientos divide la vuelta completa en 16 partes iguales: 360° : 16 = 22,5°. La barra de escala permite pasar de la distancia en el mapa a la distancia real.</p>
+       <p class="fuente">Quartapelle, A. (2017), <em>Revista de Historia Canaria</em>, 199, 11-37 · Quartapelle, A. (2023), <em>Revista de Historia Canaria</em>, 205, 323-336, doi:10.25145/j.histcan.2023.205.13. El mapa de la actividad es un esquema simplificado, no una reproducción.</p>`
+    ];
+    let focoPrevio = null;
+    function abrirPanel(id) { focoPrevio = document.activeElement; const p = $(id); p.hidden = false; p.querySelector("button").focus(); }
+    function cerrarPanel(p) { p.hidden = true; if (focoPrevio && document.contains(focoPrevio)) focoPrevio.focus(); }
+    $("btn-saber").addEventListener("click", () => {
+      $("t-info").textContent = "Etapa " + (actual + 1) + " · " + etapa.nombre;
+      $("cuerpo-info").innerHTML = INFO[actual];   // contenido estático propio, sin datos externos
+      abrirPanel("panel-info");
+    });
+    function mostrarAlternativo(v) { alternativos.hidden = !v; $("btn-alternativo").setAttribute("aria-pressed", String(v)); }
+    $("btn-alternativo").addEventListener("click", () => mostrarAlternativo(alternativos.hidden));
+    $("btn-imagen").addEventListener("click", (e) => {
+      const v = !video.classList.contains("visible");
+      video.classList.toggle("visible", v);
+      M.suelo.opacity = v ? 0.55 : 0.9;
+      e.currentTarget.setAttribute("aria-pressed", String(v));
+      e.currentTarget.textContent = v ? "Ocultar mi imagen" : "Mostrar mi imagen";
+    });
+    // ---------- Portada, capítulo y botón «atrás» ----------
+    const inicioDlg = $("inicio");
+    const irPortada = (hash = "") => { salirDeActividad(); location.href = "index.html" + location.search + hash; };
+    function salirDeActividad() {
+      document.querySelectorAll(".panel:not([hidden])").forEach((p) => (p.hidden = true));
+      if (modo === "manos") cerrarCamara();
+      modo = null;
+      if (video.classList.contains("visible")) $("btn-imagen").click();
+      $("btn-imagen").hidden = true;
+      indicadorCamara("");
+    }
+    function mostrarInicio(apilar = true) {
+      salirDeActividad();
+      inicioDlg.hidden = false;
+      if (apilar) history.pushState({ p: "inicio" }, "");
+      $("btn-manos").focus({ preventScroll: true });
+    }
+    function entrarEnEtapa() {
+      if (actual < 0) irA(primeraEtapa()); else history.pushState({ p: "etapa", i: actual }, "");
+    }
+    $("btn-volver-portada").addEventListener("click", () => irPortada());
+    $("btn-linea").addEventListener("click", () => irPortada());
+    $("btn-fin-linea").addEventListener("click", () => irPortada());
+    window.addEventListener("popstate", (e) => {
+      const st = e.state || { p: "inicio" };
+      if (st.p === "inicio") mostrarInicio(false);
+      else if (st.p === "etapa") {
+        document.querySelectorAll(".panel:not([hidden])").forEach((p) => (p.hidden = true));
+        inicioDlg.hidden = true;
+        if (!modo) { modo = "tactil"; mostrarAlternativo(true); }
+        irA(st.i, false);
+      }
+    });
+    history.replaceState({ p: "inicio" }, "");
+
+    function primeraEtapa() { let i = hechas.findIndex((h) => !h); return i < 0 ? 4 : i; }
+    function empezarTactil(mensaje) {
+      const venia = !$("inicio").hidden;
+      modo = "tactil"; $("inicio").hidden = true;
+      mostrarAlternativo(true);
+      if (venia || actual < 0) entrarEnEtapa();
+      if (mensaje) estado(mensaje, "status-warn", "msg-" + mensaje.length);
+      const f = alternativos.querySelector("input,button"); if (f) f.focus();
+    }
+    $("btn-tactil").addEventListener("click", () => empezarTactil());
+    $("btn-manos").addEventListener("click", async () => {
+      $("inicio").hidden = true; modo = "manos"; $("btn-imagen").hidden = false;
+      if ($("chk-imagen").checked && !video.classList.contains("visible")) $("btn-imagen").click();
+      entrarEnEtapa();
+      try { await iniciarManos(); }
+      catch (err) {
+        cerrarCamara(); detector = null; modo = null; $("btn-imagen").hidden = true;
+        indicadorCamara("Cámara: no disponible (" + (err.name || "error") + ")", "error");
+        if (video.classList.contains("visible")) $("btn-imagen").click();
+        const motivos = { NotAllowedError: "no se ha dado permiso para usar la cámara", NotFoundError: "no se ha encontrado ninguna cámara", NotReadableError: "otra aplicación está usando la cámara", ContextoInseguro: err.message, SinModelo: err.message + " (consulta modelo/LEEME.txt y el LEEME del paquete)" };
+        empezarTactil("No se puede construir con las manos: " + (motivos[err.name] || "no se ha podido preparar el detector de manos") + ". Puedes hacerlo con el dedo o con los controles.");
+      }
+    });
+    document.addEventListener("visibilitychange", async () => {
+      if (modo !== "manos") return;
+      if (document.hidden) cerrarCamara();
+      else { try { await abrirCamara(); indicadorCamara("Cámara activa (" + delegado + ")", "ok"); ultimaClave = ""; } catch (e) { modo = "tactil"; empezarTactil("La cámara se ha desactivado. Puedes seguir con el dedo o con los controles."); } }
+    });
+    window.addEventListener("pagehide", cerrarCamara);
+    // ---------- Diagnóstico de cámara y manos ----------
+    const listaDiag = $("lista-diag");
+    function filaDiag(clase, texto, consejo) {
+      const li = document.createElement("li"); li.className = "r-" + clase; li.textContent = texto;
+      if (consejo) { const sm = document.createElement("small"); sm.textContent = consejo; li.appendChild(sm); }
+      listaDiag.appendChild(li); return li;
+    }
+    async function tamanoLocal(ruta) {
+      try { const r = await fetch(ruta, { method: "HEAD", cache: "no-store" }); return r.ok ? parseInt(r.headers.get("content-length") || "0", 10) || -1 : 0; }
+      catch (e) { return 0; }
+    }
+    async function diagnosticoBasico() {
+      listaDiag.replaceChildren();
+      const proto = location.protocol, local = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
+      if (proto === "file:") filaDiag("error", "La página se ha abierto con doble clic (file://).", "Ábrela desde GitHub Pages o con un servidor: python3 -m http.server 8000 y http://localhost:8000.");
+      else if (!window.isSecureContext) filaDiag("error", "La dirección no es segura (" + proto + "//" + location.host + ").", "La cámara solo funciona con https o en localhost. En GitHub Pages la dirección empieza por https://.");
+      else filaDiag("ok", "Dirección segura (" + (local ? "localhost" : "https") + ").");
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) filaDiag("ok", "El navegador permite usar la cámara.");
+      else if (!window.isSecureContext) filaDiag("error", "El navegador bloquea la cámara por la dirección no segura.", "Se resuelve al abrir la página con https.");
+      else filaDiag("error", "Este navegador no ofrece acceso a la cámara.", "Prueba con Chrome, Edge o Safari actualizados.");
+      try {
+        const st = await navigator.permissions.query({ name: "camera" });
+        if (st.state === "denied") filaDiag("error", "El permiso de cámara está bloqueado para esta página.", "Pulsa el candado o el icono de la barra de direcciones y permite la cámara; después recarga la página.");
+        else filaDiag(st.state === "granted" ? "ok" : "aviso", st.state === "granted" ? "Permiso de cámara concedido." : "El navegador pedirá permiso para usar la cámara.", st.state === "granted" ? "" : "Cuando aparezca el aviso, pulsa «Permitir».");
+      } catch (e) { filaDiag("aviso", "No se puede consultar el permiso de cámara en este navegador.", "Se pedirá al empezar; pulsa «Permitir»."); }
+      const wasm = await tamanoLocal("./wasm/vision_wasm_internal.wasm");
+      filaDiag(wasm ? "ok" : "error", wasm ? "Motor de detección (WASM) presente." : "Falta la carpeta wasm/ junto a la página.", wasm ? "" : "Sube también la carpeta wasm/ completa.");
+      const mod = await tamanoLocal("./modelo/hand_landmarker.task");
+      if (mod > 1000000 || mod === -1) filaDiag("ok", "Modelo de manos presente" + (mod > 0 ? " (" + (mod / 1048576).toFixed(1).replace(".", ",") + " MB)." : "."));
+      else if (mod > 0) filaDiag("error", "El archivo del modelo es demasiado pequeño (" + mod + " bytes): probablemente está dañado o es un enlace.", "Vuelve a descargarlo y súbelo de nuevo a modelo/.");
+      else if (PERMITIR_MODELO_REMOTO) filaDiag("aviso", "No hay modelo local: se descargará de Google al empezar.");
+      else filaDiag("error", "Falta el modelo de manos (modelo/hand_landmarker.task).", "Es la causa más frecuente. Descárgalo con el enlace de modelo/LEEME.txt, guárdalo con ese nombre exacto en la carpeta modelo/ y súbelo.");
+      filaDiag(renderer.getContext() ? "ok" : "error", renderer.getContext() ? "Gráficos 3D (WebGL) disponibles." : "WebGL no disponible.");
+    }
+    async function pruebaReal() {
+      const btn = $("btn-prueba"); btn.disabled = true;
+      const fila = filaDiag("aviso", "Prueba real: abriendo la cámara…");
+      const yaActiva = modo === "manos" && detector && video.srcObject;
+      try {
+        if (!yaActiva) {
+          await abrirCamara();
+          const { FilesetResolver, HandLandmarker } = await import("@mediapipe/tasks-vision");
+          const modeloLocal = await existeLocal("./modelo/hand_landmarker.task");
+          if (!modeloLocal && !PERMITIR_MODELO_REMOTO) { const e = new Error("falta el modelo"); e.name = "SinModelo"; throw e; }
+          fila.firstChild.textContent = "Prueba real: preparando el detector…";
+          const wasmLocal = await existeLocal("./wasm/vision_wasm_internal.js");
+          if (!wasmLocal && !PERMITIR_MODELO_REMOTO) { const e = new Error("falta wasm/"); e.name = "SinModelo"; throw e; }
+          visionFS = { FilesetResolver, HandLandmarker, vision: await FilesetResolver.forVisionTasks(wasmLocal ? "./wasm" : URL_TASKS + "/wasm") };
+          rutaModeloUsada = modeloLocal ? "./modelo/hand_landmarker.task" : URL_MODELO;
+          await crearDetector("GPU");
+        }
+        fila.firstChild.textContent = "Prueba real: muestra una mano a la cámara…";
+        let fotogramas = 0, maxManos = 0, fallos = 0, ultimo = -1, ts = 0;
+        const fin = performance.now() + 4000;
+        await new Promise((ok) => {
+          const paso = () => {
+            if (performance.now() > fin) return ok();
+            if (video.readyState >= 2 && video.currentTime !== ultimo) {
+              ultimo = video.currentTime; ts = Math.max(ts + 1, Math.floor(performance.now()));
+              try { const r = detector.detectForVideo(video, ts); fotogramas++; maxManos = Math.max(maxManos, (r.landmarks || []).length); } catch (e) { fallos++; }
+            }
+            requestAnimationFrame(paso);
+          };
+          paso();
+        });
+        lastTimestampMs = ts;
+        const fps = (fotogramas / 4).toFixed(1).replace(".", ",");
+        if (fotogramas === 0) { fila.className = "r-error"; fila.firstChild.textContent = "Prueba real: el detector no ha procesado ninguna imagen (" + fallos + " fallos, " + delegado + ")."; }
+        else if (maxManos === 0) { fila.className = "r-aviso"; fila.firstChild.textContent = "Prueba real: la cámara y el detector funcionan (" + fps + " imágenes/s, " + delegado + "), pero no he visto ninguna mano."; fila.appendChild(Object.assign(document.createElement("small"), { textContent: "Acerca la mano a 30-60 cm de la cámara, con buena luz y la palma hacia la pantalla, y repite la prueba." })); }
+        else { fila.className = "r-ok"; fila.firstChild.textContent = "Prueba real: manos detectadas (" + maxManos + "), " + fps + " imágenes/s con " + delegado + "."; if (fotogramas / 4 < 8) fila.appendChild(Object.assign(document.createElement("small"), { textContent: "Va lento: el movimiento puede notarse a saltos en este dispositivo." })); }
+      } catch (err) {
+        fila.className = "r-error";
+        const m = { NotAllowedError: "permiso de cámara denegado", NotFoundError: "no hay cámara", NotReadableError: "otra aplicación usa la cámara", ContextoInseguro: "la dirección no es https", SinModelo: "falta el modelo de manos en modelo/ o el motor en wasm/" };
+        fila.firstChild.textContent = "Prueba real: no se ha podido completar (" + (m[err.name] || err.message || err.name) + ").";
+      } finally {
+        if (!yaActiva) { if (detector) { try { detector.close(); } catch (e) {} } detector = null; if (video.srcObject) { video.srcObject.getTracks().forEach((t) => t.stop()); video.srcObject = null; } }
+        btn.disabled = false;
+      }
+    }
+    $("btn-diag").addEventListener("click", async () => { abrirPanel("panel-diag"); await diagnosticoBasico(); });
+    $("btn-prueba").addEventListener("click", pruebaReal);
+    if (new URLSearchParams(location.search).has("diagnostico")) { abrirPanel("panel-diag"); diagnosticoBasico(); }
+
+    document.querySelectorAll("[data-cerrar]").forEach((b) => b.addEventListener("click", () => cerrarPanel(b.closest(".panel"))));
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") document.querySelectorAll(".panel:not([hidden])").forEach(cerrarPanel); });
+
+    pintarProgreso();
+    encuadrar();
+    $("btn-manos").focus({ preventScroll: true });
+  </script>
+</body>
+</html>

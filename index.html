@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Misión Roma · Las manos que construyeron la historia</title>
   <!--
-    Misión Roma v3.2.1 (edición para GitHub Pages) · Proyecto «Las manos que construyeron la historia»
+    Misión Roma v3.3 (edición para GitHub Pages) · Proyecto «Las manos que construyeron la historia»
     Geometría, patrimonio histórico y realidad aumentada en Educación Primaria (5.º-6.º)
 
     Proceso evolutivo en cinco etapas, todas manipulables con las manos (pinza) o con alternativas DUA:
@@ -25,6 +25,7 @@
     botón «atrás» del navegador o de la tableta (History API).
     v3.2: la portada enlaza también el capítulo de la Prehistoria (prehistoria.html); index.html#roma abre
     directamente la presentación de Misión Roma.
+    v3.3: capítulo de la Edad Media (edad-media.html); el panel final de Misión Roma enlaza con él.
   -->
   <script type="importmap">
   {
@@ -175,7 +176,8 @@
           <button type="button" class="principal" id="btn-entrar-prehistoria">Entrar en Las primeras manos</button></li>
         <li class="era activa"><span class="era-nombre">Edad Antigua</span><span class="era-fecha">Desde la escritura hasta el 476 d. C.</span><span class="era-estado">Capítulo disponible: Misión Roma · El acueducto</span>
           <button type="button" class="principal" id="btn-entrar-roma">Entrar en Misión Roma</button></li>
-        <li class="era"><span class="era-nombre">Edad Media</span><span class="era-fecha">Del 476 al 1492</span><span class="era-estado">Capítulo en preparación</span></li>
+        <li class="era activa"><span class="era-nombre">Edad Media</span><span class="era-fecha">Del 476 al 1492</span><span class="era-estado">Capítulo disponible: El compás y la piedra</span>
+          <button type="button" class="principal" id="btn-entrar-media">Entrar en El compás y la piedra</button></li>
         <li class="era"><span class="era-nombre">Edad Moderna</span><span class="era-fecha">Del 1492 al 1789</span><span class="era-estado">Capítulo en preparación</span></li>
         <li class="era"><span class="era-nombre">Edad Contemporánea</span><span class="era-fecha">Desde el 1789 hasta hoy</span><span class="era-estado">Capítulo en preparación</span></li>
       </ol>
@@ -233,7 +235,7 @@
         <li><strong>Canarias:</strong> repartiste el agua de una cantonera en partes proporcionales.</li>
       </ol>
       <p>La misma idea une las cinco etapas: el agua solo se mueve sola cuesta abajo, y quien la conduce tiene que medir con mucho cuidado.</p>
-      <div class="botones"><button type="button" class="principal" data-cerrar>Volver a la obra</button></div>
+      <div class="botones"><button type="button" class="principal" id="btn-ir-media">Continuar en la Edad Media: El compás y la piedra →</button><button type="button" data-cerrar>Volver a la obra</button></div>
     </div>
   </section>
 
@@ -1136,6 +1138,8 @@
     }
     $("btn-entrar-roma").addEventListener("click", () => mostrarInicio());
     $("btn-entrar-prehistoria").addEventListener("click", () => { location.href = "prehistoria.html" + location.search; });
+    $("btn-entrar-media").addEventListener("click", () => { location.href = "edad-media.html" + location.search; });
+    $("btn-ir-media").addEventListener("click", () => { salirDeActividad(); location.href = "edad-media.html" + location.search; });
     $("btn-volver-portada").addEventListener("click", () => { if (history.state && history.state.p === "inicio") history.back(); else mostrarPortada(); });
     $("btn-linea").addEventListener("click", () => mostrarPortada());
     window.addEventListener("popstate", (e) => {

@@ -1,17 +1,18 @@
-# Las manos que construyeron la historia · v3.2.1 (edición para GitHub Pages)
+# Las manos que construyeron la historia · v3.3 (edición para GitHub Pages)
 
 Proyecto «Las manos que construyeron la historia». Geometría, patrimonio histórico y realidad aumentada en Educación Primaria (5.º y 6.º).
 
 ## Marco del proyecto
 
-La página se abre con la portada del proyecto «Las manos que construyeron la historia», que incluye una línea del tiempo. El recorrido va **desde la Prehistoria en adelante**: Prehistoria, Edad Antigua, Edad Media, Edad Moderna y Edad Contemporánea. Hay dos capítulos disponibles:
+La página se abre con la portada del proyecto «Las manos que construyeron la historia», que incluye una línea del tiempo. El recorrido va **desde la Prehistoria en adelante**: Prehistoria, Edad Antigua, Edad Media, Edad Moderna y Edad Contemporánea. Hay tres capítulos disponibles:
 
 | Edad | Capítulo | Archivo |
 |---|---|---|
 | Prehistoria | **Las primeras manos** | `prehistoria.html` |
 | Edad Antigua | **Misión Roma · El acueducto** | `index.html` (abre la portada; `index.html#roma` abre el capítulo directamente) |
+| Edad Media | **El compás y la piedra** | `edad-media.html` |
 
-La Edad Media, la Edad Moderna y la Edad Contemporánea figuran como «en preparación». Al terminar la Prehistoria, un botón lleva directamente a Misión Roma.
+La Edad Moderna y la Edad Contemporánea figuran como «en preparación». Al terminar cada capítulo, un botón lleva al siguiente: de la Prehistoria a Misión Roma y de Misión Roma a la Edad Media.
 
 **Navegación:**
 - «← Línea del tiempo» vuelve a la portada y apaga la cámara.
@@ -45,6 +46,29 @@ La Edad Media, la Edad Moderna y la Edad Contemporánea figuran como «en prepar
 - En la etapa 4, el horizonte es plano.
 - La pintadera es circular, para mostrar la simetría de rotación; las reales son mayoritariamente rectangulares.
 - La fecha de llegada de la primera población a Canarias («hace unos dos mil años») se presenta como discutida.
+
+## Capítulo «El compás y la piedra» (Edad Media)
+
+| Etapa | Área | Qué hace el alumnado con las manos | Contenidos |
+|---|---|---|---|
+| 1. Medir con el astrolabio | Historia de la ciencia, geometría | Gira la alidada hasta que la luz del sol pasa por sus dos agujeros y calcula lo que falta para 90°. | Medida de ángulos, ángulos complementarios, latitud. |
+| 2. Del medio punto al arco apuntado | Arte, geometría | Clava el compás en el punto medio (románico) y después en cada apoyo (gótico). | Radio, diámetro y luz; triángulo equilátero; comparación de alturas. |
+| 3. Trazar el rosetón | Geometría | Marca seis puntos con el compás abierto como el radio y colorea los pétalos. | Hexágono regular, simetría de rotación (órdenes 6 y 3). |
+| 4. La lacería de la Alhambra | Patrimonio, geometría | Gira cuadrados hasta formar estrellas de ocho puntas. | Giros de 45°, 360° : 8, teselados. |
+| 5. El portulano y Canarias | Geografía, medida | Gira una regla desde Mallorca hasta Lanzarote y estima la distancia con la escala. | Rumbos, rosa de 16 vientos (22,5°), escala. |
+
+**Fuentes del capítulo:**
+- History of Science Museum (Universidad de Oxford), Astrolabe Catalogue, inv. 55331 (al-Sahli, Toledo, 1068)
+- UNESCO: «Burgos Cathedral» (1984), Caminos de Santiago (1993), «Alhambra, Generalife and Albayzín, Granada» (1984)
+- Díez Jorge, M. E. (2007), *Archivo Español de Arte*, 80(317), 25-43
+- Quartapelle, A. (2017), *Revista de Historia Canaria*, 199, 11-37
+- Quartapelle, A. (2023), *Revista de Historia Canaria*, 205, 323-336, https://doi.org/10.25145/j.histcan.2023.205.13
+
+**Simplificaciones declaradas:**
+- Altura del sol a mediodía en un equinoccio, en Toledo (≈ 50°).
+- El arco apuntado es el «equilátero».
+- La lacería es un patrón de dos cuadrados.
+- El portulano es un esquema de costas orientativo, no una reproducción; los rumbos se miden en el plano del mapa.
 
 ## Capítulo «Misión Roma» (Edad Antigua): el proceso evolutivo
 
