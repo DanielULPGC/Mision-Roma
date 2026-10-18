@@ -241,34 +241,173 @@
     }
 
     // =====================================================================
-    // 1. THREE.JS BÁSICO
+    // 1. THREE.JS: MOTOR GRÁFICO (calidad alta con degradación automática)
     // =====================================================================
-    const renderer = new THREE.WebGLRenderer({ canvas: lienzo3d, alpha: true, antialias: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    const CALIDAD_LIGERA = new URLSearchParams(location.search).get("calidad") === "ligera";
+    const renderer = new THREE.WebGLRenderer({ canvas: lienzo3d, alpha: true, antialias: true, powerPreference: "high-performance" });
+    let ratioMax = CALIDAD_LIGERA ? 1.25 : 2;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, ratioMax));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
+    renderer.shadowMap.enabled = !CALIDAD_LIGERA;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    const ANISO = Math.min(8, renderer.capabilities.getMaxAnisotropy());
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
-    scene.add(new THREE.AmbientLight(0xffffff, 0.9));
-    const luz = new THREE.DirectionalLight(0xffffff, 1.2);
-    luz.position.set(2, 5, 4);
-    scene.add(luz);
+    // Iluminación: cielo y suelo, sol con sombras suaves y una luz de relleno
+    const hemi = new THREE.HemisphereLight(0xe8f0f6, 0x7a6448, 0.55);
+    const luz = new THREE.DirectionalLight(0xfff0dc, 2.4);
+    luz.position.set(3, 6, 5);
+    luz.castShadow = true;
+    luz.shadow.mapSize.set(CALIDAD_LIGERA ? 1024 : 2048, CALIDAD_LIGERA ? 1024 : 2048);
+    luz.shadow.bias = -0.0004; luz.shadow.normalBias = 0.025; luz.shadow.radius = 4;
+    const relleno = new THREE.DirectionalLight(0xd6e4ff, 0.6);
+    relleno.position.set(-5, 3, 3);
+    scene.add(hemi, luz, luz.target, relleno);
+    // Entorno para reflejos (metales y vidriados): cielo degradado generado en el propio navegador, sin archivos externos
+    (() => {
+      const pm = new THREE.PMREMGenerator(renderer), es = new THREE.Scene();
+      const geo = new THREE.SphereGeometry(10, 48, 24), col = [], c = new THREE.Color();
+      const pos = geo.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        const t = pos.getY(i) / 10;
+        c.set(t > 0 ? 0xdbe8f2 : 0x8a7457).lerp(new THREE.Color(t > 0 ? 0x9cc3e0 : 0x4a3b2a), Math.abs(t));
+        col.push(c.r, c.g, c.b);
+      }
+      geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+      es.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide })));
+      const panel = new THREE.Mesh(new THREE.PlaneGeometry(6, 3), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+      panel.position.set(4, 6, 4); panel.lookAt(0, 0, 0); es.add(panel);
+      scene.environment = pm.fromScene(es, 0.04).texture;
+      pm.dispose();
+    })();
+
+    // ---------- Texturas procedurales (sin imágenes externas; deterministas y repetibles sin costuras) ----------
+    const TX = (() => {
+      const cache = {};
+      function prng(s) { return () => ((s = (s * 16807) % 2147483647) / 2147483647); }
+      function capa(periodo, sem) {
+        const azar = prng(sem), g = new Float32Array(periodo * periodo);
+        for (let i = 0; i < g.length; i++) g[i] = azar();
+        return (x, y) => {
+          const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+          const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+          const P = periodo, a = g[((yi % P + P) % P) * P + ((xi % P + P) % P)], b = g[((yi % P + P) % P) * P + (((xi + 1) % P + P) % P)];
+          const cc = g[(((yi + 1) % P + P) % P) * P + ((xi % P + P) % P)], d = g[(((yi + 1) % P + P) % P) * P + (((xi + 1) % P + P) % P)];
+          return a + (b - a) * u + (cc - a) * v + (a - b - cc + d) * u * v;
+        };
+      }
+      function fbm(sem, base, oct) {
+        const capas = Array.from({ length: oct }, (_, o) => ({ f: capa(base << o, sem + o * 101), p: base << o, w: 0.5 ** o }));
+        const tot = capas.reduce((s, k) => s + k.w, 0);
+        return (u, v) => { let s = 0; for (const k of capas) s += k.f(u * k.p, v * k.p) * k.w; return s / tot; };
+      }
+      // Genera color y relieve a la vez: fn(u, v) → [r, g, b, altura 0..1]
+      function lienzo(nombre, T, fn) {
+        const cc = document.createElement("canvas"); cc.width = cc.height = T;
+        const cb = document.createElement("canvas"); cb.width = cb.height = T;
+        const ic = cc.getContext("2d").createImageData(T, T), ib = cb.getContext("2d").createImageData(T, T);
+        for (let y = 0; y < T; y++) for (let x = 0; x < T; x++) {
+          const [r, g, b, h] = fn(x / T, y / T), i = (y * T + x) * 4;
+          ic.data[i] = r; ic.data[i + 1] = g; ic.data[i + 2] = b; ic.data[i + 3] = 255;
+          const hh = Math.max(0, Math.min(255, h * 255)); ib.data[i] = ib.data[i + 1] = ib.data[i + 2] = hh; ib.data[i + 3] = 255;
+        }
+        cc.getContext("2d").putImageData(ic, 0, 0); cb.getContext("2d").putImageData(ib, 0, 0);
+        const map = new THREE.CanvasTexture(cc), bump = new THREE.CanvasTexture(cb);
+        map.colorSpace = THREE.SRGBColorSpace;
+        for (const t of [map, bump]) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = ANISO; }
+        return { map, bump, canvas: cc };
+      }
+      const mezcla = (a, b, t) => a + (b - a) * t;
+      const recetas = {
+        // Granito (acueducto de Segovia) y piedra de sillería en general
+        granito: () => { const n = fbm(11, 8, 5), m = fbm(29, 32, 3), az = prng(5); return (u, v) => { const k = n(u, v), s = m(u, v), p = az(); const g = 150 + (k - 0.5) * 70 + (s - 0.5) * 40 + (p > 0.985 ? -70 : p < 0.02 ? 45 : 0); return [g + 6, g + 2, g - 6, 0.35 + k * 0.4 + (s - 0.5) * 0.3]; }; },
+        caliza: () => { const n = fbm(41, 4, 6), m = fbm(7, 24, 3); return (u, v) => { const k = n(u, v), s = m(u, v); return [205 + (k - 0.5) * 40, 196 + (k - 0.5) * 38, 172 + (k - 0.5) * 30 - s * 10, 0.4 + k * 0.45 + s * 0.15]; }; },
+        tierra: () => { const n = fbm(3, 6, 6), m = fbm(17, 40, 2), az = prng(9); return (u, v) => { const k = n(u, v), s = m(u, v), p = az(); const g = (k - 0.5) * 60; let c = [128 + g, 102 + g * 0.9, 72 + g * 0.7]; if (p > 0.993) c = [175, 165, 150]; return [c[0] - s * 18, c[1] - s * 16, c[2] - s * 12, k * 0.7 + s * 0.3 + (p > 0.993 ? 0.3 : 0)]; }; },
+        madera: () => { const n = fbm(23, 4, 4), f = fbm(61, 16, 2); return (u, v) => { const w = Math.sin((v * 22 + n(u, v) * 7) * Math.PI * 2) * 0.5 + 0.5, k = f(u, v); return [mezcla(120, 160, w) - k * 25, mezcla(78, 104, w) - k * 18, mezcla(42, 58, w) - k * 12, w * 0.6 + k * 0.4]; }; },
+        barro: () => { const n = fbm(13, 6, 5), az = prng(21); return (u, v) => { const k = n(u, v), p = az(); return [168 + (k - 0.5) * 50, 110 + (k - 0.5) * 36, 72 + (k - 0.5) * 26, 0.5 + (k - 0.5) * 0.6 - (p > 0.99 ? 0.35 : 0)]; }; },
+        silex: () => { const n = fbm(31, 3, 6), m = fbm(77, 10, 3); return (u, v) => { const k = n(u, v), s = m(u, v), b = Math.abs(Math.sin((k * 9 + s * 2) * Math.PI)); return [118 + b * 38 + (s - 0.5) * 30, 112 + b * 34 + (s - 0.5) * 26, 100 + b * 28 + (s - 0.5) * 20, b * 0.6 + s * 0.4]; }; },
+        laton: () => { const n = fbm(5, 64, 2), m = fbm(91, 4, 4); return (u, v) => { const k = n(u * 0.05, v), s = m(u, v); return [196 + (k - 0.5) * 40 - s * 30, 152 + (k - 0.5) * 30 - s * 26, 70 + (k - 0.5) * 18 - s * 14, k * 0.5 + s * 0.2]; }; },
+        estuco: () => { const n = fbm(19, 8, 5); return (u, v) => { const k = n(u, v); return [238 + (k - 0.5) * 18, 230 + (k - 0.5) * 18, 214 + (k - 0.5) * 16, 0.5 + (k - 0.5) * 0.5]; }; },
+        vidriado: () => { const n = fbm(47, 6, 4); return (u, v) => { const k = n(u, v); return [225 + (k - 0.5) * 50, 225 + (k - 0.5) * 50, 225 + (k - 0.5) * 50, 0.5 + (k - 0.5) * 0.2]; }; },
+        pergamino: () => { const n = fbm(37, 4, 6), m = fbm(53, 20, 3); return (u, v) => { const k = n(u, v), s = m(u, v), e = Math.hypot(u - 0.5, v - 0.5); return [236 - k * 34 - e * 40, 216 - k * 34 - e * 46, 172 - k * 34 - e * 52 - s * 10, 0.5 + (k - 0.5) * 0.3]; }; }
+      };
+      function textura(nombre, T = 512) {
+        if (!cache[nombre]) cache[nombre] = lienzo(nombre, T, recetas[nombre]());
+        return cache[nombre];
+      }
+      // Material PBR texturizado: color multiplica la textura (permite tintar una misma piedra)
+      function mat(nombre, o = {}) {
+        const t = textura(nombre), rep = o.rep || 1;
+        const map = t.map.clone(), bump = t.bump.clone();
+        for (const x of [map, bump]) { x.repeat.set(rep, rep); x.needsUpdate = true; }
+        const Cls = o.fisico ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial;
+        const m = new Cls({ map, bumpMap: bump, bumpScale: o.relieve ?? 2, color: o.color ?? 0xffffff, roughness: o.rugosidad ?? 0.85, metalness: o.metal ?? 0, ...(o.extra || {}) });
+        return m;
+      }
+      // Fondo procedural para lienzos 2D (paredes, mapas, sellos): dibuja la textura sobre un contexto existente
+      function pintarFondo(ctx, nombre, W, H, alfa = 1) {
+        const t = textura(nombre); ctx.save(); ctx.globalAlpha = alfa;
+        for (let y = 0; y < H; y += t.canvas.height) for (let x = 0; x < W; x += t.canvas.width) ctx.drawImage(t.canvas, x, y);
+        ctx.restore();
+      }
+      return { mat, textura, pintarFondo };
+    })();
+    // Ajuste común de las texturas dibujadas en lienzos (mayor nitidez en ángulos rasantes)
+    function nitida(t) { t.anisotropy = ANISO; t.colorSpace = THREE.SRGBColorSpace; return t; }
 
     const M = {
-      piedra: new THREE.MeshStandardMaterial({ color: 0xd6d3d1, roughness: 0.7 }),
-      seleccion: new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.4 }),
-      correcto: new THREE.MeshStandardMaterial({ color: 0x4ade80, roughness: 0.4 }),
-      canal: new THREE.MeshStandardMaterial({ color: 0x0284c7 }),
-      suelo: new THREE.MeshStandardMaterial({ color: 0x8b7355, roughness: 1, transparent: true, opacity: 0.9 }),
-      tierra: new THREE.MeshStandardMaterial({ color: 0x9c7b55, roughness: 1 }),
-      madera: new THREE.MeshStandardMaterial({ color: 0x8a5a2b, roughness: 0.8 }),
-      aguaM: new THREE.MeshStandardMaterial({ color: 0x7dd3fc, roughness: 0.2, transparent: true, opacity: 0.85 }),
+      piedra: TX.mat("granito", { color: 0xe4ddd2, rugosidad: 0.82, relieve: 2.5 }),
+      seleccion: TX.mat("granito", { color: 0xf6cf3c, rugosidad: 0.6, relieve: 2 }),
+      correcto: TX.mat("granito", { color: 0x7fe0a0, rugosidad: 0.6, relieve: 2 }),
+      canal: new THREE.MeshPhysicalMaterial({ color: 0x1f7fbf, roughness: 0.18, metalness: 0, clearcoat: 0.6 }),
+      suelo: TX.mat("tierra", { color: 0xffffff, rugosidad: 1, relieve: 3, rep: 2, extra: { transparent: true, opacity: 0.94 } }),
+      tierra: TX.mat("tierra", { color: 0xf2e2c8, rugosidad: 1, relieve: 3, rep: 2 }),
+      madera: TX.mat("madera", { color: 0xffffff, rugosidad: 0.7, relieve: 1.5 }),
+      aguaM: new THREE.MeshPhysicalMaterial({ color: 0x7dd3fc, roughness: 0.05, transparent: true, opacity: 0.8, clearcoat: 1 }),
       fantasma: new THREE.LineBasicMaterial({ color: 0x1c1917, transparent: true, opacity: 0.5 }),
       cota: new THREE.LineBasicMaterial({ color: 0xc2843a }),
       lineaAgua: new THREE.LineBasicMaterial({ color: 0x0284c7 }),
       oscuro: new THREE.LineBasicMaterial({ color: 0x1c1917 })
     };
-    const caja = (w, h, d, mat) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-    const linea = (puntos, mat) => new THREE.Line(new THREE.BufferGeometry().setFromPoints(puntos.map((p) => new THREE.Vector3(p[0], p[1], p[2] || 0))), mat);
+    // Cajas con aristas biseladas (la luz dibuja los cantos, como en la piedra labrada)
+    function geoCaja(w, h, d) {
+      const b = Math.min(0.03, 0.12 * Math.min(w, h, d)), x = w / 2 - b, y = h / 2 - b, rc = Math.min(b, x * 0.9, y * 0.9);
+      const s = new THREE.Shape();
+      s.moveTo(-x + rc, -y); s.lineTo(x - rc, -y); s.absarc(x - rc, -y + rc, rc, -Math.PI / 2, 0); s.lineTo(x, y - rc); s.absarc(x - rc, y - rc, rc, 0, Math.PI / 2);
+      s.lineTo(-x + rc, y); s.absarc(-x + rc, y - rc, rc, Math.PI / 2, Math.PI); s.lineTo(-x, -y + rc); s.absarc(-x + rc, -y + rc, rc, Math.PI, Math.PI * 1.5);
+      const g = new THREE.ExtrudeGeometry(s, { depth: Math.max(0.0005, d - 2 * b), bevelEnabled: true, bevelThickness: b, bevelSize: b, bevelSegments: 2, curveSegments: 3 });
+      g.translate(0, 0, -(d - 2 * b) / 2);
+      return g;
+    }
+    const caja = (w, h, d, mat) => new THREE.Mesh(geoCaja(w, h, d), mat);
+    // Trazos: tubos con grosor real en lugar de líneas de 1 píxel
+    const matTrazo = new WeakMap();
+    function aMalla(mat) {
+      if (!mat.isLineBasicMaterial) return mat;
+      if (!matTrazo.has(mat)) matTrazo.set(mat, new THREE.MeshBasicMaterial({ color: mat.color, transparent: mat.transparent, opacity: mat.opacity, depthTest: mat.depthTest, depthWrite: !mat.transparent, toneMapped: false }));
+      return matTrazo.get(mat);
+    }
+    function linea(puntos, mat, grosor = 0.014) {
+      const v = puntos.map((p) => new THREE.Vector3(p[0], p[1], p[2] || 0));
+      const camino = new THREE.CurvePath();
+      for (let i = 1; i < v.length; i++) if (v[i].distanceToSquared(v[i - 1]) > 1e-10) camino.add(new THREE.LineCurve3(v[i - 1], v[i]));
+      if (!camino.curves.length) return new THREE.Line(new THREE.BufferGeometry().setFromPoints(v), mat);
+      return new THREE.Mesh(new THREE.TubeGeometry(camino, Math.max(2, camino.curves.length * 3), grosor, 6, false), aMalla(mat));
+    }
+    function lineaFina(puntos, mat) { return new THREE.Line(new THREE.BufferGeometry().setFromPoints(puntos.map((p) => new THREE.Vector3(p[0], p[1], p[2] || 0))), mat); }
+    function liberar(obj) { obj.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); }
     function suelo(ancho, x = 0) { const s = caja(ancho, 0.1, 2, M.suelo); s.position.set(x, -0.05, 0); return s; }
+    // Sombras: todo lo sólido proyecta y recibe; los trazos, etiquetas y vidrios no
+    function prepararSombras(raiz) {
+      raiz.traverse((o) => {
+        if (!o.isMesh || o.userData.sinSombra !== undefined) return;
+        const m = Array.isArray(o.material) ? o.material[0] : o.material;
+        const solido = m && (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) && !(m.transparent && m.opacity < 0.6) && m.depthTest !== false;
+        o.castShadow = o.receiveShadow = !!solido; o.userData.sinSombra = !solido;
+      });
+    }
 
     // Arco de medio punto: intradós de radio r (la luz es el diámetro)
     function geometriaArco(r, grosor = 0.2, fondo = 0.8) {
@@ -314,6 +453,10 @@
       camera.lookAt(0, marco.cy, 0);
       camera.setViewOffset(W, H, W / 2 - (z.x0 + libreW / 2), H / 2 - (z.y0 + libreH / 2), W, H);
       camera.updateProjectionMatrix();
+      // Sombras: el volumen de la luz se ajusta al marco de la etapa para aprovechar toda la resolución
+      const ext = Math.max(marco.ancho, marco.alto) * 0.75 + 0.5, sc = luz.shadow.camera;
+      luz.target.position.set(0, marco.cy, 0); luz.position.set(ext * 0.8, marco.cy + ext * 1.5, ext * 1.3);
+      sc.left = -ext; sc.right = ext; sc.top = ext; sc.bottom = -ext; sc.near = 0.1; sc.far = ext * 6; sc.updateProjectionMatrix();
       const dpr = Math.min(window.devicePixelRatio, 2);
       lienzoManos.width = W * dpr; lienzoManos.height = H * dpr;
       ctxM.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -395,13 +538,13 @@
       // Nódulo inicial: más grande e irregular (más piedra a la derecha)
       const inicial = objetivo.map((v, k) => { const t = ang(k); return v + 0.2 + 0.08 * Math.sin(3 * t + 0.6) + 0.06 * Math.cos(5 * t + 1.3) + 0.32 * Math.max(0, Math.cos(t - 0.4)) ** 1.5; });
       let r = inicial.slice(), golpes = 0, hecho = false, malla = null, ctrlAng = null;
-      const matSilex = new THREE.MeshStandardMaterial({ color: 0x9c9686, roughness: 0.5, metalness: 0.05, flatShading: true });
+      const matSilex = TX.mat("silex", { color: 0xe6dfd2, rugosidad: 0.42, relieve: 3, rep: 1.4, extra: { flatShading: true } });
       const ejeMat = M.cota.clone(); ejeMat.depthTest = false;
       const eje = linea([[CX, CY - 1.45, 0.3], [CX, CY + 1.25, 0.3]], ejeMat); eje.renderOrder = 5;
       const fantMat = M.fantasma.clone(); fantMat.depthTest = false;
       const guia = linea(Array.from({ length: N + 1 }, (_, k) => [CX + objetivo[k % N] * Math.cos(ang(k % N)), CY + objetivo[k % N] * Math.sin(ang(k % N)), 0.3]), fantMat);
       guia.renderOrder = 5;
-      const percutor = new THREE.Mesh(new THREE.SphereGeometry(0.17, 16, 12), new THREE.MeshStandardMaterial({ color: 0x6b6355, roughness: 0.9 }));
+      const percutor = new THREE.Mesh(new THREE.SphereGeometry(0.17, 16, 12), TX.mat("granito", { color: 0x8f8574, rugosidad: 0.9 }));
       percutor.visible = false;
       const marca = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), new THREE.MeshBasicMaterial({ color: 0x38bdf8, depthTest: false }));
       marca.renderOrder = 6; marca.visible = false;
@@ -500,7 +643,7 @@
     // =====================================================================
     const P2 = (() => {
       const g = new THREE.Group();
-      const W = 4.4, H = 3.2, CY = 1.6, CW = 512, CH = Math.round(512 * H / W);
+      const W = 4.4, H = 3.2, CY = 1.6, CW = 1024, CH = Math.round(1024 * H / W), KP = CW / 512;
       const PXCM = (CW / W) / 20;                   // 1 unidad = 20 cm de pared
       const lienzo = () => { const c = document.createElement("canvas"); c.width = CW; c.height = CH; return c; };
       const base = lienzo(), pint = lienzo(), masc = lienzo(), piel = lienzo(), comp = lienzo();
@@ -509,10 +652,16 @@
       (() => {
         const c = base.getContext("2d"); let sem = 7;
         const azar = () => ((sem = (sem * 16807) % 2147483647) / 2147483647);
-        c.fillStyle = "#c9a57b"; c.fillRect(0, 0, CW, CH);
-        for (let i = 0; i < 900; i++) { c.fillStyle = "rgba(" + (110 + azar() * 90 | 0) + "," + (80 + azar() * 60 | 0) + "," + (50 + azar() * 40 | 0) + "," + (0.05 + azar() * 0.12).toFixed(2) + ")"; c.beginPath(); c.arc(azar() * CW, azar() * CH, 4 + azar() * 26, 0, Math.PI * 2); c.fill(); }
-        c.strokeStyle = "rgba(70,50,30,.25)"; c.lineWidth = 1.5;
-        for (let i = 0; i < 7; i++) { c.beginPath(); let x = azar() * CW, y = azar() * CH; c.moveTo(x, y); for (let j = 0; j < 6; j++) { x += (azar() - 0.5) * 60; y += azar() * 40; c.lineTo(x, y); } c.stroke(); }
+        TX.pintarFondo(c, "caliza", CW, CH);
+        c.globalCompositeOperation = "multiply";
+        for (let i = 0; i < 140; i++) {
+          const x = azar() * CW, y = azar() * CH, r = (20 + azar() * 90) * KP, col = (150 + azar() * 70 | 0) + "," + (110 + azar() * 50 | 0) + "," + (70 + azar() * 40 | 0);
+          const gr = c.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, "rgba(" + col + "," + (0.08 + azar() * 0.1).toFixed(2) + ")"); gr.addColorStop(1, "rgba(" + col + ",0)");
+          c.fillStyle = gr; c.fillRect(x - r, y - r, 2 * r, 2 * r);
+        }
+        c.globalCompositeOperation = "source-over";
+        c.strokeStyle = "rgba(60,42,25,.35)"; c.lineWidth = 2 * KP;
+        for (let i = 0; i < 9; i++) { c.beginPath(); let x = azar() * CW, y = azar() * CH; c.moveTo(x, y); for (let j = 0; j < 7; j++) { x += (azar() - 0.5) * 60 * KP; y += azar() * 40 * KP; c.lineTo(x, y); } c.stroke(); }
       })();
       // Mano de referencia: 20 cm de la muñeca a la punta del dedo corazón
       const MX = CW / 2, MY = CH * 0.86;
@@ -534,16 +683,19 @@
       // Puntos del halo alrededor de la mano para medir cuánto pigmento hay
       const halo = [];
       (() => {
-        const hc = lienzo(), c = hc.getContext("2d"); c.fillStyle = c.strokeStyle = "#fff"; dibujarMano(c, 20);
+        const hc = lienzo(), c = hc.getContext("2d"); c.fillStyle = c.strokeStyle = "#fff"; dibujarMano(c, 20 * KP);
         const dh = c.getImageData(0, 0, CW, CH).data, dm = masc.getContext("2d").getImageData(0, 0, CW, CH).data;
-        for (let y = 2; y < CH; y += 6) for (let x = 2; x < CW; x += 6) { const i = (y * CW + x) * 4 + 3; if (dh[i] > 0 && dm[i] === 0) halo.push(i); }
+        for (let y = 2; y < CH; y += 6 * KP) for (let x = 2; x < CW; x += 6 * KP) { const i = (y * CW + x) * 4 + 3; if (dh[i] > 0 && dm[i] === 0) halo.push([x, y]); }
       })();
+      const HX0 = Math.min(...halo.map((h) => h[0])), HX1 = Math.max(...halo.map((h) => h[0])), HY0 = Math.min(...halo.map((h) => h[1])), HY1 = Math.max(...halo.map((h) => h[1]));
       const tex = new THREE.CanvasTexture(comp); tex.colorSpace = THREE.SRGBColorSpace;
-      const pared = new THREE.Mesh(new THREE.PlaneGeometry(W, H), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95 }));
+      const relieveRoca = TX.textura("caliza").bump.clone(); relieveRoca.repeat.set(2, 2); relieveRoca.needsUpdate = true;
+      nitida(tex);
+      const pared = new THREE.Mesh(new THREE.PlaneGeometry(W, H, 1, 1), new THREE.MeshStandardMaterial({ map: tex, bumpMap: relieveRoca, bumpScale: 3, roughness: 0.95 }));
       pared.position.set(0, CY, 0); g.add(pared);
       // Tablillas de respuesta (fase de medida)
       const OPC = [["10 cm", 10], ["20 cm", 20], ["40 cm", 40]];
-      const tablillas = OPC.map((o, i) => { const t = caja(1.0, 0.5, 0.08, new THREE.MeshStandardMaterial({ color: 0x8a5a2b, roughness: 0.8 })); t.position.set(2.95, CY + 0.8 - i * 0.8, 0.05); t.visible = false; t.userData.cm = o[1]; g.add(t); return t; });
+      const tablillas = OPC.map((o, i) => { const t = caja(1.0, 0.5, 0.08, M.madera); t.position.set(2.95, CY + 0.8 - i * 0.8, 0.05); t.visible = false; t.userData.cm = o[1]; g.add(t); return t; });
       let fase = "soplar", soplando = false, cobertura = 0, sucio = false, tMedida = 0, hecho = false, intentos = 0;
 
       function componer() {
@@ -551,7 +703,7 @@
         cC.drawImage(base, 0, 0); cC.drawImage(pint, 0, 0);
         if (fase === "soplar") { cC.globalAlpha = 0.95; cC.drawImage(piel, 0, 0); cC.globalAlpha = 1; }
         if (fase !== "soplar") {
-          cC.strokeStyle = "rgba(255,255,255,.55)"; cC.lineWidth = 1;
+          cC.strokeStyle = "rgba(255,255,255,.6)"; cC.lineWidth = 1.5 * KP;
           const paso = 5 * PXCM;
           for (let x = MX % paso; x < CW; x += paso) { cC.beginPath(); cC.moveTo(x, 0); cC.lineTo(x, CH); cC.stroke(); }
           for (let y = MY % paso; y < CH; y += paso) { cC.beginPath(); cC.moveTo(0, y); cC.lineTo(CW, y); cC.stroke(); }
@@ -562,15 +714,15 @@
         const cx = u * CW, cy = (1 - v) * CH;
         cP.globalCompositeOperation = "source-over"; cP.fillStyle = "rgba(150,40,22,0.28)";
         for (let i = 0; i < n; i++) {
-          const a = Math.random() * Math.PI * 2, d = Math.sqrt(-2 * Math.log(Math.random() + 1e-6)) * 11;
-          cP.beginPath(); cP.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d, 1.2 + Math.random() * 2.2, 0, Math.PI * 2); cP.fill();
+          const a = Math.random() * Math.PI * 2, d = Math.sqrt(-2 * Math.log(Math.random() + 1e-6)) * 11 * KP;
+          cP.beginPath(); cP.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d, (1.2 + Math.random() * 2.2) * KP, 0, Math.PI * 2); cP.fill();
         }
         cP.globalCompositeOperation = "destination-out"; cP.drawImage(masc, 0, 0); cP.globalCompositeOperation = "source-over";
         sucio = true; componer();
       }
       function medirCobertura() {
-        const d = cP.getImageData(0, 0, CW, CH).data; let n = 0;
-        for (const i of halo) if (d[i] > 70) n++;
+        const d = cP.getImageData(HX0, HY0, HX1 - HX0 + 1, HY1 - HY0 + 1).data, ancho = HX1 - HX0 + 1; let n = 0;
+        for (const [x, y] of halo) if (d[((y - HY0) * ancho + (x - HX0)) * 4 + 3] > 70) n++;
         cobertura = n / halo.length; sucio = false;
         if (fase === "soplar" && cobertura >= 0.7) {
           fase = "medir"; tablillas.forEach((t) => (t.visible = true)); componer(); refrescar();
@@ -602,7 +754,7 @@
         alternativos() {
           filaBotones([["Soplar pigmento alrededor", () => {
             if (fase !== "soplar") return;
-            for (let i = 0; i < 40; i++) { const idx = halo[(Math.random() * halo.length) | 0] - 3, px = (idx / 4) % CW, py = Math.floor(idx / 4 / CW); soplar(px / CW, 1 - py / CH, 14); }
+            for (let i = 0; i < 40; i++) { const [px, py] = halo[(Math.random() * halo.length) | 0]; soplar(px / CW, 1 - py / CH, 14); }
             medirCobertura();
           }]]);
           filaBotones(OPC.map((o) => ["Mide " + o[0], () => { if (fase === "medir") responder(o[1]); }]));
@@ -629,13 +781,13 @@
       const OBJ = [0.42, 0.66, 0.78, 0.7, 0.48, 0.55];
       const rr = Array(NA).fill(0.45);
       let sel = 0, arrastre = null, fase = "modelar", sellos = 0, hecho = false, malla = null, ctrlSel = null, ctrlAnch = null;
-      const matBarro = new THREE.MeshStandardMaterial({ color: 0x9a6b45, roughness: 0.85, side: THREE.DoubleSide });
+      const matBarro = TX.mat("barro", { color: 0xe8c7a8, rugosidad: 0.82, relieve: 2.5, rep: 3, extra: { side: THREE.DoubleSide } });
       const matAsa = new THREE.MeshBasicMaterial({ color: 0xc2843a, depthTest: false }), matAsaSel = new THREE.MeshBasicMaterial({ color: 0xfacc15, depthTest: false });
       const asas = HS.map(() => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 8), matAsa); m.renderOrder = 6; g.add(m); return m; });
       const fant = M.fantasma.clone(); fant.depthTest = false;
       const guiaD = linea(OBJ.map((r, j) => [r, HS[j], 0]), fant), guiaI = linea(OBJ.map((r, j) => [-r, HS[j], 0]), fant);
       guiaD.renderOrder = guiaI.renderOrder = 5; g.add(guiaD, guiaI);
-      const matConcha = new THREE.MeshStandardMaterial({ color: 0x3b2414, roughness: 0.9 });
+      const matConcha = TX.mat("barro", { color: 0x5a3a24, rugosidad: 0.9 });
       const geoConcha = new THREE.TorusGeometry(0.045, 0.011, 4, 10, Math.PI);
       const conchas = [];
       function perfil() {
@@ -727,7 +879,7 @@
     const P4 = (() => {
       const g = new THREE.Group();
       const R = 2.1;
-      const suelo4 = new THREE.Mesh(new THREE.CircleGeometry(R, 96), new THREE.MeshStandardMaterial({ color: 0xa8956a, roughness: 1 }));
+      const suelo4 = new THREE.Mesh(new THREE.CircleGeometry(R, 96), TX.mat("tierra", { color: 0xf0e2c0, rugosidad: 1, relieve: 3, rep: 2 }));
       suelo4.position.z = -0.03; g.add(suelo4);
       const horizonte = new THREE.Mesh(new THREE.RingGeometry(R - 0.04, R + 0.02, 96), new THREE.MeshBasicMaterial({ color: 0x5b4636 }));
       g.add(horizonte);
@@ -735,9 +887,9 @@
       const sol = new THREE.Mesh(new THREE.SphereGeometry(0.2, 20, 14), new THREE.MeshBasicMaterial({ color: 0xfbbf24 }));
       sol.position.set(R + 0.32, 0, 0.05); g.add(sol);
       const dolmen = new THREE.Group(); g.add(dolmen);
-      const tumulo = new THREE.Mesh(new THREE.CircleGeometry(1.05, 64), new THREE.MeshStandardMaterial({ color: 0x7d6b45, roughness: 1, transparent: true, opacity: 0.75 }));
+      const tumulo = new THREE.Mesh(new THREE.CircleGeometry(1.05, 64), TX.mat("tierra", { color: 0xb59a6c, rugosidad: 1, relieve: 4, rep: 1.5, extra: { transparent: true, opacity: 0.85 } }));
       tumulo.position.set(0, 0.25, 0); dolmen.add(tumulo);
-      const matLosa = new THREE.MeshStandardMaterial({ color: 0x8f8a80, roughness: 0.8 });
+      const matLosa = TX.mat("granito", { color: 0xcfc8bb, rugosidad: 0.85, relieve: 3 });
       for (let i = 0; i < 9; i++) { const a = -Math.PI * 0.8 + (i / 8) * Math.PI * 1.6 + Math.PI / 2 + Math.PI; const l = caja(0.22, 0.09, 0.14, matLosa); l.position.set(Math.cos(a) * 0.36, Math.sin(a) * 0.36, 0.07); l.rotation.z = a + Math.PI / 2; dolmen.add(l); }
       for (let y = 0.48; y <= 1.62; y += 0.19) for (const x of [-0.19, 0.19]) { const l = caja(0.09, 0.17, 0.14, matLosa); l.position.set(x, y, 0.07); dolmen.add(l); }
       const flecha = linea([[0, 0, 0.16], [0, 1.95, 0.16]], M.cota); dolmen.add(flecha);
@@ -783,30 +935,31 @@
     const P5 = (() => {
       const g = new THREE.Group();
       g.add(suelo(8));
-      const T = 512, XS = -1.7, XI = 1.75, CY = 1.45, RS = 0.95;
+      const T = 1024, K5 = T / 512, XS = -1.7, XI = 1.75, CY = 1.45, RS = 0.95;
       const lienzo = () => { const c = document.createElement("canvas"); c.width = c.height = T; return c; };
       const dib = lienzo(), cara = lienzo(), imp = lienzo(), tinta = lienzo();
       const cD = dib.getContext("2d"), cF = cara.getContext("2d"), cI = imp.getContext("2d"), cT = tinta.getContext("2d");
-      cI.fillStyle = "#e9d3b1"; cI.fillRect(0, 0, T, T);
+      TX.pintarFondo(cI, "pergamino", T, T);
       const texF = new THREE.CanvasTexture(cara), texI = new THREE.CanvasTexture(imp);
-      texF.colorSpace = texI.colorSpace = THREE.SRGBColorSpace;
-      const matBarro = new THREE.MeshStandardMaterial({ color: 0xa8714a, roughness: 0.85 });
+      nitida(texF); nitida(texI);
+      const matBarro = TX.mat("barro", { color: 0xd9a37a, rugosidad: 0.85, relieve: 3 });
       // Cuerpo del sello y cara de dibujo (CircleGeometry: la textura se ve sin girar, así la impresión es su reflejo exacto)
       const cuerpo = new THREE.Mesh(new THREE.CylinderGeometry(RS, RS, 0.24, 64), matBarro);
       cuerpo.rotation.x = Math.PI / 2; cuerpo.position.set(XS, CY, 0); g.add(cuerpo);
-      const sello = new THREE.Mesh(new THREE.CircleGeometry(RS, 64), new THREE.MeshStandardMaterial({ map: texF, roughness: 0.85 }));
+      const sello = new THREE.Mesh(new THREE.CircleGeometry(RS, 96), new THREE.MeshStandardMaterial({ map: texF, roughness: 0.85, bumpMap: texF, bumpScale: 1.5 }));
       sello.position.set(XS, CY, 0.125); g.add(sello);
       const lamina = new THREE.Mesh(new THREE.PlaneGeometry(2.1, 2.1), new THREE.MeshStandardMaterial({ map: texI, roughness: 0.95 }));
+      lamina.userData.sinSombra = false;
       lamina.position.set(XI, CY, 0); g.add(lamina);
       let orden = 6, trazo = null, largo = 0, impresiones = 0, hecho = false;
       function componerCara() {
-        cF.fillStyle = "#b07a4f"; cF.fillRect(0, 0, T, T);
-        cF.strokeStyle = "rgba(255,255,255,.28)"; cF.lineWidth = 2; cF.setLineDash([6, 8]);
+        TX.pintarFondo(cF, "barro", T, T); cF.fillStyle = "rgba(150,90,50,.35)"; cF.fillRect(0, 0, T, T);
+        cF.strokeStyle = "rgba(255,255,255,.3)"; cF.lineWidth = 2 * K5; cF.setLineDash([6 * K5, 8 * K5]);
         for (let k = 0; k < orden; k++) { const a = (k / orden) * Math.PI * 2; cF.beginPath(); cF.moveTo(T / 2, T / 2); cF.lineTo(T / 2 + Math.cos(a) * T / 2, T / 2 + Math.sin(a) * T / 2); cF.stroke(); }
         cF.setLineDash([]); cF.drawImage(dib, 0, 0); texF.needsUpdate = true;
       }
       function segmento(a, b) {
-        cD.strokeStyle = "#3a2214"; cD.lineWidth = 12; cD.lineCap = "round";
+        cD.strokeStyle = "#3a2214"; cD.lineWidth = 12 * K5; cD.lineCap = "round";
         for (let k = 0; k < orden; k++) {
           const t = (k / orden) * Math.PI * 2, c = Math.cos(t), s = Math.sin(t);
           const rot = (p) => [T / 2 + (p[0] - T / 2) * c - (p[1] - T / 2) * s, T / 2 + (p[0] - T / 2) * s + (p[1] - T / 2) * c];
@@ -817,11 +970,11 @@
       function borrar() { cD.clearRect(0, 0, T, T); largo = 0; componerCara(); refrescar(); }
       function cambiarOrden(n) { orden = n; borrar(); estado("Orden " + n + ": tu dibujo se repetirá " + n + " veces girando " + Math.round(360 / n) + "° cada vez.", "status-warn", "p5-orden-" + n); }
       function figura(tipo) {
-        const c = T / 2, pts = tipo === "triangulo" ? [[c + 60, c - 18], [c + 200, c - 50], [c + 200, c + 14], [c + 60, c - 18]] : [[c + 120, c - 60], [c + 170, c - 20], [c + 200, c + 30]];
+        const c = T / 2, k = K5, pts = tipo === "triangulo" ? [[c + 60 * k, c - 18 * k], [c + 200 * k, c - 50 * k], [c + 200 * k, c + 14 * k], [c + 60 * k, c - 18 * k]] : [[c + 120 * k, c - 60 * k], [c + 170 * k, c - 20 * k], [c + 200 * k, c + 30 * k]];
         for (let i = 1; i < pts.length; i++) segmento(pts[i - 1], pts[i]);
       }
       function estampar(u, v) {
-        if (largo < 260) { estado("Dibuja un poco más en la pintadera antes de estampar.", "status-warn", "p5-poco"); return; }
+        if (largo < 260 * K5) { estado("Dibuja un poco más en la pintadera antes de estampar.", "status-warn", "p5-poco"); return; }
         cT.clearRect(0, 0, T, T); cT.save(); cT.translate(T, 0); cT.scale(-1, 1); cT.drawImage(dib, 0, 0); cT.restore();   // el sello imprime al revés
         cT.globalCompositeOperation = "source-in"; cT.fillStyle = "#9b2d20"; cT.fillRect(0, 0, T, T); cT.globalCompositeOperation = "source-over";
         const L = Math.round(T * 2 * RS / 2.1), x = clamp(u * T, L / 2, T - L / 2), y = clamp((1 - v) * T, L / 2, T - L / 2);
@@ -832,7 +985,7 @@
       function uv(obj, x, y) { const h = rayo(x, y).intersectObject(obj, false)[0]; return h && h.uv ? { h, uv: h.uv } : null; }
       function refrescar() {
         if (actual !== 4) return;
-        metricas(["Simetría de rotación: orden " + orden, "Giro entre repeticiones: 360° : " + orden + " = " + Math.round(360 / orden) + "°", "Dibujo: " + Math.min(100, Math.round(largo / 2.6)) + " %", "Impresiones: " + impresiones]);
+        metricas(["Simetría de rotación: orden " + orden, "Giro entre repeticiones: 360° : " + orden + " = " + Math.round(360 / orden) + "°", "Dibujo: " + Math.min(100, Math.round(largo / (2.6 * K5))) + " %", "Impresiones: " + impresiones]);
       }
       componerCara();
       return {
@@ -860,7 +1013,7 @@
         move(x, y) {
           if (!trazo) return;
           const s = uv(sello, x, y);
-          if (s) { const p = [s.uv.x * T, (1 - s.uv.y) * T]; if (Math.hypot(p[0] - trazo[0], p[1] - trazo[1]) > 4) { segmento(trazo, p); trazo = p; } }
+          if (s) { const p = [s.uv.x * T, (1 - s.uv.y) * T]; if (Math.hypot(p[0] - trazo[0], p[1] - trazo[1]) > 4 * K5) { segmento(trazo, p); trazo = p; } }
         },
         up() { trazo = null; },
         tick() {}
@@ -1061,12 +1214,27 @@
     // 11. BUCLE Y CONTROLES GENERALES
     // =====================================================================
     const reloj = new THREE.Clock();
+    // Calidad adaptativa: si el equipo no llega a 24 imágenes por segundo dos veces seguidas, se quitan las sombras y se baja la resolución.
+    // «?calidad=alta» mantiene siempre la calidad máxima; «?calidad=ligera» arranca ya en modo ligero.
+    const CALIDAD_FIJA = new URLSearchParams(location.search).get("calidad") === "alta";
+    let fpsT0 = performance.now(), fpsN = 0, lentas = 0, cuadros = 0, degradado = CALIDAD_LIGERA;
+    function degradar() {
+      degradado = true; renderer.shadowMap.enabled = false;
+      scene.traverse((o) => { if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => { m.needsUpdate = true; }); });
+      ratioMax = 1.25; renderer.setPixelRatio(Math.min(window.devicePixelRatio, ratioMax)); encuadrar();
+    }
     renderer.setAnimationLoop(() => {
       const dt = Math.min(reloj.getDelta(), 0.1);
       if (modo === "manos") procesarManos();
-      if (etapa) etapa.tick(dt);
+      if (etapa) { etapa.tick(dt); if (cuadros++ % 30 === 0) prepararSombras(etapa.grupo); }
       actualizarEtiquetas();
       renderer.render(scene, camera);
+      fpsN++;
+      const ahora = performance.now();
+      if (ahora - fpsT0 > 2000) {
+        const fps = fpsN * 1000 / (ahora - fpsT0); fpsT0 = ahora; fpsN = 0;
+        if (!document.hidden && etapa) { lentas = fps < 24 ? lentas + 1 : 0; if (lentas >= 2 && !degradado && !CALIDAD_FIJA) degradar(); }
+      }
     });
 
     const INFO = [

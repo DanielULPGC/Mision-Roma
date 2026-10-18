@@ -1,4 +1,4 @@
-# Las manos que construyeron la historia · v3.3 (edición para GitHub Pages)
+# Las manos que construyeron la historia · v3.4 (edición para GitHub Pages)
 
 Proyecto «Las manos que construyeron la historia». Geometría, patrimonio histórico y realidad aumentada en Educación Primaria (5.º y 6.º).
 
@@ -92,6 +92,10 @@ Todas las etapas se pueden hacer de tres formas:
 - **Modo docente.** Añade `?docente` a la dirección (por ejemplo, `http://localhost:8000/?docente`) para abrir cualquier etapa sin completar las anteriores.
 - **Progreso.** Las etapas completadas se recuerdan solo en ese navegador. Para reiniciar, borra los datos del sitio en el navegador.
 - **«Saber más».** Cada etapa tiene un panel con la explicación, preguntas y la fuente.
+- **Calidad gráfica.** Por defecto se usa la calidad alta: materiales con textura (granito, caliza, barro, sílex, latón, estuco, vidriado, pergamino y madera), sombras suaves, reflejos, aristas biseladas, trazos con grosor real y lienzos de 1024 a 1536 píxeles. Las texturas se generan en el propio navegador, sin descargar imágenes. Si el equipo no llega a 24 imágenes por segundo durante unos 4 segundos, la actividad quita las sombras y baja la resolución por sí sola.
+  - `?calidad=ligera` arranca directamente en modo ligero (útil en tabletas antiguas).
+  - `?calidad=alta` mantiene siempre la calidad máxima (útil para proyectar en la pizarra digital o hacer capturas).
+  - Se pueden combinar: `?docente&calidad=ligera`.
 
 ### Datos inventados y simplificaciones (declarados en la propia actividad)
 - El terreno de la etapa 1 y las fincas y cifras de la etapa 5 son inventados.
@@ -180,8 +184,10 @@ Su uso con menores debe valorarse con el delegado o la delegada de protección d
 - Encuadre comprobado en móvil vertical, móvil horizontal y tableta.
 - Sin peticiones externas salvo el modelo, cuando falta y está permitido.
 - La cámara se apaga cuando el detector no arranca.
+- Calidad gráfica alta (v3.4): recorridos de los tres capítulos repetidos sin errores, capturas de las quince etapas revisadas y modo ligero comprobado.
 
 **Pendiente:**
 - Prueba de la pinza real con alumnado y en las tabletas del aula.
 - Revisión de Safari para iPad.
+- Comprobar en las tabletas del aula si salta el modo ligero automático; si va lenta, usar `?calidad=ligera`.
 - Revisión humana de los contenidos y de la adecuación curricular.

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Misión Roma · Las manos que construyeron la historia</title>
   <!--
-    Misión Roma v3.3 (edición para GitHub Pages) · Proyecto «Las manos que construyeron la historia»
+    Misión Roma v3.4 (edición para GitHub Pages) · Proyecto «Las manos que construyeron la historia»
     Geometría, patrimonio histórico y realidad aumentada en Educación Primaria (5.º-6.º)
 
     Proceso evolutivo en cinco etapas, todas manipulables con las manos (pinza) o con alternativas DUA:
@@ -270,34 +270,173 @@
     }
 
     // =====================================================================
-    // 1. THREE.JS BÁSICO
+    // 1. THREE.JS: MOTOR GRÁFICO (calidad alta con degradación automática)
     // =====================================================================
-    const renderer = new THREE.WebGLRenderer({ canvas: lienzo3d, alpha: true, antialias: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    const CALIDAD_LIGERA = new URLSearchParams(location.search).get("calidad") === "ligera";
+    const renderer = new THREE.WebGLRenderer({ canvas: lienzo3d, alpha: true, antialias: true, powerPreference: "high-performance" });
+    let ratioMax = CALIDAD_LIGERA ? 1.25 : 2;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, ratioMax));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
+    renderer.shadowMap.enabled = !CALIDAD_LIGERA;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    const ANISO = Math.min(8, renderer.capabilities.getMaxAnisotropy());
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
-    scene.add(new THREE.AmbientLight(0xffffff, 0.9));
-    const luz = new THREE.DirectionalLight(0xffffff, 1.2);
-    luz.position.set(2, 5, 4);
-    scene.add(luz);
+    // Iluminación: cielo y suelo, sol con sombras suaves y una luz de relleno
+    const hemi = new THREE.HemisphereLight(0xe8f0f6, 0x7a6448, 0.55);
+    const luz = new THREE.DirectionalLight(0xfff0dc, 2.4);
+    luz.position.set(3, 6, 5);
+    luz.castShadow = true;
+    luz.shadow.mapSize.set(CALIDAD_LIGERA ? 1024 : 2048, CALIDAD_LIGERA ? 1024 : 2048);
+    luz.shadow.bias = -0.0004; luz.shadow.normalBias = 0.025; luz.shadow.radius = 4;
+    const relleno = new THREE.DirectionalLight(0xd6e4ff, 0.6);
+    relleno.position.set(-5, 3, 3);
+    scene.add(hemi, luz, luz.target, relleno);
+    // Entorno para reflejos (metales y vidriados): cielo degradado generado en el propio navegador, sin archivos externos
+    (() => {
+      const pm = new THREE.PMREMGenerator(renderer), es = new THREE.Scene();
+      const geo = new THREE.SphereGeometry(10, 48, 24), col = [], c = new THREE.Color();
+      const pos = geo.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        const t = pos.getY(i) / 10;
+        c.set(t > 0 ? 0xdbe8f2 : 0x8a7457).lerp(new THREE.Color(t > 0 ? 0x9cc3e0 : 0x4a3b2a), Math.abs(t));
+        col.push(c.r, c.g, c.b);
+      }
+      geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+      es.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide })));
+      const panel = new THREE.Mesh(new THREE.PlaneGeometry(6, 3), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+      panel.position.set(4, 6, 4); panel.lookAt(0, 0, 0); es.add(panel);
+      scene.environment = pm.fromScene(es, 0.04).texture;
+      pm.dispose();
+    })();
+
+    // ---------- Texturas procedurales (sin imágenes externas; deterministas y repetibles sin costuras) ----------
+    const TX = (() => {
+      const cache = {};
+      function prng(s) { return () => ((s = (s * 16807) % 2147483647) / 2147483647); }
+      function capa(periodo, sem) {
+        const azar = prng(sem), g = new Float32Array(periodo * periodo);
+        for (let i = 0; i < g.length; i++) g[i] = azar();
+        return (x, y) => {
+          const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+          const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+          const P = periodo, a = g[((yi % P + P) % P) * P + ((xi % P + P) % P)], b = g[((yi % P + P) % P) * P + (((xi + 1) % P + P) % P)];
+          const cc = g[(((yi + 1) % P + P) % P) * P + ((xi % P + P) % P)], d = g[(((yi + 1) % P + P) % P) * P + (((xi + 1) % P + P) % P)];
+          return a + (b - a) * u + (cc - a) * v + (a - b - cc + d) * u * v;
+        };
+      }
+      function fbm(sem, base, oct) {
+        const capas = Array.from({ length: oct }, (_, o) => ({ f: capa(base << o, sem + o * 101), p: base << o, w: 0.5 ** o }));
+        const tot = capas.reduce((s, k) => s + k.w, 0);
+        return (u, v) => { let s = 0; for (const k of capas) s += k.f(u * k.p, v * k.p) * k.w; return s / tot; };
+      }
+      // Genera color y relieve a la vez: fn(u, v) → [r, g, b, altura 0..1]
+      function lienzo(nombre, T, fn) {
+        const cc = document.createElement("canvas"); cc.width = cc.height = T;
+        const cb = document.createElement("canvas"); cb.width = cb.height = T;
+        const ic = cc.getContext("2d").createImageData(T, T), ib = cb.getContext("2d").createImageData(T, T);
+        for (let y = 0; y < T; y++) for (let x = 0; x < T; x++) {
+          const [r, g, b, h] = fn(x / T, y / T), i = (y * T + x) * 4;
+          ic.data[i] = r; ic.data[i + 1] = g; ic.data[i + 2] = b; ic.data[i + 3] = 255;
+          const hh = Math.max(0, Math.min(255, h * 255)); ib.data[i] = ib.data[i + 1] = ib.data[i + 2] = hh; ib.data[i + 3] = 255;
+        }
+        cc.getContext("2d").putImageData(ic, 0, 0); cb.getContext("2d").putImageData(ib, 0, 0);
+        const map = new THREE.CanvasTexture(cc), bump = new THREE.CanvasTexture(cb);
+        map.colorSpace = THREE.SRGBColorSpace;
+        for (const t of [map, bump]) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = ANISO; }
+        return { map, bump, canvas: cc };
+      }
+      const mezcla = (a, b, t) => a + (b - a) * t;
+      const recetas = {
+        // Granito (acueducto de Segovia) y piedra de sillería en general
+        granito: () => { const n = fbm(11, 8, 5), m = fbm(29, 32, 3), az = prng(5); return (u, v) => { const k = n(u, v), s = m(u, v), p = az(); const g = 150 + (k - 0.5) * 70 + (s - 0.5) * 40 + (p > 0.985 ? -70 : p < 0.02 ? 45 : 0); return [g + 6, g + 2, g - 6, 0.35 + k * 0.4 + (s - 0.5) * 0.3]; }; },
+        caliza: () => { const n = fbm(41, 4, 6), m = fbm(7, 24, 3); return (u, v) => { const k = n(u, v), s = m(u, v); return [205 + (k - 0.5) * 40, 196 + (k - 0.5) * 38, 172 + (k - 0.5) * 30 - s * 10, 0.4 + k * 0.45 + s * 0.15]; }; },
+        tierra: () => { const n = fbm(3, 6, 6), m = fbm(17, 40, 2), az = prng(9); return (u, v) => { const k = n(u, v), s = m(u, v), p = az(); const g = (k - 0.5) * 60; let c = [128 + g, 102 + g * 0.9, 72 + g * 0.7]; if (p > 0.993) c = [175, 165, 150]; return [c[0] - s * 18, c[1] - s * 16, c[2] - s * 12, k * 0.7 + s * 0.3 + (p > 0.993 ? 0.3 : 0)]; }; },
+        madera: () => { const n = fbm(23, 4, 4), f = fbm(61, 16, 2); return (u, v) => { const w = Math.sin((v * 22 + n(u, v) * 7) * Math.PI * 2) * 0.5 + 0.5, k = f(u, v); return [mezcla(120, 160, w) - k * 25, mezcla(78, 104, w) - k * 18, mezcla(42, 58, w) - k * 12, w * 0.6 + k * 0.4]; }; },
+        barro: () => { const n = fbm(13, 6, 5), az = prng(21); return (u, v) => { const k = n(u, v), p = az(); return [168 + (k - 0.5) * 50, 110 + (k - 0.5) * 36, 72 + (k - 0.5) * 26, 0.5 + (k - 0.5) * 0.6 - (p > 0.99 ? 0.35 : 0)]; }; },
+        silex: () => { const n = fbm(31, 3, 6), m = fbm(77, 10, 3); return (u, v) => { const k = n(u, v), s = m(u, v), b = Math.abs(Math.sin((k * 9 + s * 2) * Math.PI)); return [118 + b * 38 + (s - 0.5) * 30, 112 + b * 34 + (s - 0.5) * 26, 100 + b * 28 + (s - 0.5) * 20, b * 0.6 + s * 0.4]; }; },
+        laton: () => { const n = fbm(5, 64, 2), m = fbm(91, 4, 4); return (u, v) => { const k = n(u * 0.05, v), s = m(u, v); return [196 + (k - 0.5) * 40 - s * 30, 152 + (k - 0.5) * 30 - s * 26, 70 + (k - 0.5) * 18 - s * 14, k * 0.5 + s * 0.2]; }; },
+        estuco: () => { const n = fbm(19, 8, 5); return (u, v) => { const k = n(u, v); return [238 + (k - 0.5) * 18, 230 + (k - 0.5) * 18, 214 + (k - 0.5) * 16, 0.5 + (k - 0.5) * 0.5]; }; },
+        vidriado: () => { const n = fbm(47, 6, 4); return (u, v) => { const k = n(u, v); return [225 + (k - 0.5) * 50, 225 + (k - 0.5) * 50, 225 + (k - 0.5) * 50, 0.5 + (k - 0.5) * 0.2]; }; },
+        pergamino: () => { const n = fbm(37, 4, 6), m = fbm(53, 20, 3); return (u, v) => { const k = n(u, v), s = m(u, v), e = Math.hypot(u - 0.5, v - 0.5); return [236 - k * 34 - e * 40, 216 - k * 34 - e * 46, 172 - k * 34 - e * 52 - s * 10, 0.5 + (k - 0.5) * 0.3]; }; }
+      };
+      function textura(nombre, T = 512) {
+        if (!cache[nombre]) cache[nombre] = lienzo(nombre, T, recetas[nombre]());
+        return cache[nombre];
+      }
+      // Material PBR texturizado: color multiplica la textura (permite tintar una misma piedra)
+      function mat(nombre, o = {}) {
+        const t = textura(nombre), rep = o.rep || 1;
+        const map = t.map.clone(), bump = t.bump.clone();
+        for (const x of [map, bump]) { x.repeat.set(rep, rep); x.needsUpdate = true; }
+        const Cls = o.fisico ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial;
+        const m = new Cls({ map, bumpMap: bump, bumpScale: o.relieve ?? 2, color: o.color ?? 0xffffff, roughness: o.rugosidad ?? 0.85, metalness: o.metal ?? 0, ...(o.extra || {}) });
+        return m;
+      }
+      // Fondo procedural para lienzos 2D (paredes, mapas, sellos): dibuja la textura sobre un contexto existente
+      function pintarFondo(ctx, nombre, W, H, alfa = 1) {
+        const t = textura(nombre); ctx.save(); ctx.globalAlpha = alfa;
+        for (let y = 0; y < H; y += t.canvas.height) for (let x = 0; x < W; x += t.canvas.width) ctx.drawImage(t.canvas, x, y);
+        ctx.restore();
+      }
+      return { mat, textura, pintarFondo };
+    })();
+    // Ajuste común de las texturas dibujadas en lienzos (mayor nitidez en ángulos rasantes)
+    function nitida(t) { t.anisotropy = ANISO; t.colorSpace = THREE.SRGBColorSpace; return t; }
 
     const M = {
-      piedra: new THREE.MeshStandardMaterial({ color: 0xd6d3d1, roughness: 0.7 }),
-      seleccion: new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.4 }),
-      correcto: new THREE.MeshStandardMaterial({ color: 0x4ade80, roughness: 0.4 }),
-      canal: new THREE.MeshStandardMaterial({ color: 0x0284c7 }),
-      suelo: new THREE.MeshStandardMaterial({ color: 0x8b7355, roughness: 1, transparent: true, opacity: 0.9 }),
-      tierra: new THREE.MeshStandardMaterial({ color: 0x9c7b55, roughness: 1 }),
-      madera: new THREE.MeshStandardMaterial({ color: 0x8a5a2b, roughness: 0.8 }),
-      aguaM: new THREE.MeshStandardMaterial({ color: 0x7dd3fc, roughness: 0.2, transparent: true, opacity: 0.85 }),
+      piedra: TX.mat("granito", { color: 0xe4ddd2, rugosidad: 0.82, relieve: 2.5 }),
+      seleccion: TX.mat("granito", { color: 0xf6cf3c, rugosidad: 0.6, relieve: 2 }),
+      correcto: TX.mat("granito", { color: 0x7fe0a0, rugosidad: 0.6, relieve: 2 }),
+      canal: new THREE.MeshPhysicalMaterial({ color: 0x1f7fbf, roughness: 0.18, metalness: 0, clearcoat: 0.6 }),
+      suelo: TX.mat("tierra", { color: 0xffffff, rugosidad: 1, relieve: 3, rep: 2, extra: { transparent: true, opacity: 0.94 } }),
+      tierra: TX.mat("tierra", { color: 0xf2e2c8, rugosidad: 1, relieve: 3, rep: 2 }),
+      madera: TX.mat("madera", { color: 0xffffff, rugosidad: 0.7, relieve: 1.5 }),
+      aguaM: new THREE.MeshPhysicalMaterial({ color: 0x7dd3fc, roughness: 0.05, transparent: true, opacity: 0.8, clearcoat: 1 }),
       fantasma: new THREE.LineBasicMaterial({ color: 0x1c1917, transparent: true, opacity: 0.5 }),
       cota: new THREE.LineBasicMaterial({ color: 0xc2843a }),
       lineaAgua: new THREE.LineBasicMaterial({ color: 0x0284c7 }),
       oscuro: new THREE.LineBasicMaterial({ color: 0x1c1917 })
     };
-    const caja = (w, h, d, mat) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-    const linea = (puntos, mat) => new THREE.Line(new THREE.BufferGeometry().setFromPoints(puntos.map((p) => new THREE.Vector3(p[0], p[1], p[2] || 0))), mat);
+    // Cajas con aristas biseladas (la luz dibuja los cantos, como en la piedra labrada)
+    function geoCaja(w, h, d) {
+      const b = Math.min(0.03, 0.12 * Math.min(w, h, d)), x = w / 2 - b, y = h / 2 - b, rc = Math.min(b, x * 0.9, y * 0.9);
+      const s = new THREE.Shape();
+      s.moveTo(-x + rc, -y); s.lineTo(x - rc, -y); s.absarc(x - rc, -y + rc, rc, -Math.PI / 2, 0); s.lineTo(x, y - rc); s.absarc(x - rc, y - rc, rc, 0, Math.PI / 2);
+      s.lineTo(-x + rc, y); s.absarc(-x + rc, y - rc, rc, Math.PI / 2, Math.PI); s.lineTo(-x, -y + rc); s.absarc(-x + rc, -y + rc, rc, Math.PI, Math.PI * 1.5);
+      const g = new THREE.ExtrudeGeometry(s, { depth: Math.max(0.0005, d - 2 * b), bevelEnabled: true, bevelThickness: b, bevelSize: b, bevelSegments: 2, curveSegments: 3 });
+      g.translate(0, 0, -(d - 2 * b) / 2);
+      return g;
+    }
+    const caja = (w, h, d, mat) => new THREE.Mesh(geoCaja(w, h, d), mat);
+    // Trazos: tubos con grosor real en lugar de líneas de 1 píxel
+    const matTrazo = new WeakMap();
+    function aMalla(mat) {
+      if (!mat.isLineBasicMaterial) return mat;
+      if (!matTrazo.has(mat)) matTrazo.set(mat, new THREE.MeshBasicMaterial({ color: mat.color, transparent: mat.transparent, opacity: mat.opacity, depthTest: mat.depthTest, depthWrite: !mat.transparent, toneMapped: false }));
+      return matTrazo.get(mat);
+    }
+    function linea(puntos, mat, grosor = 0.014) {
+      const v = puntos.map((p) => new THREE.Vector3(p[0], p[1], p[2] || 0));
+      const camino = new THREE.CurvePath();
+      for (let i = 1; i < v.length; i++) if (v[i].distanceToSquared(v[i - 1]) > 1e-10) camino.add(new THREE.LineCurve3(v[i - 1], v[i]));
+      if (!camino.curves.length) return new THREE.Line(new THREE.BufferGeometry().setFromPoints(v), mat);
+      return new THREE.Mesh(new THREE.TubeGeometry(camino, Math.max(2, camino.curves.length * 3), grosor, 6, false), aMalla(mat));
+    }
+    function lineaFina(puntos, mat) { return new THREE.Line(new THREE.BufferGeometry().setFromPoints(puntos.map((p) => new THREE.Vector3(p[0], p[1], p[2] || 0))), mat); }
+    function liberar(obj) { obj.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); }
     function suelo(ancho, x = 0) { const s = caja(ancho, 0.1, 2, M.suelo); s.position.set(x, -0.05, 0); return s; }
+    // Sombras: todo lo sólido proyecta y recibe; los trazos, etiquetas y vidrios no
+    function prepararSombras(raiz) {
+      raiz.traverse((o) => {
+        if (!o.isMesh || o.userData.sinSombra !== undefined) return;
+        const m = Array.isArray(o.material) ? o.material[0] : o.material;
+        const solido = m && (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) && !(m.transparent && m.opacity < 0.6) && m.depthTest !== false;
+        o.castShadow = o.receiveShadow = !!solido; o.userData.sinSombra = !solido;
+      });
+    }
 
     // Arco de medio punto: intradós de radio r (la luz es el diámetro)
     function geometriaArco(r, grosor = 0.2, fondo = 0.8) {
@@ -343,6 +482,10 @@
       camera.lookAt(0, marco.cy, 0);
       camera.setViewOffset(W, H, W / 2 - (z.x0 + libreW / 2), H / 2 - (z.y0 + libreH / 2), W, H);
       camera.updateProjectionMatrix();
+      // Sombras: el volumen de la luz se ajusta al marco de la etapa para aprovechar toda la resolución
+      const ext = Math.max(marco.ancho, marco.alto) * 0.75 + 0.5, sc = luz.shadow.camera;
+      luz.target.position.set(0, marco.cy, 0); luz.position.set(ext * 0.8, marco.cy + ext * 1.5, ext * 1.3);
+      sc.left = -ext; sc.right = ext; sc.top = ext; sc.bottom = -ext; sc.near = 0.1; sc.far = ext * 6; sc.updateProjectionMatrix();
       const dpr = Math.min(window.devicePixelRatio, 2);
       lienzoManos.width = W * dpr; lienzoManos.height = H * dpr;
       ctxM.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -603,12 +746,10 @@
       const pos = Array.from({ length: 30 }, (_, i) => (i / 30) * 2);
       g.add(pIzq, pDer, a1, a2, fantasma, c1, c2, agua);
 
-      const geoSillar = new THREE.BoxGeometry(LADO_PILAR - 0.02, ALTO_SILLAR - 0.02, LADO_PILAR - 0.02);
-      const aristasSillar = new THREE.EdgesGeometry(geoSillar);
+      const geoSillar = geoCaja(LADO_PILAR - 0.02, ALTO_SILLAR - 0.02, LADO_PILAR - 0.02);
       function nuevoSillar(i) {
-        const tono = new THREE.Color(0xd6d3d1).offsetHSL(0, 0, ((i * 53) % 9 - 4) * 0.012);
-        const m = new THREE.Mesh(geoSillar, new THREE.MeshStandardMaterial({ color: tono, roughness: 0.75 }));
-        m.add(new THREE.LineSegments(aristasSillar, M.oscuro));
+        const tono = new THREE.Color(0xffffff).offsetHSL(0, 0, ((i * 53) % 9 - 4) * 0.015);
+        const m = new THREE.Mesh(geoSillar, M.piedra.clone()); m.material.color.copy(tono);
         return m;
       }
       const monton = new THREE.Group();
@@ -1066,12 +1207,27 @@
     // 11. BUCLE Y CONTROLES GENERALES
     // =====================================================================
     const reloj = new THREE.Clock();
+    // Calidad adaptativa: si el equipo no llega a 24 imágenes por segundo dos veces seguidas, se quitan las sombras y se baja la resolución.
+    // «?calidad=alta» mantiene siempre la calidad máxima; «?calidad=ligera» arranca ya en modo ligero.
+    const CALIDAD_FIJA = new URLSearchParams(location.search).get("calidad") === "alta";
+    let fpsT0 = performance.now(), fpsN = 0, lentas = 0, cuadros = 0, degradado = CALIDAD_LIGERA;
+    function degradar() {
+      degradado = true; renderer.shadowMap.enabled = false;
+      scene.traverse((o) => { if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => { m.needsUpdate = true; }); });
+      ratioMax = 1.25; renderer.setPixelRatio(Math.min(window.devicePixelRatio, ratioMax)); encuadrar();
+    }
     renderer.setAnimationLoop(() => {
       const dt = Math.min(reloj.getDelta(), 0.1);
       if (modo === "manos") procesarManos();
-      if (etapa) etapa.tick(dt);
+      if (etapa) { etapa.tick(dt); if (cuadros++ % 30 === 0) prepararSombras(etapa.grupo); }
       actualizarEtiquetas();
       renderer.render(scene, camera);
+      fpsN++;
+      const ahora = performance.now();
+      if (ahora - fpsT0 > 2000) {
+        const fps = fpsN * 1000 / (ahora - fpsT0); fpsT0 = ahora; fpsN = 0;
+        if (!document.hidden && etapa) { lentas = fps < 24 ? lentas + 1 : 0; if (lentas >= 2 && !degradado && !CALIDAD_FIJA) degradar(); }
+      }
     });
 
     const INFO = [
