@@ -1,4 +1,4 @@
-# Las manos que construyeron la historia · v3.5 (edición para GitHub Pages)
+# Las manos que construyeron la historia · v3.5.1 (edición para GitHub Pages)
 
 Proyecto «Las manos que construyeron la historia». Geometría, patrimonio histórico y realidad aumentada en Educación Primaria (5.º y 6.º).
 
@@ -95,6 +95,7 @@ Todas las etapas se pueden hacer de tres formas:
 - **Decorados (v3.5).** Cada etapa tiene un telón pintado en el navegador acorde con su época y lugar (sabana del lago Turkana, cueva, aldea neolítica, cumbres de Gran Canaria, valle de Segovia, barranco con bancales, Toledo, obra de una catedral, nave gótica, patio nazarí, puerto de Mallorca), con suelo, niebla y luz propios. Al mostrar la imagen de la cámara, el decorado se retira.
 - **Bifaz (v3.5).** El nódulo empieza cubierto de córtex; cada golpe saca una lasca invasora de una cara distinta (talla bifacial), con negativos en abanico, ondas de percusión y retoque final del filo. Puede conservar córtex en la base, como muchos bifaces.
 - **Cerámica cardial (v3.5).** Pasta parda bruñida con manchas de cocción. Las impresiones se graban en la superficie de la vasija (siguen su curvatura) y reproducen el borde dentado de la valva de berberecho; se ordenan en una franja del hombro, como en la decoración cardial.
+- **Pintadera (v3.5.1).** Rehecha a partir de Cruz de Mercadal, Delgado Darias y Velasco Vázquez (2013), *Pintaderas de El Museo Canario* (ISBN 978-84-695-6874-3). Tiene cuerpo (campo, laterales y dorso) y apéndice perforado, que se ve al girar la pieza. Se elige entre las cuatro formas más frecuentes del catálogo: rectangular (77 de 183 matrices simples), cuadrada (34), circular (29) y triangular (29). Cada forma tiene su simetría: orden 2, 4, 3 o libre en la circular. Se decora con punzón (impresión, la técnica más frecuente) o con incisión. El botón «Esquema del museo» muestra hileras que siguen la forma del campo, como en los esquemas pautados del catálogo. La medida real y el área del campo se muestran en pantalla. Al estampar, la imagen sale al revés (reflejo) y en negativo.
 - **Calidad gráfica.** Por defecto se usa la calidad alta: materiales con textura (granito, caliza, barro, sílex, latón, estuco, vidriado, pergamino y madera), sombras suaves, reflejos, aristas biseladas, trazos con grosor real y lienzos de 1024 a 1536 píxeles. Las texturas se generan en el propio navegador, sin descargar imágenes. Si el equipo no llega a 24 imágenes por segundo durante unos 4 segundos, la actividad quita las sombras y baja la resolución por sí sola.
   - `?calidad=ligera` arranca directamente en modo ligero (útil en tabletas antiguas).
   - `?calidad=alta` mantiene siempre la calidad máxima (útil para proyectar en la pizarra digital o hacer capturas).

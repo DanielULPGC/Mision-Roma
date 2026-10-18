@@ -1514,92 +1514,234 @@
 
     // =====================================================================
     // 7. ETAPA 5 · CANARIAS: la pintadera — simetría de rotación y de reflexión
+    // Base documental: Cruz de Mercadal, Delgado Darias y Velasco Vázquez (2013), «Pintaderas de El Museo Canario».
+    // Partes: campo (cara decorada), laterales, dorso y apéndice (mango), a menudo con perforación.
     // =====================================================================
     const P5 = (() => {
       const g = new THREE.Group();
       g.add(suelo(8));
-      const T = 1024, K5 = T / 512, XS = -1.7, XI = 1.75, CY = 1.45, RS = 0.95;
+      const T = 1024, K5 = T / 512, XS = -1.65, XI = 1.75, CY = 1.45, RS = 0.95, ESC = RS / (T / 2);
       const lienzo = () => { const c = document.createElement("canvas"); c.width = c.height = T; return c; };
-      const dib = lienzo(), cara = lienzo(), imp = lienzo(), tinta = lienzo();
-      const cD = dib.getContext("2d"), cF = cara.getContext("2d"), cI = imp.getContext("2d"), cT = tinta.getContext("2d");
+      const cara = lienzo(), relieve = lienzo(), imp = lienzo(), tinta = lienzo();
+      const cF = cara.getContext("2d"), cR = relieve.getContext("2d"), cI = imp.getContext("2d"), cT = tinta.getContext("2d");
+      const cP = document.createElement("canvas").getContext("2d");          // solo para comprobar si un punto cae dentro del campo
       TX.pintarFondo(cI, "pergamino", T, T);
-      const texF = new THREE.CanvasTexture(cara), texI = new THREE.CanvasTexture(imp);
-      nitida(texF); nitida(texI);
-      const matBarro = TX.mat("barro", { color: 0xd9a37a, rugosidad: 0.85, relieve: 3 });
-      // Cuerpo del sello y cara de dibujo (CircleGeometry: la textura se ve sin girar, así la impresión es su reflejo exacto)
-      const cuerpo = new THREE.Mesh(new THREE.CylinderGeometry(RS, RS, 0.24, 64), matBarro);
-      cuerpo.rotation.x = Math.PI / 2; cuerpo.position.set(XS, CY, 0); g.add(cuerpo);
-      const sello = new THREE.Mesh(new THREE.CircleGeometry(RS, 96), new THREE.MeshStandardMaterial({ map: texF, roughness: 0.85, bumpMap: texF, bumpScale: 1.5 }));
-      sello.position.set(XS, CY, 0.125); g.add(sello);
+      const texF = nitida(new THREE.CanvasTexture(cara)), texI = nitida(new THREE.CanvasTexture(imp)), texR = new THREE.CanvasTexture(relieve);
+      texR.anisotropy = ANISO;
+      // Formas más frecuentes de las 183 matrices simples del catálogo: rectangular (77), cuadrada (34), circular (29) y triangular (29)
+      // Medidas reales de ejemplo dentro del tamaño mediano del catálogo (campos de 6 a 23 cm²)
+      const FORMAS = {
+        circular: { nombre: "circular", ejes: "infinitos", orden: null, punzon: "circular", real: "Ø 5 cm", area: "≈ 19,6 cm² (π · 2,5 · 2,5)" },
+        cuadrada: { nombre: "cuadrada", ejes: "4", orden: 4, punzon: "cuadrado", real: "4,5 cm de lado", area: "20,25 cm² (4,5 · 4,5)" },
+        triangular: { nombre: "triangular", ejes: "3", orden: 3, punzon: "triangular", real: "6 cm de lado", area: "≈ 15,6 cm² (6 · 5,2 : 2)" },
+        rectangular: { nombre: "rectangular", ejes: "2", orden: 2, punzon: "circular", real: "7 × 3 cm", area: "21 cm² (7 · 3)" }
+      };
+      let forma = "circular", ordenCirc = 6, tecnica = "punzon", marcas = 0, impresiones = 0, hecho = false, trazo = null, ultimo = null;
+      const orden = () => FORMAS[forma].orden || ordenCirc;
+      const C = T / 2, PR = 15 * K5;                                         // radio del punzón (≈ 2-3 mm en un campo de 5 cm)
+      // Contorno del campo en coordenadas del lienzo (y hacia abajo)
+      function contorno() {
+        if (forma === "circular") return null;
+        if (forma === "cuadrada") { const s = 0.8 * C; return [[C - s, C - s], [C + s, C - s], [C + s, C + s], [C - s, C + s]]; }
+        if (forma === "triangular") { const R = 0.97 * C; return [0, 1, 2].map((k) => { const a = -Math.PI / 2 + (k * 2 * Math.PI) / 3; return [C + R * Math.cos(a), C + R * Math.sin(a) + 0.12 * C]; }); }
+        const w = 0.96 * C, h = 0.41 * C; return [[C - w, C - h], [C + w, C - h], [C + w, C + h], [C - w, C + h]];
+      }
+      // Centro de giro: el del campo (en el triángulo, su baricentro)
+      const centro = () => (forma === "triangular" ? [C, C + 0.12 * C] : [C, C]);
+      function trazarCampo(ctx, encoger = 0) {
+        ctx.beginPath();
+        const pts = contorno();
+        if (!pts) { ctx.arc(C, C, 0.95 * C - encoger, 0, Math.PI * 2); return; }
+        const [cx, cy] = centro();
+        pts.forEach(([x, y], i) => { const dx = x - cx, dy = y - cy, d = Math.hypot(dx, dy), f = (d - encoger * 1.6) / d; i ? ctx.lineTo(cx + dx * f, cy + dy * f) : ctx.moveTo(cx + dx * f, cy + dy * f); });
+        ctx.closePath();
+      }
+      const dentro = (x, y) => { trazarCampo(cP, PR * 1.25); return cP.isPointInPath(x, y); };
+      // Pieza en 3D: cuerpo (campo y laterales) extruido, cara con la decoración y apéndice perforado en el dorso
+      const pieza = new THREE.Group(); pieza.position.set(XS, CY, 0); pieza.rotation.set(-0.08, 0.32, 0); g.add(pieza);
+      // Giro de la pieza: de frente (campo) o de lado (dorso y apéndice); al entrar por primera vez se muestra girando
+      const GIRO_CAMPO = 0.32, GIRO_DORSO = 2.2; let giroObjetivo = GIRO_CAMPO, presentada = false;
+      const matCuerpo = TX.mat("barro", { color: 0x7d6656, rugosidad: 0.6, relieve: 2 });
+      const matCara = new THREE.MeshStandardMaterial({ map: texF, bumpMap: texR, bumpScale: 3.5, roughness: 0.55 });
+      const matHueco = new THREE.MeshStandardMaterial({ color: 0x1c120c, roughness: 1 });
+      let cuerpo = null, campo = null;
+      const GROSOR = 0.26, BISEL = 0.035;
+      function formaThree() {
+        const s = new THREE.Shape(), pts = contorno(), lp = (x, y) => [(x - C) * ESC, -(y - C) * ESC];
+        if (!pts) s.absarc(0, 0, 0.95 * RS, 0, Math.PI * 2, false);
+        else pts.forEach(([x, y], i) => { const [a, b] = lp(x, y); i ? s.lineTo(a, b) : s.moveTo(a, b); });
+        return s;
+      }
+      function construirPieza() {
+        [cuerpo, campo].forEach((m) => { if (m) { pieza.remove(m); m.geometry.dispose(); } });
+        const sh = formaThree();
+        const gc = new THREE.ExtrudeGeometry(sh, { depth: GROSOR, bevelEnabled: true, bevelThickness: BISEL, bevelSize: BISEL, bevelSegments: 3, curveSegments: 64 });
+        gc.translate(0, 0, -GROSOR - BISEL); cuerpo = new THREE.Mesh(gc, matCuerpo);
+        const gf = new THREE.ShapeGeometry(sh, 64), p = gf.attributes.position, uvA = gf.attributes.uv;
+        for (let i = 0; i < p.count; i++) uvA.setXY(i, p.getX(i) / (2 * RS) + 0.5, p.getY(i) / (2 * RS) + 0.5);
+        campo = new THREE.Mesh(gf, matCara); campo.position.z = 0.002;
+        pieza.add(cuerpo, campo);
+      }
+      // Apéndice: cono truncado de sección elíptica, centrado en el dorso, con perforación que lo atraviesa por su lado mayor
+      const apendice = (() => {
+        const L = 0.62, perfil = [[0.001, 0], [0.34, 0], [0.3, 0.12], [0.22, 0.34], [0.19, L - 0.06], [0.14, L], [0.001, L + 0.01]].map(([r, y]) => new THREE.Vector2(r, y));
+        const ga = new THREE.LatheGeometry(perfil, 40); ga.scale(0.62, 1, 1); ga.rotateX(-Math.PI / 2); ga.translate(0, 0, -GROSOR - BISEL);
+        const m = new THREE.Mesh(ga, matCuerpo), zM = -GROSOR - BISEL - L * 0.6, rM = 0.2 * 0.62;
+        for (const lado of [1, -1]) { const h = new THREE.Mesh(new THREE.CircleGeometry(0.06, 24), matHueco); h.rotation.y = lado * Math.PI / 2; h.position.set(lado * (rM + 0.004), 0, zM); m.add(h); }
+        pieza.add(m); return m;
+      })();
       const lamina = new THREE.Mesh(new THREE.PlaneGeometry(2.1, 2.1), new THREE.MeshStandardMaterial({ map: texI, roughness: 0.95 }));
-      lamina.userData.sinSombra = false;
-      lamina.position.set(XI, CY, 0); g.add(lamina);
-      let orden = 6, trazo = null, largo = 0, impresiones = 0, hecho = false;
-      function componerCara() {
-        TX.pintarFondo(cF, "barro", T, T); cF.fillStyle = "rgba(150,90,50,.35)"; cF.fillRect(0, 0, T, T);
-        cF.strokeStyle = "rgba(255,255,255,.3)"; cF.lineWidth = 2 * K5; cF.setLineDash([6 * K5, 8 * K5]);
-        for (let k = 0; k < orden; k++) { const a = (k / orden) * Math.PI * 2; cF.beginPath(); cF.moveTo(T / 2, T / 2); cF.lineTo(T / 2 + Math.cos(a) * T / 2, T / 2 + Math.sin(a) * T / 2); cF.stroke(); }
-        cF.setLineDash([]); cF.drawImage(dib, 0, 0); texF.needsUpdate = true;
-      }
-      function segmento(a, b) {
-        cD.strokeStyle = "#3a2214"; cD.lineWidth = 12 * K5; cD.lineCap = "round";
-        for (let k = 0; k < orden; k++) {
-          const t = (k / orden) * Math.PI * 2, c = Math.cos(t), s = Math.sin(t);
-          const rot = (p) => [T / 2 + (p[0] - T / 2) * c - (p[1] - T / 2) * s, T / 2 + (p[0] - T / 2) * s + (p[1] - T / 2) * c];
-          const A = rot(a), B = rot(b); cD.beginPath(); cD.moveTo(A[0], A[1]); cD.lineTo(B[0], B[1]); cD.stroke();
+      lamina.userData.sinSombra = false; lamina.position.set(XI, CY, 0); g.add(lamina);
+
+      // --- Decoración: la máscara guarda lo hundido (impresiones e incisiones); la cara y el relieve se componen a partir de ella ---
+      function punzonar(ctx, x, y, giro, modo) {     // modo "cara": facetas sombreadas; "plano": silueta
+        const tipo = FORMAS[forma].punzon, r = PR;
+        ctx.save(); ctx.translate(x, y); ctx.rotate(giro);
+        if (tipo === "circular") {
+          if (modo === "plano") { ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); }
+          else { const gr = ctx.createRadialGradient(-r * 0.25, -r * 0.25, 0, 0, 0, r); gr.addColorStop(0, "#160d08"); gr.addColorStop(0.7, "#3a2516"); gr.addColorStop(1, "#6e4c34"); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); }
+        } else {
+          const n = tipo === "triangular" ? 3 : 4, v = Array.from({ length: n }, (_, k) => { const a = -Math.PI / 2 + (k * 2 * Math.PI) / n + (n === 4 ? Math.PI / 4 : 0); return [Math.cos(a) * r * 1.15, Math.sin(a) * r * 1.15]; });
+          if (modo === "plano") { ctx.beginPath(); v.forEach(([a, b], i) => (i ? ctx.lineTo(a, b) : ctx.moveTo(a, b))); ctx.closePath(); ctx.fill(); }
+          else {                                     // huella piramidal: cada faceta recibe una luz distinta
+            const tonos = n === 3 ? ["#5c3d28", "#2a1a10", "#3f2a1b"] : ["#5c3d28", "#3f2a1b", "#22150c", "#36241a"];
+            for (let k = 0; k < n; k++) { const a = v[k], b = v[(k + 1) % n]; ctx.fillStyle = tonos[k]; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.closePath(); ctx.fill(); }
+          }
         }
-        largo += Math.hypot(b[0] - a[0], b[1] - a[1]); componerCara(); refrescar();
+        ctx.restore();
       }
-      function borrar() { cD.clearRect(0, 0, T, T); largo = 0; componerCara(); refrescar(); }
-      function cambiarOrden(n) { orden = n; borrar(); estado("Orden " + n + ": tu dibujo se repetirá " + n + " veces girando " + Math.round(360 / n) + "° cada vez.", "status-warn", "p5-orden-" + n); }
-      function figura(tipo) {
-        const c = T / 2, k = K5, pts = tipo === "triangulo" ? [[c + 60 * k, c - 18 * k], [c + 200 * k, c - 50 * k], [c + 200 * k, c + 14 * k], [c + 60 * k, c - 18 * k]] : [[c + 120 * k, c - 60 * k], [c + 170 * k, c - 20 * k], [c + 200 * k, c + 30 * k]];
-        for (let i = 1; i < pts.length; i++) segmento(pts[i - 1], pts[i]);
+      const huellas = [], incisiones = [];             // en coordenadas del lienzo
+      function componer() {
+        // Cara: barro bruñido, con el campo recortado y las huellas sombreadas
+        TX.pintarFondo(cF, "barro", T, T);
+        cF.globalCompositeOperation = "multiply"; cF.fillStyle = "#8f7a68"; cF.fillRect(0, 0, T, T); cF.globalCompositeOperation = "source-over";
+        cF.strokeStyle = "rgba(255,255,255,.28)"; cF.lineWidth = 2 * K5; cF.setLineDash([6 * K5, 8 * K5]);
+        const [cx, cy] = centro(), n = orden();
+        cF.save(); trazarCampo(cF); cF.clip();
+        for (let k = 0; k < n; k++) { const a = -Math.PI / 2 + (k / n) * Math.PI * 2; cF.beginPath(); cF.moveTo(cx, cy); cF.lineTo(cx + Math.cos(a) * T, cy + Math.sin(a) * T); cF.stroke(); }
+        cF.setLineDash([]);
+        for (const l of incisiones) { cF.lineCap = "round"; cF.strokeStyle = "rgba(220,180,140,.35)"; cF.lineWidth = PR * 1.1; cF.beginPath(); cF.moveTo(l[0] - 2, l[1] - 2); cF.lineTo(l[2] - 2, l[3] - 2); cF.stroke(); cF.strokeStyle = "#2a1a10"; cF.lineWidth = PR * 0.8; cF.beginPath(); cF.moveTo(l[0], l[1]); cF.lineTo(l[2], l[3]); cF.stroke(); }
+        for (const h of huellas) punzonar(cF, h[0], h[1], h[2], "cara");
+        cF.restore(); texF.needsUpdate = true;
+        // Relieve: gris medio y lo hundido en negro
+        cR.fillStyle = "#9a9a9a"; cR.fillRect(0, 0, T, T); cR.fillStyle = "#000"; cR.strokeStyle = "#000";
+        for (const l of incisiones) { cR.lineCap = "round"; cR.lineWidth = PR * 0.8; cR.beginPath(); cR.moveTo(l[0], l[1]); cR.lineTo(l[2], l[3]); cR.stroke(); }
+        for (const h of huellas) punzonar(cR, h[0], h[1], h[2], "plano");
+        texR.needsUpdate = true;
       }
+      // Cada marca se repite girando alrededor del centro (simetría de rotación de orden n)
+      function rotar(x, y, k, n) { const [cx, cy] = centro(), a = (k / n) * Math.PI * 2, c = Math.cos(a), s = Math.sin(a); return [cx + (x - cx) * c - (y - cy) * s, cy + (x - cx) * s + (y - cy) * c, a]; }
+      function marcaPunzon(x, y, repetir = true) {
+        if (!dentro(x, y)) return false;
+        const n = repetir ? orden() : 1, [cx, cy] = centro(), giro0 = forma === "triangular" || forma === "cuadrada" ? 0 : Math.atan2(y - cy, x - cx);
+        for (let k = 0; k < n; k++) { const [a, b, ang] = rotar(x, y, k, n); if (dentro(a, b)) { huellas.push([a, b, giro0 + (forma === "circular" || forma === "rectangular" ? ang : 0)]); marcas++; } }
+        return true;
+      }
+      function marcaLinea(x0, y0, x1, y1) {
+        if (!dentro(x0, y0) || !dentro(x1, y1)) return false;
+        const n = orden();
+        for (let k = 0; k < n; k++) { const a = rotar(x0, y0, k, n), b = rotar(x1, y1, k, n); incisiones.push([a[0], a[1], b[0], b[1]]); }
+        marcas += n * Math.max(1, Math.round(Math.hypot(x1 - x0, y1 - y0) / (PR * 3)));
+        return true;
+      }
+      function borrar() { huellas.length = 0; incisiones.length = 0; marcas = 0; componer(); refrescar(); }
+      function cambiarForma(f) {
+        forma = f; construirPieza(); borrar();
+        const F = FORMAS[f];
+        estado("Pintadera " + F.nombre + ": simetría de rotación de orden " + orden() + " (giro de " + Math.round(360 / orden()) + "°) y " + F.ejes + " ejes de simetría.", "status-warn", "p5-forma-" + f);
+      }
+      function cambiarOrden(n) {
+        if (forma !== "circular") { estado("En una pintadera " + FORMAS[forma].nombre + " el orden lo fija la forma: " + orden() + ". Elige la circular para cambiarlo.", "status-warn", "p5-orden-fijo-" + forma); return; }
+        ordenCirc = n; borrar(); estado("Orden " + n + ": tu dibujo se repetirá " + n + " veces girando " + Math.round(360 / n) + "° cada vez.", "status-warn", "p5-orden-" + n);
+      }
+      // Botones accesibles
+      function anillo() {
+        const [cx, cy] = centro(), n = orden(), r = (forma === "rectangular" ? 0.28 : 0.5) * C, paso = PR * 2.7, sector = (2 * Math.PI) / n, cuantos = Math.max(1, Math.floor((sector * r) / paso));
+        for (let i = 0; i < cuantos; i++) { const a = -Math.PI / 2 + (i + 0.5) * (sector / cuantos); marcaPunzon(cx + Math.cos(a) * r, cy + Math.sin(a) * r); }
+        componer(); refrescar();
+      }
+      function lineaIncisa() { const [cx, cy] = centro(), a = -Math.PI / 2 + Math.PI / orden(), r0 = 0.18 * C, r1 = (forma === "rectangular" ? 0.32 : 0.62) * C; marcaLinea(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0, cx + Math.cos(a) * r1, cy + Math.sin(a) * r1); componer(); refrescar(); }
+      // Esquemas pautados, inspirados en piezas del catálogo (fig. 5.1): las hileras de impresiones siguen el contorno del campo
+      function esquema() {
+        huellas.length = 0; incisiones.length = 0; marcas = 0;
+        const [cx, cy] = centro(), paso = PR * 2.6;
+        const hilera = (pts) => { for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length], L = Math.hypot(b[0] - a[0], b[1] - a[1]), m = Math.max(1, Math.round(L / paso)); for (let j = 0; j < m; j++) marcaPunzon(a[0] + ((b[0] - a[0]) * j) / m, a[1] + ((b[1] - a[1]) * j) / m, false); } };
+        if (forma === "circular") {
+          for (const f of [0.86, 0.66, 0.46, 0.26]) { const r = f * C, m = Math.max(orden(), Math.round((2 * Math.PI * r) / paso / orden()) * orden()); for (let j = 0; j < m; j++) { const a = (j / m) * Math.PI * 2; marcaPunzon(cx + Math.cos(a) * r, cy + Math.sin(a) * r, false); } }
+          marcaPunzon(cx, cy, false);
+        } else if (forma === "triangular") {
+          const d = PR * 2.9, h = d * Math.sqrt(3) / 2;
+          for (let fila = 0; fila < 40; fila++) for (let i = -20; i <= 20; i++) { const y = cy - 0.95 * C + fila * h, x = cx + (i + (fila % 2 ? 0.5 : 0)) * d; marcaPunzon(x, y, false); }
+        } else {
+          const pts = contorno();
+          for (const f of forma === "cuadrada" ? [0.88, 0.64, 0.4] : [0.86, 0.5]) hilera(pts.map(([x, y]) => [cx + (x - cx) * f, cy + (y - cy) * f]));
+          if (forma === "cuadrada") marcaPunzon(cx, cy, false);
+          else for (let x = cx - 0.6 * C; x <= cx + 0.6 * C; x += paso) marcaPunzon(x, cy, false);
+        }
+        componer(); refrescar();
+        estado("Esquema inspirado en pintaderas del catálogo: las impresiones van en hileras que siguen la forma del campo. Muchas pintaderas repiten esquemas casi iguales.", "status-warn", "p5-esquema-" + forma);
+      }
+      // Estampar: el sello deja la imagen al revés (reflejo) y en negativo: lo hundido no toca la superficie y queda sin color
       function estampar(u, v) {
-        if (largo < 260 * K5) { estado("Dibuja un poco más en la pintadera antes de estampar.", "status-warn", "p5-poco"); return; }
-        cT.clearRect(0, 0, T, T); cT.save(); cT.translate(T, 0); cT.scale(-1, 1); cT.drawImage(dib, 0, 0); cT.restore();   // el sello imprime al revés
-        cT.globalCompositeOperation = "source-in"; cT.fillStyle = "#9b2d20"; cT.fillRect(0, 0, T, T); cT.globalCompositeOperation = "source-over";
-        const L = Math.round(T * 2 * RS / 2.1), x = clamp(u * T, L / 2, T - L / 2), y = clamp((1 - v) * T, L / 2, T - L / 2);
-        cI.globalAlpha = 0.9; cI.drawImage(tinta, x - L / 2, y - L / 2, L, L); cI.globalAlpha = 1; texI.needsUpdate = true;
+        if (marcas < 12) { estado("Decora un poco más la pintadera antes de estampar.", "status-warn", "p5-poco"); return; }
+        cT.clearRect(0, 0, T, T); cT.save(); cT.translate(T, 0); cT.scale(-1, 1);
+        trazarCampo(cT); cT.fillStyle = "#9b2d20"; cT.fill();
+        cT.globalCompositeOperation = "destination-out"; cT.fillStyle = "#000"; cT.strokeStyle = "#000";
+        for (const l of incisiones) { cT.lineCap = "round"; cT.lineWidth = PR * 0.8; cT.beginPath(); cT.moveTo(l[0], l[1]); cT.lineTo(l[2], l[3]); cT.stroke(); }
+        for (const h of huellas) punzonar(cT, h[0], h[1], h[2], "plano");
+        cT.restore(); cT.globalCompositeOperation = "source-over";
+        const L = Math.round((T * 2 * RS) / 2.1), x = clamp(u * T, L / 2, T - L / 2), y = clamp((1 - v) * T, L / 2, T - L / 2);
+        cI.globalAlpha = 0.85; cI.drawImage(tinta, x - L / 2, y - L / 2, L, L); cI.globalAlpha = 1; texI.needsUpdate = true;
         impresiones++; refrescar();
-        if (!hecho) { hecho = true; completar(4, "¡Impresión hecha! Fíjate: el sello imprime el dibujo al revés, como en un espejo (simetría axial)."); abrirPanel("panel-final"); }
+        if (!hecho) { hecho = true; completar(4, "¡Impresión hecha! Fíjate: el dibujo sale al revés, como en un espejo (simetría axial), y en negativo: lo hundido no toca la superficie y queda sin color."); abrirPanel("panel-final"); }
       }
       function uv(obj, x, y) { const h = rayo(x, y).intersectObject(obj, false)[0]; return h && h.uv ? { h, uv: h.uv } : null; }
       function refrescar() {
         if (actual !== 4) return;
-        metricas(["Simetría de rotación: orden " + orden, "Giro entre repeticiones: 360° : " + orden + " = " + Math.round(360 / orden) + "°", "Dibujo: " + Math.min(100, Math.round(largo / (2.6 * K5))) + " %", "Impresiones: " + impresiones]);
+        const F = FORMAS[forma], n = orden();
+        metricas(["Forma: " + F.nombre + " · ejes de simetría: " + F.ejes, "Simetría de rotación: orden " + n + " (360° : " + n + " = " + fmt(360 / n, 0) + "°)", "Campo real: " + F.real + " · área " + F.area, "Técnica: " + (tecnica === "punzon" ? "impresión con punzón" : "incisión") + " · marcas: " + marcas + " · estampaciones: " + impresiones]);
       }
-      componerCara();
+      construirPieza(); componer();
       return {
         nombre: "La pintadera canaria", grupo: g, marco: { ancho: 5.8, alto: 3.0, cy: 1.45 }, fondo: "canarias",
-        nota: "Las pintaderas son sellos de barro cocido de Gran Canaria con dibujos geométricos. La nuestra es circular; en El Museo Canario la mayoría son rectangulares o cuadradas.",
+        nota: "Pintaderas: matrices de barro cocido de Gran Canaria. De las 183 matrices simples de El Museo Canario, 77 son rectangulares, 34 cuadradas, 29 circulares y 29 triangulares.",
         entrar() {
-          etiqueta("tu pintadera", "", () => [XS, CY + RS + 0.3]);
+          etiqueta("campo de tu pintadera", "", () => [XS, CY + RS + 0.3]);
+          etiqueta("apéndice perforado (mango)", "geo", () => (pieza.rotation.y > 1.2 ? [XS - 0.85, CY + 0.4, 0.6] : null));
+          if (!presentada && !MOV_REDUCIDO) { presentada = true; pieza.rotation.y = GIRO_DORSO; giroObjetivo = GIRO_CAMPO; pieza.userData.espera = 1.6; }
           etiqueta("donde se estampa", "", () => [XI, CY + 1.3]);
-          etiqueta("impresión (al revés)", "geo", () => (impresiones ? [XI, CY - 1.15] : null)).el.classList.add("abajo");
-          if (!hecho) estado("Haz pinza sobre la pintadera y dibuja en un sector: el dibujo se repite al girar. Después haz pinza sobre la lámina para estampar.", "status-warn", "p5-ini");
+          etiqueta("impresión (al revés y en negativo)", "geo", () => (impresiones ? [XI, CY - 1.15] : null)).el.classList.add("abajo");
+          if (!hecho) estado("Haz pinza sobre el campo y arrastra: el punzón deja una hilera de impresiones que se repite al girar. Después haz pinza sobre la lámina para estampar.", "status-warn", "p5-ini");
           refrescar();
         },
         alternativos() {
-          filaBotones([["Orden 4", () => cambiarOrden(4)], ["Orden 6", () => cambiarOrden(6)], ["Orden 8", () => cambiarOrden(8)]]);
-          filaBotones([["Añadir triángulo", () => figura("triangulo")], ["Añadir línea", () => figura("linea")], ["Borrar", borrar]]);
-          filaBotones([["Estampar", () => estampar(0.5, 0.5)]]);
+          filaBotones([["Circular", () => cambiarForma("circular")], ["Cuadrada", () => cambiarForma("cuadrada")], ["Triangular", () => cambiarForma("triangular")], ["Rectangular", () => cambiarForma("rectangular")], ["Orden 4", () => cambiarOrden(4)], ["Orden 6", () => cambiarOrden(6)], ["Orden 8", () => cambiarOrden(8)]]);
+          filaBotones([["Técnica: punzón", () => { tecnica = "punzon"; refrescar(); }], ["Técnica: incisión", () => { tecnica = "incision"; refrescar(); }], ["Ver el dorso y el apéndice", () => { giroObjetivo = GIRO_DORSO; estado("El dorso lleva el apéndice, un mango que facilita sujetar la pintadera; en el catálogo, 98 de los 124 apéndices completos están perforados.", "status-warn", "p5-dorso"); }], ["Ver el campo", () => { giroObjetivo = GIRO_CAMPO; }]]);
+          filaBotones([["Un anillo de impresiones", anillo], ["Una línea incisa", lineaIncisa], ["Esquema del museo", esquema], ["Borrar", borrar], ["Estampar", () => estampar(0.5, 0.5)]]);
         },
         down(x, y) {
-          const s = uv(sello, x, y);
-          if (s) { trazo = [s.uv.x * T, (1 - s.uv.y) * T]; return true; }
+          const s = uv(campo, x, y);
+          if (s) {
+            const p = [s.uv.x * T, (1 - s.uv.y) * T]; trazo = p; ultimo = p;
+            if (tecnica === "punzon" && marcaPunzon(p[0], p[1])) { componer(); refrescar(); }
+            return true;
+          }
           const l = uv(lamina, x, y);
           if (l) estampar(l.uv.x, l.uv.y);
           return false;
         },
         move(x, y) {
           if (!trazo) return;
-          const s = uv(sello, x, y);
-          if (s) { const p = [s.uv.x * T, (1 - s.uv.y) * T]; if (Math.hypot(p[0] - trazo[0], p[1] - trazo[1]) > 4 * K5) { segmento(trazo, p); trazo = p; } }
+          const s = uv(campo, x, y); if (!s) return;
+          const p = [s.uv.x * T, (1 - s.uv.y) * T], d = Math.hypot(p[0] - ultimo[0], p[1] - ultimo[1]);
+          if (tecnica === "punzon" && d > PR * 2.6) { if (marcaPunzon(p[0], p[1])) { componer(); refrescar(); } ultimo = p; }
+          else if (tecnica === "incision" && d > PR * 1.5) { if (marcaLinea(ultimo[0], ultimo[1], p[0], p[1])) { componer(); refrescar(); } ultimo = p; }
         },
         up() { trazo = null; },
-        tick() {}
+        tick(dt) {
+          if (pieza.userData.espera > 0) { pieza.userData.espera -= dt; return; }
+          const d = giroObjetivo - pieza.rotation.y; if (Math.abs(d) > 0.002) pieza.rotation.y += d * Math.min(1, dt * (MOV_REDUCIDO ? 20 : 3));
+        }
       };
     })();
 
@@ -1840,11 +1982,14 @@
        <h3>Patrimonio: los dólmenes de Antequera</h3><p>Menga, Viera y El Romeral (Málaga) son Patrimonio Mundial desde 2016. Menga se construyó hace unos 5600-5800 años y su mayor piedra de cubierta pesa unas 150 toneladas. Su corredor no mira al sol, sino a una montaña, la Peña de los Enamorados. En Viera, en cambio, el sol del equinoccio entra por el corredor hasta la cámara.</p>
        <h3>Ángulos y puntos cardinales</h3><p>Medimos la orientación en grados desde el norte, girando como las agujas del reloj: el este está a 90°, el sur a 180° y el oeste a 270°. En nuestro modelo el horizonte es plano; en la realidad, las montañas cambian un poco el punto por donde sale el sol.</p>
        <p class="fuente">UNESCO, «Antequera Dolmens Site» (2016) · Lozano Rodríguez et al. (2024), <em>Science Advances</em>, doi:10.1126/sciadv.adp1295 · Junta de Andalucía, Conjunto Arqueológico Dólmenes de Antequera. El dolmen de la actividad es un modelo simplificado.</p>`,
-      `<h3>Las pintaderas</h3><p>Son sellos de barro cocido de Gran Canaria con dibujos geométricos, como triángulos y líneas, y casi siempre con un mango, a menudo perforado. El Museo Canario conserva más de doscientas.</p>
-       <h3>¿Para qué servían?</h3><p>No lo sabemos con seguridad. Se ha propuesto que servían para decorar la piel o el pan, como adornos o amuletos, o como marcas de propiedad. Cuando nadie lo dejó escrito, los arqueólogos proponen hipótesis y las ponen a prueba.</p>
+      `<h3>Las pintaderas</h3><p>Son matrices de barro cocido de Gran Canaria. Tienen un <strong>cuerpo</strong>, con el <strong>campo</strong> decorado, los laterales y el dorso, y casi siempre un <strong>apéndice</strong> o mango en el centro del dorso, a menudo perforado. El Museo Canario conserva 214. De las 183 matrices simples, 77 son rectangulares, 34 cuadradas, 29 circulares y 29 triangulares. Los campos miden entre unos 2 × 2 cm y 4 × 10 cm.</p>
+       <h3>Cómo se hacían</h3><p>Se modelaban con las manos, se alisaban y, con el barro «de cuero» (casi duro), se decoraban con punzones de madera o hueso: <strong>impresión</strong> (presionar la punta), <strong>incisión</strong> (arrastrarla) y <strong>excisión</strong> (vaciar). La impresión es la técnica más frecuente. Después podían pintarse con almagre (rojo), bruñirse y cocerse.</p>
+       <h3>Geometría y normas</h3><p>La decoración sigue la forma del campo: circunferencias en las circulares, triángulos en las triangulares, cuadrados y líneas paralelas en las cuadradas y rectangulares. Muchas pintaderas repiten <strong>esquemas casi iguales</strong>, lo que hace pensar en normas compartidas por toda la isla, quizá ligadas a la identidad de sus habitantes.</p>
+       <h3>Al estampar</h3><p>El sello deja la imagen al revés, como en un espejo. Además, si se usa tinte, lo hundido no toca la superficie y queda sin color; sobre barro tierno, lo hundido sale en relieve.</p>
+       <h3>¿Para qué servían?</h3><p>No lo sabemos con seguridad. Se ha propuesto que servían para pintar la piel, como marcas de propiedad (por ejemplo, en graneros), como amuletos o como señales de identidad. La mayoría se ha encontrado en casas y cuevas de habitación, por toda la isla. Cuando nadie lo dejó escrito, los arqueólogos proponen hipótesis y las ponen a prueba.</p>
        <h3>Geometría en las paredes</h3><p>En la Cueva Pintada de Gáldar, la población indígena de Gran Canaria decoró una cámara con motivos exclusivamente geométricos, en rojo y blanco sobre fondo negro.</p>
        <h3>¿Prehistoria en Canarias?</h3><p>Las primeras personas llegaron a las islas desde el norte de África hace unos dos mil años; la fecha exacta todavía se discute. Sus descendientes vivieron sin metales hasta la conquista castellana del siglo XV. Por eso algunos libros hablan de «Prehistoria de Canarias», aunque muchos especialistas prefieren decir «época prehispánica» o «indígena». Las edades de la historia son una manera de ordenar el tiempo y no encajan igual en todos los lugares.</p>
-       <p class="fuente">El Museo Canario, catálogo «Pintaderas» · Turespaña, ficha «Cueva Pintada» · Velasco-Vázquez et al. (2021), <em>Complutum</em>, 32(1), 167-189, doi:10.5209/cmpl.76453. La pintadera de la actividad es circular para mostrar la simetría de rotación.</p>`
+       <p class="fuente">Cruz de Mercadal, M.ª C., Delgado Darias, T. y Velasco Vázquez, J. (2013). <em>Pintaderas de El Museo Canario</em>. El Museo Canario. ISBN 978-84-695-6874-3 · Turespaña, ficha «Cueva Pintada» · Velasco-Vázquez et al. (2021), <em>Complutum</em>, 32(1), 167-189, doi:10.5209/cmpl.76453. Las medidas de la actividad son ejemplos dentro del tamaño mediano del catálogo; los esquemas están inspirados en piezas reales, no las copian.</p>`
     ];
     let focoPrevio = null;
     function abrirPanel(id) { focoPrevio = document.activeElement; const p = $(id); p.hidden = false; p.querySelector("button").focus(); }
