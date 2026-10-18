@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Misión Roma · Las manos que construyeron la historia</title>
+  <!--
+    Misión Roma v3.0.1 (edición para GitHub Pages) · Proyecto «Las manos que construyeron la historia»
+    Geometría, patrimonio histórico y realidad aumentada en Educación Primaria (5.º-6.º)
+
+    Proceso evolutivo en cinco etapas, todas manipulables con las manos (pinza) o con alternativas DUA:
+      1. Leer el terreno (Geografía): perfil topográfico, cota y exageración vertical.
+      2. Nivelar el canal (Matemáticas): pendiente en porcentaje y números enteros.  [núcleo v2.x conservado]
+      3. Construir (Medida y geometría): sillares, prisma, volumen, arco de medio punto.
+      4. Cómo lo hacían los romanos (Historia): el corobate (Vitruvio, VIII, 5) y la pendiente real.
+      5. Transferencia a Canarias: la cantonera y el reparto del agua en proporción (fracciones y porcentajes).
+
+    Se conservan de v2.2: RA «espejo» con cámara frontal, pinza normalizada con histéresis, privacidad por
+    defecto, apagado de cámara, contexto seguro, SRI, librerías y WASM locales, PERMITIR_MODELO_REMOTO.
+    El terreno, las fincas y las cifras de las etapas 1 y 5 son inventados con fines didácticos (declarado).
+  -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./lib/three.module.js",
+      "@mediapipe/tasks-vision": "./lib/vision_bundle.mjs"
+    },
+    "integrity": {
+      "./lib/three.module.js": "sha384-61S/Nu32S3E5+n+KpCOTb2eRYps6fVKm+9Gz1QBvSePFthb46f063Aa/qe/lykFZ",
+      "./lib/vision_bundle.mjs": "sha384-9MVwqhzThi8MIJU3B3BxQi92VYFPzYDEWSYI5vJig77g7vjdK+y/gG9EQ/sjWmdU"
+    }
+  }
+  </script>
+  <style>
+    :root{
+      --ocre:#c2843a; --noche:#1c1917; --panel:rgba(28,25,23,.9); --texto:#faf7f2;
+      --ok:#4ade80; --aviso:#facc15; --error:#f87171; --agua:#38bdf8;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%;overflow:hidden;background:var(--noche);color:var(--texto);
+      font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-user-select:none;user-select:none}
+    #escena{position:fixed;inset:0;background:linear-gradient(#cfe3ec 0%,#e9dfcc 62%,#b89c78 100%)}
+    #video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);opacity:0;transition:opacity .3s}
+    #video.visible{opacity:1}
+    #lienzo3d,#lienzoManos{position:absolute;inset:0;width:100%;height:100%}
+    #lienzo3d{touch-action:none}
+    #lienzoManos{pointer-events:none}
+    .etq{position:absolute;transform:translate(-50%,-100%);background:var(--panel);color:var(--texto);font-variant-numeric:tabular-nums;
+      font-size:.76rem;padding:3px 7px;border-radius:6px;white-space:nowrap;pointer-events:none}
+    .etq.geo{background:rgba(194,132,58,.95);color:#1c1917;font-weight:600}
+    .etq.abajo{transform:translate(-50%,0)}
+    .etq.agua{background:rgba(2,132,199,.92)}
+    #hud{position:absolute;top:max(10px,env(safe-area-inset-top));left:10px;right:10px;max-width:460px;
+      background:var(--panel);border:1px solid rgba(255,255,255,.2);border-radius:12px;padding:9px 12px;z-index:5}
+    #hud .lema{font-size:.72rem;opacity:.8;margin:0}
+    #hud h1{font-size:1rem;margin:1px 0 5px}
+    #etapas{display:flex;gap:4px;list-style:none;margin:0 0 6px;padding:0}
+    #etapas li{flex:1}
+    #etapas button{width:100%;padding:5px 2px;font-size:.68rem;border-radius:7px;line-height:1.15}
+    #etapas button[aria-current="step"]{background:var(--ocre);color:#1c1917}
+    #etapas button.hecha::after{content:" ✓"}
+    #etapas button:disabled{opacity:.4;cursor:not-allowed}
+    .metricas{display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;font-size:.82rem;font-weight:600}
+    #estado{margin-top:6px;font-size:.85rem;font-weight:700}
+    .status-ok{color:var(--ok)} .status-warn{color:var(--aviso)} .status-error{color:var(--error)}
+    #nota{font-size:.68rem;opacity:.75;margin-top:4px}
+    #controles{position:absolute;left:10px;right:10px;bottom:max(10px,env(safe-area-inset-bottom));
+      display:flex;flex-wrap:wrap;gap:8px;justify-content:center;z-index:5}
+    button{font:inherit;font-size:.86rem;font-weight:700;border-radius:10px;padding:9px 13px;
+      background:var(--panel);color:var(--texto);border:1px solid rgba(255,255,255,.25);cursor:pointer}
+    button[aria-pressed="true"],button.principal{background:var(--ocre);color:#1c1917}
+    button:disabled{opacity:.45;cursor:not-allowed}
+    button:focus-visible,input:focus-visible{outline:3px solid var(--agua);outline-offset:2px}
+    #alternativos{width:100%;display:flex;flex-direction:column;gap:6px;background:var(--panel);border-radius:10px;padding:8px 12px}
+    #alternativos .fila{display:flex;align-items:center;gap:8px;font-size:.82rem}
+    #alternativos .fila label{min-width:92px}
+    #alternativos input[type=range]{flex:1;accent-color:var(--ocre)}
+    #inicio,.panel{position:absolute;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;
+      background:rgba(28,25,23,.82);padding:16px}
+    .tarjeta{background:#292524;border:1px solid rgba(255,255,255,.2);border-radius:14px;padding:18px;max-width:540px;
+      max-height:88vh;overflow:auto;line-height:1.45;-webkit-user-select:text;user-select:text}
+    .tarjeta h2{margin:0 0 4px;font-size:1.25rem}
+    .tarjeta h3{margin:14px 0 4px;font-size:1rem;color:var(--ocre)}
+    .tarjeta p,.tarjeta li{margin:6px 0;font-size:.92rem}
+    .tarjeta .botones{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+    .privacidad,.fuente{font-size:.76rem;opacity:.8}
+    [hidden]{display:none!important}
+    @media (prefers-reduced-motion: reduce){ #video{transition:none} }
+    @media (orientation: landscape) and (max-height: 520px){
+      #hud{right:auto;width:290px;padding:7px 10px}
+      #hud h1{font-size:.88rem} #hud .lema{display:none}
+      .metricas{font-size:.72rem} #estado{font-size:.74rem} #nota{font-size:.62rem}
+      #controles{left:10px;right:auto;width:290px;justify-content:flex-start;gap:5px}
+      #controles button{padding:6px 9px;font-size:.76rem}
+      #alternativos{padding:5px 9px}
+    }
+  </style>
+</head>
+<body>
+  <main id="escena">
+    <video id="video" playsinline muted aria-hidden="true"></video>
+    <canvas id="lienzo3d" role="img" aria-label="Escena 3D de la etapa actual. Los elementos marcados se pueden mover con la pinza, con el dedo o con los controles alternativos."></canvas>
+    <canvas id="lienzoManos" aria-hidden="true"></canvas>
+    <div id="etiquetas" aria-hidden="true"></div>
+  </main>
+
+  <header id="hud">
+    <p class="lema">Las manos que construyeron la historia</p>
+    <h1 id="titulo-etapa">Misión Roma</h1>
+    <ol id="etapas" aria-label="Etapas de la misión">
+      <li><button type="button" data-etapa="0">1 Terreno</button></li>
+      <li><button type="button" data-etapa="1">2 Nivelar</button></li>
+      <li><button type="button" data-etapa="2">3 Construir</button></li>
+      <li><button type="button" data-etapa="3">4 Romanos</button></li>
+      <li><button type="button" data-etapa="4">5 Canarias</button></li>
+    </ol>
+    <div id="metricas" class="metricas"></div>
+    <div id="estado" class="status-warn" role="status" aria-live="polite">Elige cómo quieres construir.</div>
+    <div id="nota"></div>
+  </header>
+
+  <nav id="controles" aria-label="Herramientas">
+    <div id="alternativos" hidden></div>
+    <button type="button" id="btn-saber">Saber más</button>
+    <button type="button" id="btn-imagen" aria-pressed="false" hidden>Mostrar mi imagen</button>
+    <button type="button" id="btn-alternativo" aria-pressed="false">Otra forma de mover</button>
+    <button type="button" id="btn-siguiente" class="principal" disabled>Siguiente etapa</button>
+  </nav>
+
+  <section id="inicio" role="dialog" aria-modal="true" aria-labelledby="t-inicio">
+    <div class="tarjeta">
+      <h2 id="t-inicio">Misión Roma</h2>
+      <p><strong>Las manos que construyeron la historia</strong></p>
+      <p>Hay que llevar agua desde un manantial hasta una ciudad, como hacían los romanos. Lo harás en cinco etapas, igual que en una obra de verdad: leer el terreno, nivelar el canal, construir, medir como los romanos y, al final, descubrir cómo se reparte el agua en Canarias.</p>
+      <p>Con la cámara, junta el <strong>pulgar y el índice</strong> (haz pinza) sobre lo que quieras mover y desplaza la mano.</p>
+      <div class="botones">
+        <button type="button" class="principal" id="btn-manos">Construir con mis manos (cámara)</button>
+        <button type="button" id="btn-tactil">Construir con el dedo, el ratón o el teclado</button>
+      </div>
+      <p class="privacidad">La cámara se usa solo para localizar las manos. La imagen se procesa en este dispositivo: no se graba ni se envía. Por defecto tu imagen no se muestra; solo aparecen unas manos dibujadas. Si el modelo de detección de manos no está instalado junto a la actividad, se descarga desde internet.</p>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-info" role="dialog" aria-modal="true" hidden aria-labelledby="t-info">
+    <div class="tarjeta">
+      <h2 id="t-info">Saber más</h2>
+      <div id="cuerpo-info"></div>
+      <div class="botones"><button type="button" class="principal" data-cerrar>Volver a la obra</button></div>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-final" role="dialog" aria-modal="true" hidden aria-labelledby="t-final">
+    <div class="tarjeta">
+      <h2 id="t-final">¡Misión cumplida!</h2>
+      <p>Tus manos han recorrido el camino de una obra hidráulica:</p>
+      <ol>
+        <li><strong>Terreno:</strong> leíste el perfil y encontraste el valle donde el canal queda en el aire.</li>
+        <li><strong>Nivelar:</strong> ajustaste el pilar para que el agua bajara siempre, con la misma pendiente.</li>
+        <li><strong>Construir:</strong> levantaste el pilar con sillares y calculaste su volumen.</li>
+        <li><strong>Romanos:</strong> nivelaste un corobate y viste lo poco que bajaba un canal de verdad.</li>
+        <li><strong>Canarias:</strong> repartiste el agua de una cantonera en partes proporcionales.</li>
+      </ol>
+      <p>La misma idea une las cinco etapas: el agua solo se mueve sola cuesta abajo, y quien la conduce tiene que medir con mucho cuidado.</p>
+      <div class="botones"><button type="button" class="principal" data-cerrar>Volver a la obra</button></div>
+    </div>
+  </section>
+
+  <script type="module">
+    import * as THREE from "three";
+
+    // =====================================================================
+    // 0. UTILIDADES Y DOM
+    // =====================================================================
+    const $ = (id) => document.getElementById(id);
+    const escena = $("escena"), video = $("video"), lienzo3d = $("lienzo3d"), lienzoManos = $("lienzoManos");
+    const ctxM = lienzoManos.getContext("2d");
+    const estadoTxt = $("estado"), metricasDiv = $("metricas"), notaDiv = $("nota"), alternativos = $("alternativos");
+    const fmt = (n, d = 2) => n.toFixed(d).replace(".", ",");
+    const fmtSigno = (n, d = 1) => (n > 0.0499 ? "+" : n < -0.0499 ? "−" : "") + fmt(Math.abs(n), d);
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+    const MOV_REDUCIDO = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const DOCENTE = new URLSearchParams(location.search).has("docente");
+
+    let categoriaPrevia = "";
+    let actual = -1, etapa = null;
+    function estado(texto, clase = "status-warn", categoria = texto) {
+      if (categoria === categoriaPrevia) return;
+      categoriaPrevia = categoria;
+      estadoTxt.textContent = texto;
+      estadoTxt.className = clase;
+    }
+    function metricas(lineas) {
+      while (metricasDiv.children.length < lineas.length) metricasDiv.appendChild(document.createElement("div"));
+      while (metricasDiv.children.length > lineas.length) metricasDiv.lastChild.remove();
+      lineas.forEach((t, i) => { if (metricasDiv.children[i].textContent !== t) metricasDiv.children[i].textContent = t; });
+    }
+
+    // =====================================================================
+    // 1. THREE.JS BÁSICO
+    // =====================================================================
+    const renderer = new THREE.WebGLRenderer({ canvas: lienzo3d, alpha: true, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.9));
+    const luz = new THREE.DirectionalLight(0xffffff, 1.2);
+    luz.position.set(2, 5, 4);
+    scene.add(luz);
+
+    const M = {
+      piedra: new THREE.MeshStandardMaterial({ color: 0xd6d3d1, roughness: 0.7 }),
+      seleccion: new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.4 }),
+      correcto: new THREE.MeshStandardMaterial({ color: 0x4ade80, roughness: 0.4 }),
+      canal: new THREE.MeshStandardMaterial({ color: 0x0284c7 }),
+      suelo: new THREE.MeshStandardMaterial({ color: 0x8b7355, roughness: 1, transparent: true, opacity: 0.9 }),
+      tierra: new THREE.MeshStandardMaterial({ color: 0x9c7b55, roughness: 1 }),
+      madera: new THREE.MeshStandardMaterial({ color: 0x8a5a2b, roughness: 0.8 }),
+      aguaM: new THREE.MeshStandardMaterial({ color: 0x7dd3fc, roughness: 0.2, transparent: true, opacity: 0.85 }),
+      fantasma: new THREE.LineBasicMaterial({ color: 0x1c1917, transparent: true, opacity: 0.5 }),
+      cota: new THREE.LineBasicMaterial({ color: 0xc2843a }),
+      lineaAgua: new THREE.LineBasicMaterial({ color: 0x0284c7 }),
+      oscuro: new THREE.LineBasicMaterial({ color: 0x1c1917 })
+    };
+    const caja = (w, h, d, mat) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    const linea = (puntos, mat) => new THREE.Line(new THREE.BufferGeometry().setFromPoints(puntos.map((p) => new THREE.Vector3(p[0], p[1], p[2] || 0))), mat);
+    function suelo(ancho, x = 0) { const s = caja(ancho, 0.1, 2, M.suelo); s.position.set(x, -0.05, 0); return s; }
+
+    // Arco de medio punto: intradós de radio r (la luz es el diámetro)
+    function geometriaArco(r, grosor = 0.2, fondo = 0.8) {
+      const f = new THREE.Shape();
+      f.absarc(0, 0, r + grosor, 0, Math.PI, false);
+      f.absarc(0, 0, r, Math.PI, 0, true);
+      const g = new THREE.ExtrudeGeometry(f, { depth: fondo, bevelEnabled: false, curveSegments: 32 });
+      g.translate(0, 0, -fondo / 2);
+      return g;
+    }
+
+    // Partículas de agua reutilizables
+    function crearAgua(n, radio = 0.07) {
+      const m = new THREE.InstancedMesh(new THREE.SphereGeometry(radio, 8, 6), new THREE.MeshStandardMaterial({ color: 0x7dd3fc, roughness: 0.2 }), n);
+      m.frustumCulled = false;
+      return m;
+    }
+    const VEL_AGUA = MOV_REDUCIDO ? 0.15 : 0.4;
+    const ficticio = new THREE.Object3D();
+    function situarGota(malla, i, x, y, z = 0) { ficticio.position.set(x, y, z); ficticio.updateMatrix(); malla.setMatrixAt(i, ficticio.matrix); }
+
+    // =====================================================================
+    // 2. ENCUADRE, PROYECCIÓN Y ETIQUETAS
+    // =====================================================================
+    let marco = { ancho: 7.6, alto: 5.0, cy: 1.8 };
+    function encuadrar() {
+      const W = escena.clientWidth, H = escena.clientHeight;
+      renderer.setSize(W, H, false);
+      camera.aspect = W / H;
+      const hud = $("hud").getBoundingClientRect(), ctr = $("controles").getBoundingClientRect();
+      const lateral = window.matchMedia("(orientation: landscape) and (max-height: 520px)").matches;
+      const z = lateral
+        ? { x0: Math.max(hud.right, ctr.right) + 8, x1: W - 8, y0: 8, y1: H - 8 }
+        : { x0: 8, x1: W - 8, y0: hud.bottom + 8, y1: ctr.top - 8 };
+      const libreW = Math.max(z.x1 - z.x0, W * 0.3), libreH = Math.max(z.y1 - z.y0, H * 0.25);
+      const t = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+      const d = Math.max((marco.ancho / 2) / (t * camera.aspect) * (W / libreW), (marco.alto / 2) / t * (H / libreH));
+      camera.position.set(0, marco.cy + 0.5, d);
+      camera.lookAt(0, marco.cy, 0);
+      camera.setViewOffset(W, H, W / 2 - (z.x0 + libreW / 2), H / 2 - (z.y0 + libreH / 2), W, H);
+      camera.updateProjectionMatrix();
+      const dpr = Math.min(window.devicePixelRatio, 2);
+      lienzoManos.width = W * dpr; lienzoManos.height = H * dpr;
+      ctxM.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    window.addEventListener("resize", encuadrar);
+    new ResizeObserver(encuadrar).observe($("hud"));
+    new ResizeObserver(encuadrar).observe($("controles"));
+
+    const v3 = new THREE.Vector3();
+    function aPantalla(x, y, z = 0) {
+      v3.set(x, y, z).project(camera);
+      return { x: (v3.x * 0.5 + 0.5) * escena.clientWidth, y: (-v3.y * 0.5 + 0.5) * escena.clientHeight };
+    }
+    function pixelesPorMetro() {
+      const a = aPantalla(0, 0), b = aPantalla(0, 1);
+      return Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    }
+    const raycaster = new THREE.Raycaster(), ndc = new THREE.Vector2();
+    function rayo(sx, sy) {
+      ndc.set((sx / escena.clientWidth) * 2 - 1, -(sy / escena.clientHeight) * 2 + 1);
+      raycaster.setFromCamera(ndc, camera);
+      return raycaster;
+    }
+    function toca(sx, sy, objetos) { return rayo(sx, sy).intersectObjects([].concat(objetos), true).length > 0; }
+    const planoZ0 = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+    function enPlano(sx, sy) { const p = new THREE.Vector3(); return rayo(sx, sy).ray.intersectPlane(planoZ0, p) ? p : null; }
+
+    let etiquetas = [];
+    function etiqueta(texto, clase, posFn) {
+      const el = document.createElement("span");
+      el.className = "etq " + (clase || "");
+      el.textContent = texto;
+      $("etiquetas").appendChild(el);
+      const e = { el, posFn, set texto(t) { if (el.textContent !== t) el.textContent = t; } };
+      etiquetas.push(e);
+      return e;
+    }
+    function limpiarEtiquetas() { etiquetas.forEach((e) => e.el.remove()); etiquetas = []; }
+    function actualizarEtiquetas() {
+      for (const e of etiquetas) {
+        const p = e.posFn();
+        if (!p) { e.el.hidden = true; continue; }
+        e.el.hidden = false;
+        const s = aPantalla(p[0], p[1], p[2] || 0);
+        e.el.style.left = s.x + "px"; e.el.style.top = s.y + "px";
+      }
+    }
+
+    // Controles alternativos (DUA)
+    function filaRango(etq, min, max, paso, valor, alCambiar, texto) {
+      const id = "alt-" + Math.random().toString(36).slice(2, 8);
+      const fila = document.createElement("div"); fila.className = "fila";
+      const l = document.createElement("label"); l.htmlFor = id; l.textContent = etq;
+      const r = document.createElement("input"); r.type = "range"; r.id = id; r.min = min; r.max = max; r.step = paso; r.value = valor;
+      const sinc = () => r.setAttribute("aria-valuetext", texto(parseFloat(r.value)));
+      r.addEventListener("input", () => { alCambiar(parseFloat(r.value)); sinc(); });
+      sinc();
+      fila.append(l, r); alternativos.appendChild(fila);
+      return { poner(v) { r.value = v; sinc(); } };
+    }
+    function filaBotones(lista) {
+      const fila = document.createElement("div"); fila.className = "fila";
+      for (const [txt, fn] of lista) {
+        const b = document.createElement("button"); b.type = "button"; b.textContent = txt; b.addEventListener("click", fn); fila.appendChild(b);
+      }
+      alternativos.appendChild(fila);
+    }
+
+    // =====================================================================
+    // 3. ETAPA 1 · LEER EL TERRENO (Geografía)
+    // =====================================================================
+    const E1 = (() => {
+      const g = new THREE.Group();
+      const L = 1200, ANCHO = 7.4, k = ANCHO / L;           // 1 m del terreno = k unidades a escala natural
+      const zT = (x) => 430 - 4 * (x / L) - 22 * Math.exp(-(((x - 650) / 150) ** 2)) + 1.5 * Math.sin(x / 95);
+      const zC = (x) => 429.5 - 6 * (x / L);                // canal inventado: baja 6 m en 1200 m (0,5 %)
+      const wx = (x) => -ANCHO / 2 + x * k;
+      const xm = (w) => (w + ANCHO / 2) / k;
+      let E = 1, paso = "a", ancla = null, cotaMano = null;
+
+      const relieve = new THREE.Group(); g.add(relieve);
+      const forma = new THREE.Shape();
+      forma.moveTo(wx(0), 0);
+      for (let x = 0; x <= L; x += 10) forma.lineTo(wx(x), (zT(x) - 400) * k);
+      forma.lineTo(wx(L), 0); forma.closePath();
+      const geoT = new THREE.ExtrudeGeometry(forma, { depth: 1.2, bevelEnabled: false });
+      geoT.translate(0, 0, -0.6);
+      const terreno = new THREE.Mesh(geoT, M.tierra);
+      relieve.add(terreno);
+      const canal = linea(Array.from({ length: 13 }, (_, i) => [wx(i * 100), (zC(i * 100) - 400) * k, 0.62]), M.lineaAgua);
+      canal.visible = false; relieve.add(canal);
+      const pilaresGuia = new THREE.Group(); pilaresGuia.visible = false; relieve.add(pilaresGuia);
+      for (let x = 520; x <= 780; x += 26) {
+        if (zC(x) - zT(x) > 4) pilaresGuia.add(linea([[wx(x), (zT(x) - 400) * k, 0.62], [wx(x), (zC(x) - 400) * k, 0.62]], M.cota));
+      }
+      const base = caja(ANCHO + 0.4, 0.1, 1.4, M.suelo); base.position.y = -0.05; g.add(base);
+
+      function ponerE(v) { E = clamp(v, 1, 25); relieve.scale.y = E; ctrlE && ctrlE.poner(E); refrescar(); }
+      function comprobar(x) {
+        const hueco = zC(x) - zT(x);
+        if (hueco > 12) {
+          canal.visible = pilaresGuia.visible = true;
+          paso = "hecho";
+          completar(0, "¡Bien visto! En el valle el canal pasa a unos " + Math.round(hueco) + " m del suelo: ahí hace falta una arcada.");
+        } else {
+          estado("Aquí el terreno está a " + Math.round(zT(x)) + " m: el canal puede ir por el suelo o bajo tierra. Busca donde el terreno baja más.", "status-warn", "e1-no-" + Math.round(x / 50));
+        }
+        refrescar();
+      }
+      let ctrlE = null;
+      function refrescar() {
+        metricas([
+          "Exageración vertical: ×" + fmt(E, 1),
+          "Cota bajo tu mano: " + (cotaMano == null ? "—" : Math.round(cotaMano) + " m"),
+          "Manantial: 430 m",
+          "Ciudad: " + Math.round(zT(L)) + " m"
+        ]);
+      }
+      return {
+        nombre: "Leer el terreno", grupo: g, marco: { ancho: 8.2, alto: 5.6, cy: 2.3 },
+        nota: "Perfil topográfico inventado para la actividad. Las alturas están exageradas para poder verlas.",
+        entrar() {
+          etiqueta("Manantial · 430 m", "", () => [wx(0) + 0.95, (zT(0) - 400) * k * E + 0.15]);
+          etiqueta("Ciudad", "", () => [wx(L) - 0.45, (zT(L) - 400) * k * E + 0.15]);
+          etiqueta("Valle", "geo", () => (paso === "hecho" ? [wx(650), (zT(650) - 400) * k * E - 0.05] : null)).el.classList.add("abajo");
+          etiqueta("canal", "agua", () => (paso === "hecho" ? [wx(330), (zC(330) - 400) * k * E + 0.12] : null));
+          if (paso === "a") estado("Desde lejos el terreno parece plano. Haz pinza en cualquier sitio y sube la mano para estirar las alturas.", "status-warn", "e1-a");
+          else if (paso === "b") estado("¿Dónde quedará el canal en el aire? Haz pinza sobre el punto más bajo del valle.", "status-warn", "e1-b");
+          refrescar();
+        },
+        alternativos() {
+          ctrlE = filaRango("Exageración", 1, 25, 0.5, E, (v) => { ponerE(v); if (E >= 10 && paso === "a") pasarB(); }, (v) => "por " + fmt(v, 1));
+          let xSel = 300;
+          filaRango("Punto del recorrido", 0, 1200, 10, xSel, (v) => { xSel = v; cotaMano = zT(v); refrescar(); }, (v) => Math.round(v) + " metros desde el manantial, cota " + Math.round(zT(v)) + " metros");
+          filaBotones([["Comprobar este punto", () => { if (paso === "b") comprobar(xSel); }]]);
+        },
+        down(x, y) {
+          if (paso === "a") { ancla = { y, E }; return true; }
+          if (paso === "b") {
+            const hit = rayo(x, y).intersectObject(terreno, false)[0];
+            const p = hit ? hit.point : enPlano(x, y);
+            if (p) comprobar(clamp(xm(p.x), 0, L));
+            return false;
+          }
+          return false;
+        },
+        move(x, y) { if (ancla) ponerE(ancla.E * Math.exp((ancla.y - y) / 110)); },
+        up() { if (!ancla) return; ancla = null; if (paso === "a" && E >= 10) pasarB(); else if (paso === "a") estado("Sigue estirando: con más exageración se ve mejor el valle (al menos ×10).", "status-warn", "e1-a2"); },
+        hover(x, y) { const p = enPlano(x, y); if (p && Math.abs(p.x) <= ANCHO / 2) { cotaMano = zT(clamp(xm(p.x), 0, L)); refrescar(); } },
+        tick() {}
+      };
+      function pasarB() { paso = "b"; estado("¿Dónde quedará el canal en el aire? Haz pinza sobre el punto más bajo del valle.", "status-warn", "e1-b"); }
+    })();
+
+    // =====================================================================
+    // 4. ETAPA 2 · NIVELAR EL CANAL (Matemáticas) — núcleo de v2.x
+    // =====================================================================
+    const ALTURA_IZQ = 3.4, ALTURA_DER = 3.0, DISTANCIA_TRAMO = 2.5, LADO_PILAR = 0.9;
+    const RADIO_ARCO = (DISTANCIA_TRAMO - LADO_PILAR) / 2, GROSOR_ARCO = 0.2;
+    const geoArcoComun = geometriaArco(RADIO_ARCO, GROSOR_ARCO);
+
+    function tramoCanal(malla, x1, y1, x2, y2) {
+      malla.scale.x = Math.hypot(x2 - x1, y2 - y1);
+      malla.position.set((x1 + x2) / 2, (y1 + y2) / 2 + 0.09, 0);
+      malla.rotation.z = Math.atan2(y2 - y1, x2 - x1);
+    }
+    // Agua que avanza solo mientras el canal baja (de izquierda a derecha)
+    function moverAguaCanal(malla, pos, hC, dt) {
+      const baja1 = hC < ALTURA_IZQ, baja2 = hC > ALTURA_DER;
+      const limite = !baja1 ? 0.12 : !baja2 ? 1.0 : Infinity;
+      for (let i = 0; i < pos.length; i++) {
+        const tope = limite - (i % 9) * 0.035;
+        let s = pos[i];
+        if (s < tope) s = Math.min(s + dt * VEL_AGUA, tope); else if (limite === Infinity || s > limite) s += dt * VEL_AGUA;
+        if (s >= 2) s -= 2;
+        pos[i] = s;
+        const yI = ALTURA_IZQ + 0.22, yM = hC + 0.22, yF = ALTURA_DER + 0.22;
+        if (s < 1) situarGota(malla, i, -DISTANCIA_TRAMO + s * DISTANCIA_TRAMO, yI + (yM - yI) * s, ((i * 37) % 7 - 3) * 0.04);
+        else situarGota(malla, i, (s - 1) * DISTANCIA_TRAMO, yM + (yF - yM) * (s - 1), ((i * 37) % 7 - 3) * 0.04);
+      }
+      malla.instanceMatrix.needsUpdate = true;
+    }
+
+    const E2 = (() => {
+      const g = new THREE.Group();
+      g.add(suelo(8));
+      const pIzq = caja(LADO_PILAR, ALTURA_IZQ, LADO_PILAR, M.piedra); pIzq.position.set(-DISTANCIA_TRAMO, ALTURA_IZQ / 2, 0);
+      const pDer = caja(LADO_PILAR, ALTURA_DER, LADO_PILAR, M.piedra); pDer.position.set(DISTANCIA_TRAMO, ALTURA_DER / 2, 0);
+      const pilar = caja(LADO_PILAR, 1, LADO_PILAR, M.seleccion);
+      const zona = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1, 1.7), new THREE.MeshBasicMaterial({ visible: false }));
+      pilar.add(zona);
+      const a1 = new THREE.Mesh(geoArcoComun, M.piedra), a2 = new THREE.Mesh(geoArcoComun, M.piedra);
+      const c1 = caja(1, 0.18, 0.5, M.canal), c2 = caja(1, 0.18, 0.5, M.canal);
+      const agua = crearAgua(36);
+      const pos = Array.from({ length: 36 }, (_, i) => (i / 36) * 2);
+      g.add(pIzq, pDer, pilar, a1, a2, c1, c2, agua);
+      let h = 2.0, arrastre = null, ctrl = null;
+
+      function actualizarGeometria(nueva) {
+        h = clamp(nueva, 1.2, 4.0);
+        if (h >= 3.15 && h <= 3.25) h = 3.2;   // encaje del sillar (tolerancia original)
+        pilar.scale.y = h; pilar.position.set(0, h / 2, 0);
+        a1.position.set(-DISTANCIA_TRAMO / 2, Math.min(ALTURA_IZQ, h) - RADIO_ARCO - GROSOR_ARCO, 0);
+        a2.position.set(DISTANCIA_TRAMO / 2, Math.min(h, ALTURA_DER) - RADIO_ARCO - GROSOR_ARCO, 0);
+        tramoCanal(c1, -DISTANCIA_TRAMO, ALTURA_IZQ, 0, h);
+        tramoCanal(c2, 0, h, DISTANCIA_TRAMO, ALTURA_DER);
+        pilar.material = h === 3.2 ? M.correcto : M.seleccion;
+        if (actual !== 1) return;
+        const p1 = ((h - ALTURA_IZQ) / DISTANCIA_TRAMO) * 100, p2 = ((ALTURA_DER - h) / DISTANCIA_TRAMO) * 100;
+        metricas(["Altura pilar: " + fmt(h) + " m", "Tramo 1: " + fmtSigno(p1) + " %", "Tramo 2: " + fmtSigno(p2) + " %", "Volumen prisma: " + fmt(LADO_PILAR * LADO_PILAR * h) + " m³"]);
+        ctrl && ctrl.poner(h);
+        if (h >= ALTURA_IZQ) estado("El tramo 1 no baja: el agua no sale del manantial. Baja el pilar.", "status-error", "e2-t1");
+        else if (h <= ALTURA_DER) estado("El tramo 2 no baja: el agua se queda atascada en el pilar. El agua no sube sola.", "status-error", "e2-t2");
+        else if (h === 3.2) { completar(1, "¡Nivelación conseguida! Los dos tramos bajan igual (−8 %) hasta la ciudad."); }
+        else estado("El agua llega, pero los dos tramos no bajan igual. ¿Puedes igualar las pendientes?", "status-warn", "e2-llega");
+      }
+      actualizarGeometria(2.0);
+      return {
+        nombre: "Nivelar el canal", grupo: g, marco: { ancho: 7.6, alto: 5.0, cy: 1.8 },
+        nota: "Modelo con exageración vertical: la inclinación real era mucho menor (lo verás en la etapa 4).",
+        entrar() {
+          etiqueta("Manantial", "", () => [-DISTANCIA_TRAMO, ALTURA_IZQ + 0.55]);
+          etiqueta("Ciudad", "", () => [DISTANCIA_TRAMO, ALTURA_DER + 0.55]);
+          categoriaPrevia = ""; actualizarGeometria(h);
+          if (h < ALTURA_DER) estado("Haz pinza sobre el pilar amarillo y súbelo con la mano.", "status-warn", "e2-ini");
+        },
+        alternativos() { ctrl = filaRango("Altura del pilar", 1.2, 4, 0.01, h, actualizarGeometria, (v) => fmt(v) + " metros"); },
+        down(x, y) { if (!toca(x, y, zona)) return false; arrastre = { y0: y, h0: h, ppm: pixelesPorMetro() }; return true; },
+        // Ganancia 0,5: el pilar sube a media velocidad que la mano, para poder afinar con la pinza
+        move(x, y) { if (arrastre) actualizarGeometria(arrastre.h0 + 0.5 * (arrastre.y0 - y) / arrastre.ppm); },
+        up() { arrastre = null; },
+        tick(dt) { moverAguaCanal(agua, pos, h, dt); }
+      };
+    })();
+
+    // =====================================================================
+    // 5. ETAPA 3 · CONSTRUIR (Medida y geometría)
+    // =====================================================================
+    const E3 = (() => {
+      const g = new THREE.Group();
+      const H_OBJ = 3.2, ALTO_SILLAR = 0.4, N_OBJ = Math.round(H_OBJ / ALTO_SILLAR), V_SILLAR = LADO_PILAR * LADO_PILAR * ALTO_SILLAR;
+      const X_MONTON = 3.75;
+      g.add(suelo(9.2, 0.6));
+      const pIzq = caja(LADO_PILAR, ALTURA_IZQ, LADO_PILAR, M.piedra); pIzq.position.set(-DISTANCIA_TRAMO, ALTURA_IZQ / 2, 0);
+      const pDer = caja(LADO_PILAR, ALTURA_DER, LADO_PILAR, M.piedra); pDer.position.set(DISTANCIA_TRAMO, ALTURA_DER / 2, 0);
+      const a1 = new THREE.Mesh(geoArcoComun, M.piedra), a2 = new THREE.Mesh(geoArcoComun, M.piedra);
+      a1.position.set(-DISTANCIA_TRAMO / 2, H_OBJ - RADIO_ARCO - GROSOR_ARCO, 0);
+      a2.position.set(DISTANCIA_TRAMO / 2, ALTURA_DER - RADIO_ARCO - GROSOR_ARCO, 0);
+      const cotaR = linea([[0, 0, 0.45], [0, RADIO_ARCO, 0.45]], M.cota), cotaL = linea([[-RADIO_ARCO, 0, 0.45], [RADIO_ARCO, 0, 0.45]], M.cota);
+      a1.add(cotaR, cotaL);
+      cotaR.visible = cotaL.visible = false;
+      const fantasma = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(LADO_PILAR, H_OBJ, LADO_PILAR)), M.fantasma);
+      fantasma.position.y = H_OBJ / 2;
+      const c1 = caja(1, 0.18, 0.5, M.canal), c2 = caja(1, 0.18, 0.5, M.canal);
+      tramoCanal(c1, -DISTANCIA_TRAMO, ALTURA_IZQ, 0, H_OBJ); tramoCanal(c2, 0, H_OBJ, DISTANCIA_TRAMO, ALTURA_DER);
+      c1.visible = c2.visible = false;
+      const agua = crearAgua(30); agua.visible = false;
+      const pos = Array.from({ length: 30 }, (_, i) => (i / 30) * 2);
+      g.add(pIzq, pDer, a1, a2, fantasma, c1, c2, agua);
+
+      const geoSillar = new THREE.BoxGeometry(LADO_PILAR - 0.02, ALTO_SILLAR - 0.02, LADO_PILAR - 0.02);
+      const aristasSillar = new THREE.EdgesGeometry(geoSillar);
+      function nuevoSillar(i) {
+        const tono = new THREE.Color(0xd6d3d1).offsetHSL(0, 0, ((i * 53) % 9 - 4) * 0.012);
+        const m = new THREE.Mesh(geoSillar, new THREE.MeshStandardMaterial({ color: tono, roughness: 0.75 }));
+        m.add(new THREE.LineSegments(aristasSillar, M.oscuro));
+        return m;
+      }
+      const monton = new THREE.Group();
+      for (let i = 0; i < 3; i++) { const s = nuevoSillar(i + 20); s.position.set(X_MONTON, 0.2 + i * ALTO_SILLAR, 0); monton.add(s); }
+      g.add(monton);
+      const colocados = [];
+      let enMano = null, terminado = false;
+
+      function colocar() {
+        if (colocados.length >= N_OBJ) { estado("El pilar ya llega al canal: no caben más sillares.", "status-warn", "e3-lleno"); return false; }
+        const s = nuevoSillar(colocados.length);
+        s.position.set(0, ALTO_SILLAR / 2 + colocados.length * ALTO_SILLAR, 0);
+        g.add(s); colocados.push(s);
+        if (colocados.length === N_OBJ) terminar(); else estado("Sillar colocado. ¿Cuántos harán falta para llegar al canal (3,20 m)?", "status-warn", "e3-c" + colocados.length);
+        refrescar();
+        return true;
+      }
+      function quitar() {
+        const s = colocados.pop(); if (!s) return;
+        g.remove(s); terminado = false; c1.visible = c2.visible = agua.visible = cotaR.visible = cotaL.visible = false; refrescar();
+        estado("Has quitado un sillar.", "status-warn", "e3-q" + colocados.length);
+      }
+      function terminar() {
+        terminado = true; c1.visible = c2.visible = agua.visible = cotaR.visible = cotaL.visible = true;
+        completar(2, "¡Pilar terminado! " + N_OBJ + " sillares × 0,40 m = 3,20 m. Volumen: " + N_OBJ + " × 0,324 = 2,592 m³.");
+      }
+      function refrescar() {
+        const n = colocados.length;
+        metricas([
+          "Sillares: " + n, "Altura: " + n + " × 0,40 = " + fmt(n * ALTO_SILLAR) + " m",
+          "Volumen: " + fmt(n * V_SILLAR, 3) + " m³", "Objetivo: 3,20 m (" + fmt(LADO_PILAR * LADO_PILAR * H_OBJ, 3) + " m³)"
+        ]);
+      }
+      return {
+        nombre: "Construir el pilar", grupo: g, marco: { ancho: 9.6, alto: 5.0, cy: 1.8 },
+        nota: "Cada sillar mide 0,90 × 0,90 × 0,40 m. Es un prisma: 6 caras, 12 aristas y 8 vértices.",
+        entrar() {
+          etiqueta("sillares", "", () => [X_MONTON, 1.45]);
+          etiqueta("r = 0,80 m", "geo", () => (terminado ? [a1.position.x - 0.42, a1.position.y + RADIO_ARCO * 0.55, 0.3] : null));
+          etiqueta("luz = 1,60 m", "geo", () => (terminado ? [a1.position.x, a1.position.y - 0.3, 0.3] : null));
+          etiqueta("aquí va el pilar", "", () => (terminado ? null : [0, H_OBJ + 0.45]));
+          etiqueta("prisma: 6 caras · 12 aristas · 8 vértices", "geo abajo", () => (terminado ? [0, -0.25] : null));
+          refrescar();
+          if (!terminado) estado("Coge un sillar del montón con la pinza y suéltalo sobre la marca del pilar.", "status-warn", "e3-ini");
+        },
+        alternativos() { filaBotones([["Colocar un sillar", () => colocar()], ["Quitar el último", quitar]]); },
+        down(x, y) {
+          if (!toca(x, y, monton)) return false;
+          enMano = nuevoSillar(colocados.length); g.add(enMano);
+          const p = enPlano(x, y); if (p) enMano.position.set(p.x, p.y, 0.3);
+          return true;
+        },
+        move(x, y) { const p = enPlano(x, y); if (enMano && p) enMano.position.set(p.x, p.y, 0.3); },
+        up() {
+          if (!enMano) return;
+          const sobrePilar = Math.abs(enMano.position.x) < 0.8;
+          g.remove(enMano); enMano = null;
+          if (sobrePilar) colocar(); else estado("Suelta el sillar encima de la marca del pilar, entre los dos arcos.", "status-warn", "e3-fuera");
+        },
+        tick(dt) { if (agua.visible) moverAguaCanal(agua, pos, H_OBJ, dt); }
+      };
+    })();
+
+    // =====================================================================
+    // 6. ETAPA 4 · CÓMO LO HACÍAN LOS ROMANOS (Historia): corobate y pendiente real
+    // =====================================================================
+    const E4 = (() => {
+      const g = new THREE.Group();
+      const PIE = 0.296, LARGO = 20 * PIE, PATA = 1.0, DESNIVEL = 0.18, XP = LARGO / 2 - 0.15;
+      // suelo: izquierda a 0, derecha más baja
+      const sIzq = caja(LARGO / 2 + 0.6, 0.1, 2, M.suelo); sIzq.position.set(-(LARGO / 4) - 0.3, -0.05, 0);
+      const sDer = caja(LARGO / 2 + 0.6, 0.1, 2, M.suelo); sDer.position.set(LARGO / 4 + 0.3, -0.05 - DESNIVEL, 0);
+      g.add(sIzq, sDer);
+      const cuna = caja(0.5, 1, 0.6, M.madera); g.add(cuna);
+      const zonaCuna = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.6, 1.2), new THREE.MeshBasicMaterial({ visible: false }));
+      g.add(zonaCuna);
+      // el corobate gira sobre el pie izquierdo
+      const corobate = new THREE.Group(); corobate.position.set(-XP, 0, 0); g.add(corobate);
+      const regla = caja(LARGO, 0.14, 0.3, M.madera); regla.position.set(XP, PATA, 0);
+      const pata1 = caja(0.1, PATA, 0.2, M.madera); pata1.position.set(0, PATA / 2, 0);
+      const pata2 = caja(0.1, PATA, 0.2, M.madera); pata2.position.set(2 * XP, PATA / 2, 0);
+      const canalito = caja(5 * PIE, 0.06, 0.12, new THREE.MeshStandardMaterial({ color: 0x5b3a1a })); canalito.position.set(XP, PATA + 0.1, 0);
+      corobate.add(regla, pata1, pata2, canalito);
+      // traviesas con marca vertical (se inclinan con el instrumento)
+      const marcas = [];
+      for (const [xa, xb] of [[0.05, 0.75], [2 * XP - 0.05, 2 * XP - 0.75]]) {
+        const tr = linea([[xa, 0.35, 0.16], [xb, PATA - 0.07, 0.16]], M.oscuro); corobate.add(tr);
+        const xm = (xa + xb) / 2;
+        const marca = linea([[xm, 0.45, 0.17], [xm, 0.7, 0.17]], M.cota); corobate.add(marca);
+        marcas.push(xm);
+      }
+      // plomadas: cuelgan siempre en vertical desde la regla
+      const matPlomo = new THREE.MeshStandardMaterial({ color: 0x44403c });
+      const plomadas = marcas.map(() => {
+        const l = linea([[0, 0, 0.18], [0, -0.5, 0.18]], M.oscuro);
+        const p = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.09, 8), matPlomo); p.rotation.x = Math.PI;
+        const gr = new THREE.Group(); gr.add(l, p); g.add(gr);
+        return { gr, l, p };
+      });
+      // agua del canalito: su superficie queda siempre horizontal
+      const aguaC = caja(5 * PIE, 0.04, 0.1, M.aguaM); g.add(aguaC);
+      // canal de ejemplo para la pendiente real (paso b)
+      const PEND_REAL = 0.003, LARGO_C = 5.9;
+      const canalEj = caja(1, 0.16, 0.4, M.canal); canalEj.visible = false; g.add(canalEj);
+      let cunaAlt = 0.0, paso = "a", ang = 0, arrastre = null, Ex = 16, ctrlC = null, ctrlE = null;
+
+      function geom() {
+        const yDer = -DESNIVEL + cunaAlt;
+        cuna.visible = cunaAlt > 0.004;
+        cuna.scale.y = Math.max(cunaAlt, 0.001); cuna.position.set(XP, -DESNIVEL + cunaAlt / 2, 0);
+        zonaCuna.position.set(XP, -DESNIVEL + 0.5, 0);
+        ang = Math.atan2(yDer, 2 * XP);
+        corobate.rotation.z = ang;
+        corobate.updateMatrixWorld(true);
+        // plomadas colgando de la regla, encima de cada marca
+        marcas.forEach((xm, i) => {
+          const sup = new THREE.Vector3(xm, PATA - 0.07, 0).applyMatrix4(corobate.matrixWorld);
+          const pl = plomadas[i];
+          pl.gr.position.set(sup.x, sup.y, 0);
+          pl.p.position.set(0, -0.5, 0.18);
+        });
+        const c = new THREE.Vector3(XP, PATA + 0.14, 0).applyMatrix4(corobate.matrixWorld);
+        aguaC.position.copy(c); aguaC.rotation.z = 0;
+        aguaC.scale.x = clamp(1 - Math.abs(ang) * 40, 0.25, 1);    // con inclinación, el agua se va a un extremo
+        aguaC.position.x += Math.sign(-ang) * (1 - aguaC.scale.x) * (5 * PIE) / 2;
+        const grados = THREE.MathUtils.radToDeg(ang);
+        if (actual !== 3) return;
+        if (paso === "a") metricas(["Cuña: " + fmt(cunaAlt * 100, 1) + " cm", "Inclinación: " + fmtSigno(grados, 2) + "°", "Plomadas: " + (Math.abs(grados) < 0.05 ? "sobre la marca" : "desviadas"), "Regla: 20 pies ≈ " + fmt(LARGO, 2) + " m"]);
+        ctrlC && ctrlC.poner(cunaAlt * 100);
+      }
+      function ponerCuna(v) {
+        cunaAlt = clamp(v, 0, 0.4);
+        if (Math.abs(cunaAlt - DESNIVEL) < 0.02) cunaAlt = DESNIVEL;
+        geom();
+        if (paso !== "a" || actual !== 3) return;
+        if (cunaAlt === DESNIVEL) {
+          paso = "b"; canalEj.visible = true; ponerE(16);
+          estado("¡Corobate nivelado! El agua queda pareja en los dos extremos. Ahora quita la exageración: haz pinza y baja la mano.", "status-ok", "e4-b");
+        } else if (cunaAlt > DESNIVEL) estado("Te has pasado: ahora el lado derecho queda más alto. Baja la cuña.", "status-error", "e4-alto");
+        else estado("El corobate está inclinado: el agua se va a un lado y las plomadas no tocan la marca. Sube la cuña de la derecha.", "status-warn", "e4-bajo");
+      }
+      function ponerE(v) {
+        Ex = clamp(v, 1, 16);
+        if (Ex < 1.25) Ex = 1;
+        const caida = LARGO_C * PEND_REAL * Ex;
+        tramoCanal(canalEj, -LARGO_C / 2, 2.4 + caida / 2, LARGO_C / 2, 2.4 - caida / 2);
+        metricas(["Exageración: ×" + fmt(Ex, 1), "Pendiente dibujada: " + fmt(PEND_REAL * Ex * 100, 1) + " %", "Bajada dibujada: " + fmt(caida * 100, 1) + " cm", "Bajada real: " + fmt(LARGO_C * PEND_REAL * 100, 1) + " cm en " + fmt(LARGO_C, 1) + " m"]);
+        ctrlE && ctrlE.poner(Ex);
+        if (paso === "b" && Ex === 1) { paso = "hecho"; completar(3, "Así de poco bajaba un canal romano de ejemplo (0,3 %): menos de 2 cm en casi 6 m. Por eso necesitaban instrumentos tan precisos."); }
+      }
+      geom();
+      return {
+        nombre: "Cómo lo hacían los romanos", grupo: g, marco: { ancho: 7.8, alto: 4.2, cy: 1.2 },
+        nota: "El corobate lo describe Vitruvio (libro VIII, cap. 5). La pendiente de ejemplo es 0,3 %; cada acueducto tenía la suya.",
+        entrar() {
+          etiqueta("corobate (≈ 20 pies)", "", () => [0, PATA + 0.55]);
+          etiqueta("cuña", "geo", () => (paso === "a" ? [XP + 0.55, -DESNIVEL + 0.3] : null));
+          etiqueta("plomada", "", () => [plomadas[0].gr.position.x, plomadas[0].gr.position.y - 0.62]).el.classList.add("abajo");
+          etiqueta("canal de ejemplo", "agua", () => (paso !== "a" ? [0, 2.75] : null));
+          if (paso === "a") ponerCuna(cunaAlt); else ponerE(Ex);
+        },
+        alternativos() {
+          ctrlC = filaRango("Cuña (cm)", 0, 40, 0.5, cunaAlt * 100, (v) => ponerCuna(v / 100), (v) => fmt(v, 1) + " centímetros");
+          ctrlE = filaRango("Exageración", 1, 16, 0.5, Ex, (v) => { if (paso !== "a") ponerE(v); }, (v) => "por " + fmt(v, 1));
+        },
+        down(x, y) {
+          if (paso === "a") { if (!toca(x, y, [zonaCuna, pata2])) return false; arrastre = { y0: y, v0: cunaAlt, ppm: pixelesPorMetro() }; return true; }
+          if (paso === "b") { arrastre = { y0: y, v0: Ex }; return true; }
+          return false;
+        },
+        move(x, y) {
+          if (!arrastre) return;
+          if (paso === "a") ponerCuna(arrastre.v0 + (arrastre.y0 - y) / arrastre.ppm * 0.12);
+          else if (paso === "b") ponerE(arrastre.v0 * Math.exp((arrastre.y0 - y) / 110));
+        },
+        up() { arrastre = null; },
+        tick() {}
+      };
+    })();
+
+    // =====================================================================
+    // 7. ETAPA 5 · CANARIAS: la cantonera (fracciones y porcentajes)
+    // =====================================================================
+    const E5 = (() => {
+      const g = new THREE.Group();
+      const OBJ = [1 / 2, 1 / 4, 1 / 4], NOMBRES = ["Finca A", "Finca B", "Finca C"], FRAC = ["1/2", "1/4", "1/4"];
+      const XS = [-1.6, 0, 1.6], ABRIR_MAX = 0.8, ANCHO_BOCA = 0.9;
+      g.add(suelo(8));
+      // depósito (cantonera) visto de frente
+      const fondo = caja(5.2, 2.6, 0.3, M.piedra); fondo.position.set(0, 1.3, -0.5); g.add(fondo);
+      const muroF = new THREE.Group(); g.add(muroF);
+      // muro frontal con tres bocas: se compone de piezas para dejar los huecos
+      const muroAlto = caja(5.2, 1.6, 0.3, M.piedra); muroAlto.position.set(0, 1.8, 0.3); muroF.add(muroAlto);
+      [-2.3, -0.8, 0.8, 2.3].forEach((x, i) => { const w = i === 0 || i === 3 ? 0.6 : 0.7; const p = caja(w, 1.0, 0.3, M.piedra); p.position.set(x, 0.5, 0.3); muroF.add(p); });
+      const aguaDep = caja(4.9, 1.7, 0.6, M.aguaM); aguaDep.position.set(0, 1.0, -0.1); g.add(aguaDep);
+      // acequia de entrada (desde la galería o el naciente)
+      const entrada = caja(2.4, 0.16, 0.4, M.canal); entrada.position.set(-3.4, 2.9, 0); entrada.rotation.z = -0.25; g.add(entrada);
+      // tablas que regulan cada boca (suben para abrir)
+      const tablas = XS.map((x) => { const t = caja(ANCHO_BOCA + 0.1, 1.0, 0.08, M.madera); g.add(t); return t; });
+      const zonas = XS.map((x) => { const z = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.2, 1), new THREE.MeshBasicMaterial({ visible: false })); z.position.set(x, 1.0, 0.5); g.add(z); return z; });
+      // acequias de salida
+      XS.forEach((x) => { const c = caja(0.5, 0.12, 1.2, M.canal); c.position.set(x, 0.06, 0.95); g.add(c); });
+      const N_GOTAS = 60, agua = crearAgua(N_GOTAS, 0.06); g.add(agua);
+      const gotas = Array.from({ length: N_GOTAS }, (_, i) => ({ s: (i * 0.137) % 1, canal: i % 3 }));
+      let ab = [0.4, 0.4, 0.4], arrastre = null, hecho = false;
+      const ctrls = [];
+
+      function repartos() { const t = ab.reduce((a, b) => a + b, 0); return t > 0 ? ab.map((a) => a / t) : [0, 0, 0]; }
+      function geom() {
+        tablas.forEach((t, i) => t.position.set(XS[i], 0.5 + ab[i], 0.48));
+        const r = repartos();
+        if (actual !== 4) return;
+        metricas(r.map((p, i) => NOMBRES[i] + ": " + Math.round(p * 100) + " % · meta " + FRAC[i]).concat(["Aberturas: " + ab.map((a) => fmt(a * 100, 0)).join(" · ") + " cm"]));
+        ctrls.forEach((c, i) => c.poner(ab[i] * 100));
+        if (hecho) return;
+        const ok = r.every((p, i) => Math.abs(p - OBJ[i]) < 0.005) && ab.some((a) => a > 0.02);
+        if (ok) {
+          hecho = true;
+          geom();
+          completar(4, "¡Reparto justo! La finca A recibe la mitad (50 %) y las fincas B y C, un cuarto cada una (25 %).");
+          abrirPanel("panel-final");
+        } else if (ab.every((a) => a < 0.02)) estado("Todas las bocas están cerradas: el agua no sale. Sube alguna tabla.", "status-error", "e5-cerrado");
+        else estado("Mueve las tablas: la finca A debe recibir la mitad del agua y las fincas B y C, un cuarto cada una.", "status-warn", "e5-ajuste");
+      }
+      geom();
+      return {
+        nombre: "El agua en Canarias", grupo: g, marco: { ancho: 7.6, alto: 4.8, cy: 1.5 },
+        nota: "Cantonera simplificada: el caudal de cada boca se toma proporcional a su abertura; las tablas encajan cada 5 cm. Fincas y cifras inventadas.",
+        entrar() {
+          etiqueta("cantonera", "", () => [0, 2.95]);
+          etiqueta("agua de la galería", "agua", () => [-2.7, 3.4]);
+          NOMBRES.forEach((n, i) => etiqueta(n + " · " + FRAC[i], "geo abajo", () => [XS[i], -0.1, 1.5]));
+          geom(); if (hecho) estado("Reparto conseguido: 1/2, 1/4 y 1/4.", "status-ok", "e5-ok");
+        },
+        alternativos() { NOMBRES.forEach((n, i) => ctrls.push(filaRango(n + " (cm)", 0, 80, 5, ab[i] * 100, (v) => { ab[i] = Math.round(v / 5) * 5 / 100; geom(); }, (v) => "abertura " + Math.round(v) + " centímetros"))); },
+        down(x, y) {
+          const i = zonas.findIndex((z) => toca(x, y, z));
+          if (i < 0 || hecho) return false;
+          arrastre = { i, y0: y, v0: ab[i], ppm: pixelesPorMetro() }; return true;
+        },
+        // La tabla encaja en ranuras de 5 cm; ganancia 0,25 para afinar con la pinza
+        move(x, y) {
+          if (!arrastre) return;
+          const v = Math.round(clamp(arrastre.v0 + 0.25 * (arrastre.y0 - y) / arrastre.ppm, 0, ABRIR_MAX) * 20) / 20;
+          if (v !== ab[arrastre.i]) { ab[arrastre.i] = v; geom(); }
+        },
+        up() { arrastre = null; },
+        tick(dt) {
+          const r = repartos();
+          // cada gota elige canal según el reparto actual y avanza hacia su finca
+          for (let i = 0; i < N_GOTAS; i++) {
+            const gt = gotas[i];
+            gt.s += dt * VEL_AGUA * 0.9;
+            if (gt.s >= 1) { gt.s -= 1; const u = Math.random(); gt.canal = u < r[0] ? 0 : u < r[0] + r[1] ? 1 : 2; }
+            const abierto = ab[gt.canal] > 0.02;
+            if (!abierto) { situarGota(agua, i, 0, -5, 0); continue; }
+            situarGota(agua, i, XS[gt.canal] + (((i * 31) % 5) - 2) * 0.06, 0.16, 0.45 + gt.s * 1.1);
+          }
+          agua.instanceMatrix.needsUpdate = true;
+        }
+      };
+    })();
+
+    // =====================================================================
+    // 8. GESTOR DE ETAPAS (proceso evolutivo)
+    // =====================================================================
+    const ETAPAS = [E1, E2, E3, E4, E5];
+    ETAPAS.forEach((e) => { e.grupo.visible = false; scene.add(e.grupo); });
+    const CLAVE = "misionRoma.v3.progreso";
+    let hechas = [false, false, false, false, false];
+    try { const s = JSON.parse(localStorage.getItem(CLAVE) || "null"); if (Array.isArray(s) && s.length === 5) hechas = s.map(Boolean); } catch (e) {}
+    const botonesEtapa = [...document.querySelectorAll("#etapas button")];
+
+    function disponible(i) { return DOCENTE || i === 0 || hechas[i - 1] || hechas[i]; }
+    function pintarProgreso() {
+      botonesEtapa.forEach((b, i) => {
+        b.disabled = !disponible(i);
+        b.classList.toggle("hecha", hechas[i]);
+        if (i === actual) b.setAttribute("aria-current", "step"); else b.removeAttribute("aria-current");
+        b.setAttribute("aria-label", "Etapa " + (i + 1) + ": " + ETAPAS[i].nombre + (hechas[i] ? ", completada" : "") + (b.disabled ? ", bloqueada" : ""));
+      });
+      $("btn-siguiente").disabled = !(actual < 4 && hechas[actual]);
+      $("btn-siguiente").textContent = actual < 4 ? "Siguiente etapa" : "Misión terminada";
+    }
+    function completar(i, mensaje) {
+      estado(mensaje, "status-ok", "completa-" + i);
+      if (!hechas[i]) { hechas[i] = true; try { localStorage.setItem(CLAVE, JSON.stringify(hechas)); } catch (e) {} }
+      pintarProgreso();
+    }
+    function irA(i) {
+      if (!disponible(i) || i === actual) return;
+      if (etapa) { etapa.grupo.visible = false; etapa.up && etapa.up(); }
+      captura = false; agarre = null;
+      actual = i; etapa = ETAPAS[i]; etapa.grupo.visible = true;
+      $("titulo-etapa").textContent = "Etapa " + (i + 1) + " · " + etapa.nombre;
+      notaDiv.textContent = etapa.nota;
+      limpiarEtiquetas();
+      alternativos.replaceChildren();
+      etapa.alternativos();
+      categoriaPrevia = "";
+      marco = etapa.marco;
+      etapa.entrar();
+      pintarProgreso();
+      encuadrar();
+    }
+    botonesEtapa.forEach((b, i) => b.addEventListener("click", () => irA(i)));
+    $("btn-siguiente").addEventListener("click", () => irA(actual + 1));
+
+    // =====================================================================
+    // 9. PUNTERO COMÚN: pinza o dedo/ratón
+    // =====================================================================
+    let captura = false;
+    function pDown(x, y) { captura = !!(etapa && etapa.down(x, y)); return captura; }
+    function pMove(x, y) { if (!etapa) return; if (captura) etapa.move(x, y); else if (etapa.hover) etapa.hover(x, y); }
+    function pUp(x, y) { if (captura && etapa) etapa.up(x, y); captura = false; }
+
+    let punteroId = null;
+    lienzo3d.addEventListener("pointerdown", (e) => { if (pDown(e.clientX, e.clientY)) { punteroId = e.pointerId; lienzo3d.setPointerCapture(e.pointerId); } });
+    lienzo3d.addEventListener("pointermove", (e) => { if (punteroId === null || e.pointerId === punteroId) pMove(e.clientX, e.clientY); });
+    const soltar = (e) => { if (e.pointerId === punteroId) { pUp(e.clientX, e.clientY); punteroId = null; } };
+    lienzo3d.addEventListener("pointerup", soltar);
+    lienzo3d.addEventListener("pointercancel", soltar);
+
+    // =====================================================================
+    // 10. MANOS (MediaPipe, cámara frontal, RA «espejo»)
+    // =====================================================================
+    const PERMITIR_MODELO_REMOTO = false;   // con false, si falta modelo/hand_landmarker.task no se recurre a Google
+    const URL_TASKS = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
+    const URL_MODELO = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
+    const CONEX = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+    const PINZA_CIERRA = 0.33, PINZA_ABRE = 0.5;
+    let detector = null, modo = null, lastVideoTime = -1, lastTimestampMs = 0, agarre = null;
+    const pinza = {}, suav = {};
+
+    function videoAPantalla(nx, ny) {
+      const W = escena.clientWidth, H = escena.clientHeight, vw = video.videoWidth || 640, vh = video.videoHeight || 480;
+      const s = Math.max(W / vw, H / vh), dw = vw * s, dh = vh * s;
+      return { x: (W - dw) / 2 + (1 - nx) * dw, y: (H - dh) / 2 + ny * dh };
+    }
+    async function abrirCamara() {
+      if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        const e = new Error("la cámara solo funciona si la página se abre desde https o desde el propio equipo (localhost)"); e.name = "ContextoInseguro"; throw e;
+      }
+      video.srcObject = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
+      await video.play();
+    }
+    function cerrarCamara() {
+      if (video.srcObject) { video.srcObject.getTracks().forEach((t) => t.stop()); video.srcObject = null; }
+      if (agarre) { pUp(0, 0); agarre = null; }
+      ctxM.clearRect(0, 0, escena.clientWidth, escena.clientHeight);
+    }
+    async function existeLocal(ruta) { try { return (await fetch(ruta, { method: "HEAD", cache: "no-store" })).ok; } catch (e) { return false; } }
+    async function iniciarManos() {
+      estado("Preparando la cámara y el detector de manos…", "status-warn", "cargando");
+      await abrirCamara();
+      const { FilesetResolver, HandLandmarker } = await import("@mediapipe/tasks-vision");
+      const rutaWasm = (await existeLocal("./wasm/vision_wasm_internal.js")) ? "./wasm" : URL_TASKS + "/wasm";
+      const modeloLocal = await existeLocal("./modelo/hand_landmarker.task");
+      if (!modeloLocal && !PERMITIR_MODELO_REMOTO) { const e = new Error("falta el archivo modelo/hand_landmarker.task en la carpeta de la actividad"); e.name = "SinModelo"; throw e; }
+      const vision = await FilesetResolver.forVisionTasks(rutaWasm);
+      const opciones = (delegate) => ({ baseOptions: { modelAssetPath: modeloLocal ? "./modelo/hand_landmarker.task" : URL_MODELO, delegate }, runningMode: "VIDEO", numHands: 2 });
+      try { detector = await HandLandmarker.createFromOptions(vision, opciones("GPU")); }
+      catch (e) { detector = await HandLandmarker.createFromOptions(vision, opciones("CPU")); }
+      categoriaPrevia = ""; etapa.entrar();
+    }
+    function dibujarMano(pts, cerrada, activa) {
+      ctxM.lineCap = "round"; ctxM.lineWidth = 7;
+      ctxM.strokeStyle = activa ? "rgba(74,222,128,.95)" : "rgba(194,132,58,.95)";
+      ctxM.beginPath();
+      for (const [a, b] of CONEX) { ctxM.moveTo(pts[a].x, pts[a].y); ctxM.lineTo(pts[b].x, pts[b].y); }
+      ctxM.stroke();
+      ctxM.fillStyle = "#faf7f2";
+      for (const p of pts) { ctxM.beginPath(); ctxM.arc(p.x, p.y, 3.5, 0, Math.PI * 2); ctxM.fill(); }
+      const m = { x: (pts[4].x + pts[8].x) / 2, y: (pts[4].y + pts[8].y) / 2 };
+      ctxM.beginPath(); ctxM.arc(m.x, m.y, 14, 0, Math.PI * 2); ctxM.lineWidth = 3; ctxM.strokeStyle = "#38bdf8"; ctxM.stroke();
+      if (cerrada) { ctxM.fillStyle = "rgba(56,189,248,.6)"; ctxM.fill(); }
+    }
+    function procesarManos() {
+      if (!detector || video.readyState < 2 || video.currentTime === lastVideoTime) return;
+      lastVideoTime = video.currentTime;
+      const nowMs = Math.max(lastTimestampMs + 1, Math.floor(performance.now())); lastTimestampMs = nowMs;
+      let res; try { res = detector.detectForVideo(video, nowMs); } catch (e) { return; }
+      ctxM.clearRect(0, 0, escena.clientWidth, escena.clientHeight);
+      const lista = res.landmarks || [], lados = res.handednesses || res.handedness || [], vistas = new Set();
+      let primeraLibre = null;
+      lista.forEach((mano, i) => {
+        const lado = (lados[i] && lados[i][0] && lados[i][0].categoryName) || ("m" + i);
+        vistas.add(lado);
+        const vw = video.videoWidth || 640, vh = video.videoHeight || 480;
+        const d = (a, b) => Math.hypot((mano[a].x - mano[b].x) * vw, (mano[a].y - mano[b].y) * vh);
+        const antes = !!pinza[lado], ratio = d(4, 8) / (d(0, 9) || 1);
+        pinza[lado] = antes ? ratio < PINZA_ABRE : ratio < PINZA_CIERRA;
+        const pts = mano.map((p) => videoAPantalla(p.x, p.y));
+        const medio = { x: (pts[4].x + pts[8].x) / 2, y: (pts[4].y + pts[8].y) / 2 };
+        const s = suav[lado] || medio; suav[lado] = { x: s.x + (medio.x - s.x) * 0.5, y: s.y + (medio.y - s.y) * 0.5 };
+        const pm = suav[lado];
+        if (!agarre && pinza[lado] && !antes && pDown(pm.x, pm.y)) agarre = { lado, perdidas: 0 };
+        if (agarre && agarre.lado === lado) {
+          agarre.perdidas = 0;
+          if (pinza[lado]) pMove(pm.x, pm.y); else { pUp(pm.x, pm.y); agarre = null; }
+        } else if (!agarre && !primeraLibre) primeraLibre = pm;
+        dibujarMano(pts, pinza[lado], agarre && agarre.lado === lado);
+      });
+      if (!agarre && primeraLibre) pMove(primeraLibre.x, primeraLibre.y);
+      if (agarre && !vistas.has(agarre.lado) && ++agarre.perdidas > 8) { pUp(0, 0); agarre = null; }
+      for (const k of Object.keys(pinza)) if (!vistas.has(k)) { delete pinza[k]; delete suav[k]; }
+    }
+
+    // =====================================================================
+    // 11. BUCLE Y CONTROLES GENERALES
+    // =====================================================================
+    const reloj = new THREE.Clock();
+    renderer.setAnimationLoop(() => {
+      const dt = Math.min(reloj.getDelta(), 0.1);
+      if (modo === "manos") procesarManos();
+      if (etapa) etapa.tick(dt);
+      actualizarEtiquetas();
+      renderer.render(scene, camera);
+    });
+
+    const INFO = [
+      `<h3>Un perfil topográfico</h3><p>Es el terreno cortado y visto de lado. La <strong>cota</strong> es la altura sobre el nivel del mar. En los perfiles se estiran las alturas (<strong>exageración vertical</strong>) para ver el relieve; si no, casi todo parece plano.</p>
+       <h3>¿Por qué hacen falta arcos?</h3><p>El canal tiene que bajar siempre un poquito. Donde el terreno se hunde, como en un valle, el canal quedaría en el aire: ahí se construye una arcada. En el resto del camino, el canal iba por el suelo o bajo tierra.</p>
+       <p class="fuente">El terreno de esta etapa es inventado.</p>`,
+      `<h3>La pendiente</h3><p>Una pendiente de −8 % significa que el canal baja 8 m por cada 100 m que avanza en horizontal. En un tramo de 2,5 m, ¿cuánto baja?</p>
+       <h3>Números negativos</h3><p>Usamos el signo menos para bajar y el signo más para subir. El agua solo corre sola si los dos tramos tienen pendiente negativa.</p>
+       <p class="fuente">Este modelo exagera la inclinación para que se vea.</p>`,
+      `<h3>El arco de medio punto</h3><p>Cada arco es media circunferencia. Su radio mide 0,80 m y su diámetro es la <strong>luz</strong>, el hueco libre entre pilares: 2,50 m entre centros menos 0,90 m de pilar = 1,60 m.</p>
+       <h3>El pilar es un prisma</h3><p>Volumen = 0,90 × 0,90 × altura. Cada sillar mide 0,90 × 0,90 × 0,40 = 0,324 m³. ¿Cuántos sillares caben en 3,20 m? ¿Coincide el volumen de los sillares con el del prisma?</p>
+       <h3>Las manos que los construyeron</h3><p>De casi todas las personas que levantaron los acueductos no conocemos el nombre. En las obras romanas trabajaban canteros, peones, transportistas y técnicos que medían el terreno; en muchas de ellas también trabajaron personas esclavizadas.</p>`,
+      `<h3>El corobate</h3><p>El arquitecto romano Vitruvio describe un instrumento para nivelar llamado <strong>corobate</strong>: una regla de unos veinte pies con patas, plomadas que deben caer justo sobre unas marcas y, para los días de viento, un canalito con agua que debe quedar igual de lleno en los dos extremos.</p>
+       <h3>¿Cuánto bajaba un canal?</h3><p>Muy poco: normalmente menos de 1 metro por cada 100 metros de avance. Vitruvio dejó escrita una cifra, pero los especialistas todavía discuten cuál era exactamente. Aquí usamos 0,3 % como ejemplo.</p>
+       <h3>Patrimonio</h3><p>El acueducto de Segovia forma parte del Patrimonio Mundial de la UNESCO desde 1985, junto con el casco antiguo de la ciudad. La palabra <em>acueducto</em> viene del latín <em>aquae ductus</em>, «conducción de agua».</p>
+       <p class="fuente">Vitruvio, <em>De architectura</em>, VIII, 5-6.</p>`,
+      `<h3>El agua en Canarias</h3><p>En las islas el agua se ha llevado durante siglos por <strong>acequias</strong>, canales que también tienen que bajar siempre, como los romanos. Comunidades de regantes llamadas <strong>heredades</strong>, como la de Arucas y Firgas, en el norte de Gran Canaria, reparten el agua entre quienes tienen derecho a ella.</p>
+       <h3>La cantonera</h3><p>Es un depósito de obra donde llega el agua y se reparte por varias salidas o <strong>bocas</strong>. Las bocas tienen el tamaño adecuado para medir el caudal, y una tabla cerca de la salida permite regularlo.</p>
+       <h3>Lo que une las cinco etapas</h3><p>Romanos y regantes canarios resolvieron el mismo problema con sus manos: conducir el agua cuesta abajo y medirla con cuidado. En la cantonera, además, hay que repartirla en partes justas: fracciones y porcentajes.</p>
+       <p class="fuente">Definición de <em>cantonera</em>: Tesoro de los diccionarios históricos de la lengua española (RAE). Fincas y cifras de esta etapa inventadas.</p>`
+    ];
+    let focoPrevio = null;
+    function abrirPanel(id) { focoPrevio = document.activeElement; const p = $(id); p.hidden = false; p.querySelector("button").focus(); }
+    function cerrarPanel(p) { p.hidden = true; if (focoPrevio && document.contains(focoPrevio)) focoPrevio.focus(); }
+    $("btn-saber").addEventListener("click", () => {
+      $("t-info").textContent = "Etapa " + (actual + 1) + " · " + etapa.nombre;
+      $("cuerpo-info").innerHTML = INFO[actual];   // contenido estático propio, sin datos externos
+      abrirPanel("panel-info");
+    });
+    function mostrarAlternativo(v) { alternativos.hidden = !v; $("btn-alternativo").setAttribute("aria-pressed", String(v)); }
+    $("btn-alternativo").addEventListener("click", () => mostrarAlternativo(alternativos.hidden));
+    $("btn-imagen").addEventListener("click", (e) => {
+      const v = !video.classList.contains("visible");
+      video.classList.toggle("visible", v);
+      M.suelo.opacity = v ? 0.55 : 0.9;
+      e.currentTarget.setAttribute("aria-pressed", String(v));
+      e.currentTarget.textContent = v ? "Ocultar mi imagen" : "Mostrar mi imagen";
+    });
+    function primeraEtapa() { let i = hechas.findIndex((h) => !h); return i < 0 ? 4 : i; }
+    function empezarTactil(mensaje) {
+      modo = "tactil"; $("inicio").hidden = true;
+      mostrarAlternativo(true);
+      if (actual < 0) irA(primeraEtapa());
+      if (mensaje) estado(mensaje, "status-warn", "msg-" + mensaje.length);
+      const f = alternativos.querySelector("input,button"); if (f) f.focus();
+    }
+    $("btn-tactil").addEventListener("click", () => empezarTactil());
+    $("btn-manos").addEventListener("click", async () => {
+      $("inicio").hidden = true; modo = "manos"; $("btn-imagen").hidden = false;
+      if (actual < 0) irA(primeraEtapa());
+      try { await iniciarManos(); }
+      catch (err) {
+        cerrarCamara(); detector = null; modo = null; $("btn-imagen").hidden = true;
+        const motivos = { NotAllowedError: "no se ha dado permiso para usar la cámara", NotFoundError: "no se ha encontrado ninguna cámara", NotReadableError: "otra aplicación está usando la cámara", ContextoInseguro: err.message, SinModelo: err.message };
+        empezarTactil("No se puede construir con las manos: " + (motivos[err.name] || "no se ha podido preparar el detector de manos") + ". Puedes hacerlo con el dedo o con los controles.");
+      }
+    });
+    document.addEventListener("visibilitychange", async () => {
+      if (modo !== "manos") return;
+      if (document.hidden) cerrarCamara();
+      else { try { await abrirCamara(); } catch (e) { modo = "tactil"; empezarTactil("La cámara se ha desactivado. Puedes seguir con el dedo o con los controles."); } }
+    });
+    window.addEventListener("pagehide", cerrarCamara);
+    document.querySelectorAll("[data-cerrar]").forEach((b) => b.addEventListener("click", () => cerrarPanel(b.closest(".panel"))));
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") document.querySelectorAll(".panel:not([hidden])").forEach(cerrarPanel); });
+
+    pintarProgreso();
+    encuadrar();
+    $("btn-manos").focus();
+  </script>
+</body>
+</html>

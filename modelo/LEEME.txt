@@ -1,0 +1,10 @@
+Coloca aquí el modelo de detección de manos con este nombre exacto:
+
+    hand_landmarker.task
+
+Descárgalo desde:
+https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task
+
+Sin este archivo, la actividad funciona igual en modo táctil (dedo, ratón y teclado),
+pero no con las manos ante la cámara. Esta edición no descarga nada de Google
+(PERMITIR_MODELO_REMOTO = false en index.html).
