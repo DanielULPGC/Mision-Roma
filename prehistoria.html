@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Las primeras manos · Las manos que construyeron la historia</title>
+  <!--
+    Las primeras manos · Prehistoria · capítulo del proyecto «Las manos que construyeron la historia»
+    Geometría, patrimonio histórico y realidad aumentada en Educación Primaria (5.º-6.º)
+    Mismo motor que Misión Roma v3.2.1 (manos con MediaPipe, cámara frontal, privacidad, diagnóstico, SRI,
+    navegación con «atrás»). Cinco etapas en orden cronológico:
+      1. Tallar un bifaz (Paleolítico): simetría axial.
+      2. La mano en la pared (arte rupestre): negativo y medida con cuadrícula.
+      3. Modelar una vasija (Neolítico): cuerpo de revolución, capacidad y friso (cerámica cardial).
+      4. Orientar el dolmen (megalitismo): ángulos y puntos cardinales (dolmen de Viera, equinoccio).
+      5. La pintadera canaria: simetría de rotación y de reflexión.
+    Formas, medidas y cifras de los modelos son inventadas o simplificadas con fines didácticos (declarado).
+  -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./lib/three.module.js",
+      "@mediapipe/tasks-vision": "./lib/vision_bundle.mjs"
+    },
+    "integrity": {
+      "./lib/three.module.js": "sha384-61S/Nu32S3E5+n+KpCOTb2eRYps6fVKm+9Gz1QBvSePFthb46f063Aa/qe/lykFZ",
+      "./lib/vision_bundle.mjs": "sha384-9MVwqhzThi8MIJU3B3BxQi92VYFPzYDEWSYI5vJig77g7vjdK+y/gG9EQ/sjWmdU"
+    }
+  }
+  </script>
+  <style>
+    :root{
+      --ocre:#c2843a; --noche:#1c1917; --panel:rgba(28,25,23,.9); --texto:#faf7f2;
+      --ok:#4ade80; --aviso:#facc15; --error:#f87171; --agua:#38bdf8;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%;overflow:hidden;background:var(--noche);color:var(--texto);
+      font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-user-select:none;user-select:none}
+    #escena{position:fixed;inset:0;background:linear-gradient(#cfe3ec 0%,#e9dfcc 62%,#b89c78 100%)}
+    #video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);opacity:0;transition:opacity .3s}
+    #video.visible{opacity:1}
+    #lienzo3d,#lienzoManos{position:absolute;inset:0;width:100%;height:100%}
+    #lienzo3d{touch-action:none}
+    #lienzoManos{pointer-events:none}
+    .etq{position:absolute;transform:translate(-50%,-100%);background:var(--panel);color:var(--texto);font-variant-numeric:tabular-nums;
+      font-size:.76rem;padding:3px 7px;border-radius:6px;white-space:nowrap;pointer-events:none}
+    .etq.geo{background:rgba(194,132,58,.95);color:#1c1917;font-weight:600}
+    .etq.abajo{transform:translate(-50%,0)}
+    .etq.agua{background:rgba(2,132,199,.92)}
+    #hud{position:absolute;top:max(10px,env(safe-area-inset-top));left:10px;right:10px;max-width:460px;
+      background:var(--panel);border:1px solid rgba(255,255,255,.2);border-radius:12px;padding:9px 12px;z-index:5}
+    #hud .lema{font-size:.72rem;opacity:.8;margin:0}
+    #hud h1{font-size:1rem;margin:1px 0 5px}
+    #etapas{display:flex;gap:4px;list-style:none;margin:0 0 6px;padding:0}
+    #etapas li{flex:1}
+    #etapas button{width:100%;padding:5px 2px;font-size:.68rem;border-radius:7px;line-height:1.15}
+    #etapas button[aria-current="step"]{background:var(--ocre);color:#1c1917}
+    #etapas button.hecha::after{content:" ✓"}
+    #etapas button:disabled{opacity:.4;cursor:not-allowed}
+    .metricas{display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;font-size:.82rem;font-weight:600}
+    #estado{margin-top:6px;font-size:.85rem;font-weight:700}
+    .status-ok{color:var(--ok)} .status-warn{color:var(--aviso)} .status-error{color:var(--error)}
+    #nota{font-size:.68rem;opacity:.75;margin-top:4px}
+    #camara{margin-top:5px;font-size:.76rem;font-weight:700;padding:3px 8px;border-radius:6px;background:rgba(255,255,255,.08)}
+    #camara.ok{color:var(--ok)} #camara.aviso{color:var(--aviso)} #camara.error{color:var(--error)}
+    .opcion{display:flex;gap:8px;align-items:flex-start;font-size:.9rem;margin-top:10px}
+    .opcion input{width:20px;height:20px;accent-color:var(--ocre);flex:none;margin-top:1px}
+    #lista-diag{list-style:none;padding:0;margin:8px 0}
+    #lista-diag li{padding:6px 0;border-bottom:1px solid rgba(255,255,255,.12);font-size:.88rem}
+    #lista-diag .r-ok::before{content:"✓ ";color:var(--ok);font-weight:700}
+    #lista-diag .r-aviso::before{content:"! ";color:var(--aviso);font-weight:700}
+    #lista-diag .r-error::before{content:"✗ ";color:var(--error);font-weight:700}
+    #lista-diag small{display:block;opacity:.8;margin-top:2px}
+    #controles{position:absolute;left:10px;right:10px;bottom:max(10px,env(safe-area-inset-bottom));
+      display:flex;flex-wrap:wrap;gap:8px;justify-content:center;z-index:5}
+    button{font:inherit;font-size:.86rem;font-weight:700;border-radius:10px;padding:9px 13px;
+      background:var(--panel);color:var(--texto);border:1px solid rgba(255,255,255,.25);cursor:pointer}
+    button[aria-pressed="true"],button.principal{background:var(--ocre);color:#1c1917}
+    button:disabled{opacity:.45;cursor:not-allowed}
+    button:focus-visible,input:focus-visible{outline:3px solid var(--agua);outline-offset:2px}
+    #alternativos{width:100%;display:flex;flex-direction:column;gap:6px;background:var(--panel);border-radius:10px;padding:8px 12px}
+    #alternativos .fila{display:flex;align-items:center;gap:8px;font-size:.82rem}
+    #alternativos .fila label{min-width:92px}
+    #alternativos input[type=range]{flex:1;accent-color:var(--ocre)}
+    #portada,#inicio,.panel{position:absolute;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;
+      background:rgba(28,25,23,.82);padding:16px}
+    .tarjeta{background:#292524;border:1px solid rgba(255,255,255,.2);border-radius:14px;padding:18px;max-width:540px;
+      max-height:88vh;overflow:auto;line-height:1.45;-webkit-user-select:text;user-select:text}
+    .tarjeta h2{margin:0 0 4px;font-size:1.25rem}
+    .tarjeta h3{margin:14px 0 4px;font-size:1rem;color:var(--ocre)}
+    .tarjeta p,.tarjeta li{margin:6px 0;font-size:.92rem}
+    .tarjeta .botones{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+    .privacidad,.fuente{font-size:.76rem;opacity:.8}
+    #portada{background:linear-gradient(rgba(28,25,23,.92),rgba(28,25,23,.97))}
+    #portada .tarjeta{max-width:620px}
+    .antetitulo{font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ocre);margin:0 0 2px;font-weight:700}
+    .linea{list-style:none;margin:10px 0 6px 6px;padding:0 0 0 14px;border-left:3px solid var(--ocre);display:flex;flex-direction:column;gap:8px}
+    .era{position:relative;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05)}
+    .era::before{content:"";position:absolute;left:-22px;top:13px;width:11px;height:11px;border-radius:50%;background:#44403c;border:2px solid var(--ocre)}
+    .era.activa{background:rgba(194,132,58,.16);border:1px solid var(--ocre)}
+    .era.activa::before{background:var(--ocre)}
+    .era-nombre{display:block;font-weight:700}
+    .era-fecha{display:block;font-size:.8rem;opacity:.8}
+    .era-estado{display:block;font-size:.78rem;opacity:.7;margin-top:2px}
+    .era button{width:100%;margin-top:8px}
+    .cabecera{display:flex;align-items:center;justify-content:space-between;gap:8px}
+    #btn-linea{padding:4px 9px;font-size:.72rem;border-radius:7px;flex:none}
+    [hidden]{display:none!important}
+    @media (prefers-reduced-motion: reduce){ #video{transition:none} }
+    @media (orientation: landscape) and (max-height: 520px){
+      #hud{right:auto;width:290px;padding:7px 10px}
+      #hud h1{font-size:.88rem} #hud .lema{visibility:hidden}
+      .metricas{font-size:.72rem} #estado{font-size:.74rem} #nota{display:none}
+      #controles{left:10px;right:auto;width:290px;justify-content:flex-start;gap:5px}
+      #controles button{padding:6px 9px;font-size:.76rem}
+      #alternativos{padding:5px 9px}
+    }
+  </style>
+</head>
+<body>
+  <main id="escena">
+    <video id="video" playsinline muted aria-hidden="true"></video>
+    <canvas id="lienzo3d" role="img" aria-label="Escena 3D de la etapa actual. Los elementos marcados se pueden mover con la pinza, con el dedo o con los controles alternativos."></canvas>
+    <canvas id="lienzoManos" aria-hidden="true"></canvas>
+    <div id="etiquetas" aria-hidden="true"></div>
+  </main>
+
+  <header id="hud">
+    <div class="cabecera">
+      <p class="lema">Las manos que construyeron la historia</p>
+      <button type="button" id="btn-linea">← Línea del tiempo</button>
+    </div>
+    <h1 id="titulo-etapa">Las primeras manos</h1>
+    <ol id="etapas" aria-label="Etapas del capítulo">
+      <li><button type="button" data-etapa="0">1 Tallar</button></li>
+      <li><button type="button" data-etapa="1">2 Pintar</button></li>
+      <li><button type="button" data-etapa="2">3 Modelar</button></li>
+      <li><button type="button" data-etapa="3">4 Orientar</button></li>
+      <li><button type="button" data-etapa="4">5 Canarias</button></li>
+    </ol>
+    <div id="metricas" class="metricas"></div>
+    <div id="estado" class="status-warn" role="status" aria-live="polite">Elige cómo quieres construir.</div>
+    <div id="nota"></div>
+    <div id="camara" role="status" aria-live="polite" hidden></div>
+  </header>
+
+  <nav id="controles" aria-label="Herramientas">
+    <div id="alternativos" hidden></div>
+    <button type="button" id="btn-saber">Saber más</button>
+    <button type="button" id="btn-imagen" aria-pressed="false" hidden>Mostrar mi imagen</button>
+    <button type="button" id="btn-alternativo" aria-pressed="false">Otra forma de mover</button>
+    <button type="button" id="btn-anterior" disabled>← Etapa anterior</button>
+    <button type="button" id="btn-siguiente" class="principal" disabled>Siguiente etapa →</button>
+  </nav>
+
+  <section id="inicio" role="dialog" aria-modal="true" aria-labelledby="t-inicio">
+    <div class="tarjeta">
+      <p class="antetitulo">Prehistoria</p>
+      <h2 id="t-inicio">Las primeras manos</h2>
+      <p>Durante más de dos millones y medio de años, mucho antes de que existiera la escritura, distintas especies humanas —y después la nuestra— aprendieron a transformar el mundo con sus manos: tallaron la piedra, pintaron en las cuevas, modelaron el barro y levantaron enormes monumentos.</p>
+      <p>Recorrerás cinco momentos, del más antiguo al más reciente: tallar un bifaz, dejar una mano en la pared de una cueva, modelar una vasija, orientar un dolmen y, por último, diseñar una pintadera canaria.</p>
+      <p>Con la cámara, junta el <strong>pulgar y el índice</strong> (haz pinza) sobre lo que quieras mover y desplaza la mano.</p>
+      <div class="botones">
+        <button type="button" class="principal" id="btn-manos">Construir con mis manos (cámara)</button>
+        <button type="button" id="btn-tactil">Construir con el dedo, el ratón o el teclado</button>
+        <button type="button" id="btn-diag">Comprobar cámara y manos</button>
+        <button type="button" id="btn-volver-portada">← Volver a la línea del tiempo</button>
+      </div>
+      <label class="opcion"><input type="checkbox" id="chk-imagen"> <span>Ver mi imagen de la cámara detrás de la escena (realidad aumentada). Si no lo marcas, solo se ven unas manos dibujadas.</span></label>
+      <p class="privacidad">La cámara se usa solo para localizar las manos. La imagen se procesa en este dispositivo: no se graba ni se envía. Tu imagen solo se muestra si marcas la casilla o pulsas «Mostrar mi imagen».</p>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-info" role="dialog" aria-modal="true" hidden aria-labelledby="t-info">
+    <div class="tarjeta">
+      <h2 id="t-info">Saber más</h2>
+      <div id="cuerpo-info"></div>
+      <div class="botones"><button type="button" class="principal" data-cerrar>Volver a la obra</button></div>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-diag" role="dialog" aria-modal="true" hidden aria-labelledby="t-diag">
+    <div class="tarjeta">
+      <h2 id="t-diag">Comprobar cámara y manos</h2>
+      <p>Este panel revisa qué hace falta para construir con las manos. Para la prueba real, pulsa el botón y muestra una mano a la cámara durante unos segundos.</p>
+      <ul id="lista-diag"></ul>
+      <div class="botones">
+        <button type="button" class="principal" id="btn-prueba">Probar la cámara ahora</button>
+        <button type="button" data-cerrar>Cerrar</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-final" role="dialog" aria-modal="true" hidden aria-labelledby="t-final">
+    <div class="tarjeta">
+      <h2 id="t-final">¡Capítulo completado!</h2>
+      <p>Tus manos han recorrido la Prehistoria:</p>
+      <ol>
+        <li><strong>Tallar:</strong> diste a un bifaz una forma simétrica.</li>
+        <li><strong>Pintar:</strong> dejaste una mano en negativo y la mediste con una cuadrícula.</li>
+        <li><strong>Modelar:</strong> creaste una vasija, un cuerpo de revolución, y la decoraste con un friso.</li>
+        <li><strong>Orientar:</strong> giraste un dolmen hasta que su corredor miró al este, a 90° del norte.</li>
+        <li><strong>Canarias:</strong> diseñaste una pintadera con simetría de rotación y viste que imprime al revés.</li>
+      </ol>
+      <p>Durante la Prehistoria, las manos aprendieron a planificar, a medir y a repetir. En la Edad Antigua, esas mismas destrezas levantarán acueductos.</p>
+      <div class="botones">
+        <button type="button" class="principal" id="btn-ir-roma">Continuar en la Edad Antigua: Misión Roma →</button>
+        <button type="button" data-cerrar>Volver a la obra</button>
+      </div>
+    </div>
+  </section>
+
+  <script type="module">
+    import * as THREE from "three";
+
+    // =====================================================================
+    // 0. UTILIDADES Y DOM
+    // =====================================================================
+    const $ = (id) => document.getElementById(id);
+    const escena = $("escena"), video = $("video"), lienzo3d = $("lienzo3d"), lienzoManos = $("lienzoManos");
+    const ctxM = lienzoManos.getContext("2d");
+    const estadoTxt = $("estado"), metricasDiv = $("metricas"), notaDiv = $("nota"), alternativos = $("alternativos");
+    const fmt = (n, d = 2) => n.toFixed(d).replace(".", ",");
+    const fmtSigno = (n, d = 1) => (n > 0.0499 ? "+" : n < -0.0499 ? "−" : "") + fmt(Math.abs(n), d);
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+    const MOV_REDUCIDO = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const DOCENTE = new URLSearchParams(location.search).has("docente");
+
+    let categoriaPrevia = "";
+    let actual = -1, etapa = null;
+    function estado(texto, clase = "status-warn", categoria = texto) {
+      if (categoria === categoriaPrevia) return;
+      categoriaPrevia = categoria;
+      estadoTxt.textContent = texto;
+      estadoTxt.className = clase;
+    }
+    function metricas(lineas) {
+      while (metricasDiv.children.length < lineas.length) metricasDiv.appendChild(document.createElement("div"));
+      while (metricasDiv.children.length > lineas.length) metricasDiv.lastChild.remove();
+      lineas.forEach((t, i) => { if (metricasDiv.children[i].textContent !== t) metricasDiv.children[i].textContent = t; });
+    }
+
+    // =====================================================================
+    // 1. THREE.JS BÁSICO
+    // =====================================================================
+    const renderer = new THREE.WebGLRenderer({ canvas: lienzo3d, alpha: true, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.9));
+    const luz = new THREE.DirectionalLight(0xffffff, 1.2);
+    luz.position.set(2, 5, 4);
+    scene.add(luz);
+
+    const M = {
+      piedra: new THREE.MeshStandardMaterial({ color: 0xd6d3d1, roughness: 0.7 }),
+      seleccion: new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.4 }),
+      correcto: new THREE.MeshStandardMaterial({ color: 0x4ade80, roughness: 0.4 }),
+      canal: new THREE.MeshStandardMaterial({ color: 0x0284c7 }),
+      suelo: new THREE.MeshStandardMaterial({ color: 0x8b7355, roughness: 1, transparent: true, opacity: 0.9 }),
+      tierra: new THREE.MeshStandardMaterial({ color: 0x9c7b55, roughness: 1 }),
+      madera: new THREE.MeshStandardMaterial({ color: 0x8a5a2b, roughness: 0.8 }),
+      aguaM: new THREE.MeshStandardMaterial({ color: 0x7dd3fc, roughness: 0.2, transparent: true, opacity: 0.85 }),
+      fantasma: new THREE.LineBasicMaterial({ color: 0x1c1917, transparent: true, opacity: 0.5 }),
+      cota: new THREE.LineBasicMaterial({ color: 0xc2843a }),
+      lineaAgua: new THREE.LineBasicMaterial({ color: 0x0284c7 }),
+      oscuro: new THREE.LineBasicMaterial({ color: 0x1c1917 })
+    };
+    const caja = (w, h, d, mat) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    const linea = (puntos, mat) => new THREE.Line(new THREE.BufferGeometry().setFromPoints(puntos.map((p) => new THREE.Vector3(p[0], p[1], p[2] || 0))), mat);
+    function suelo(ancho, x = 0) { const s = caja(ancho, 0.1, 2, M.suelo); s.position.set(x, -0.05, 0); return s; }
+
+    // Arco de medio punto: intradós de radio r (la luz es el diámetro)
+    function geometriaArco(r, grosor = 0.2, fondo = 0.8) {
+      const f = new THREE.Shape();
+      f.absarc(0, 0, r + grosor, 0, Math.PI, false);
+      f.absarc(0, 0, r, Math.PI, 0, true);
+      const g = new THREE.ExtrudeGeometry(f, { depth: fondo, bevelEnabled: false, curveSegments: 32 });
+      g.translate(0, 0, -fondo / 2);
+      return g;
+    }
+
+    // Partículas de agua reutilizables
+    function crearAgua(n, radio = 0.07) {
+      const m = new THREE.InstancedMesh(new THREE.SphereGeometry(radio, 8, 6), new THREE.MeshStandardMaterial({ color: 0x7dd3fc, roughness: 0.2 }), n);
+      m.frustumCulled = false;
+      return m;
+    }
+    const VEL_AGUA = MOV_REDUCIDO ? 0.15 : 0.4;
+    const ficticio = new THREE.Object3D();
+    function situarGota(malla, i, x, y, z = 0) { ficticio.position.set(x, y, z); ficticio.updateMatrix(); malla.setMatrixAt(i, ficticio.matrix); }
+
+    // =====================================================================
+    // 2. ENCUADRE, PROYECCIÓN Y ETIQUETAS
+    // =====================================================================
+    let marco = { ancho: 7.6, alto: 5.0, cy: 1.8 };
+    function encuadrar() {
+      const W = escena.clientWidth, H = escena.clientHeight;
+      renderer.setSize(W, H, false);
+      camera.aspect = W / H;
+      const lateral = window.matchMedia("(orientation: landscape) and (max-height: 520px)").matches;
+      // En horizontal, HUD y controles comparten columna: el HUD se limita al espacio libre y se desplaza
+      const hudEl = $("hud");
+      if (lateral) { hudEl.style.maxHeight = Math.max(110, $("controles").getBoundingClientRect().top - hudEl.offsetTop - 10) + "px"; hudEl.style.overflowY = "auto"; }
+      else { hudEl.style.maxHeight = ""; hudEl.style.overflowY = ""; }
+      const hud = hudEl.getBoundingClientRect(), ctr = $("controles").getBoundingClientRect();
+      const z = lateral
+        ? { x0: Math.max(hud.right, ctr.right) + 8, x1: W - 8, y0: 8, y1: H - 8 }
+        : { x0: 8, x1: W - 8, y0: hud.bottom + 8, y1: ctr.top - 8 };
+      const libreW = Math.max(z.x1 - z.x0, W * 0.3), libreH = Math.max(z.y1 - z.y0, H * 0.25);
+      const t = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+      const d = Math.max((marco.ancho / 2) / (t * camera.aspect) * (W / libreW), (marco.alto / 2) / t * (H / libreH));
+      camera.position.set(0, marco.cy + 0.5, d);
+      camera.lookAt(0, marco.cy, 0);
+      camera.setViewOffset(W, H, W / 2 - (z.x0 + libreW / 2), H / 2 - (z.y0 + libreH / 2), W, H);
+      camera.updateProjectionMatrix();
+      const dpr = Math.min(window.devicePixelRatio, 2);
+      lienzoManos.width = W * dpr; lienzoManos.height = H * dpr;
+      ctxM.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    window.addEventListener("resize", encuadrar);
+    new ResizeObserver(encuadrar).observe($("hud"));
+    new ResizeObserver(encuadrar).observe($("controles"));
+
+    const v3 = new THREE.Vector3();
+    function aPantalla(x, y, z = 0) {
+      v3.set(x, y, z).project(camera);
+      return { x: (v3.x * 0.5 + 0.5) * escena.clientWidth, y: (-v3.y * 0.5 + 0.5) * escena.clientHeight };
+    }
+    function pixelesPorMetro() {
+      const a = aPantalla(0, 0), b = aPantalla(0, 1);
+      return Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    }
+    const raycaster = new THREE.Raycaster(), ndc = new THREE.Vector2();
+    function rayo(sx, sy) {
+      ndc.set((sx / escena.clientWidth) * 2 - 1, -(sy / escena.clientHeight) * 2 + 1);
+      raycaster.setFromCamera(ndc, camera);
+      return raycaster;
+    }
+    function toca(sx, sy, objetos) { return rayo(sx, sy).intersectObjects([].concat(objetos), true).length > 0; }
+    const planoZ0 = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+    function enPlano(sx, sy) { const p = new THREE.Vector3(); return rayo(sx, sy).ray.intersectPlane(planoZ0, p) ? p : null; }
+
+    let etiquetas = [];
+    function etiqueta(texto, clase, posFn) {
+      const el = document.createElement("span");
+      el.className = "etq " + (clase || "");
+      el.textContent = texto;
+      $("etiquetas").appendChild(el);
+      const e = { el, posFn, set texto(t) { if (el.textContent !== t) el.textContent = t; } };
+      etiquetas.push(e);
+      return e;
+    }
+    function limpiarEtiquetas() { etiquetas.forEach((e) => e.el.remove()); etiquetas = []; }
+    function actualizarEtiquetas() {
+      for (const e of etiquetas) {
+        const p = e.posFn();
+        if (!p) { e.el.hidden = true; continue; }
+        e.el.hidden = false;
+        const s = aPantalla(p[0], p[1], p[2] || 0);
+        e.el.style.left = s.x + "px"; e.el.style.top = s.y + "px";
+      }
+    }
+
+    // Controles alternativos (DUA)
+    function filaRango(etq, min, max, paso, valor, alCambiar, texto) {
+      const id = "alt-" + Math.random().toString(36).slice(2, 8);
+      const fila = document.createElement("div"); fila.className = "fila";
+      const l = document.createElement("label"); l.htmlFor = id; l.textContent = etq;
+      const r = document.createElement("input"); r.type = "range"; r.id = id; r.min = min; r.max = max; r.step = paso; r.value = valor;
+      const sinc = () => r.setAttribute("aria-valuetext", texto(parseFloat(r.value)));
+      r.addEventListener("input", () => { alCambiar(parseFloat(r.value)); sinc(); });
+      sinc();
+      fila.append(l, r); alternativos.appendChild(fila);
+      return { poner(v) { r.value = v; sinc(); } };
+    }
+    function filaBotones(lista) {
+      const fila = document.createElement("div"); fila.className = "fila";
+      for (const [txt, fn] of lista) {
+        const b = document.createElement("button"); b.type = "button"; b.textContent = txt; b.addEventListener("click", fn); fila.appendChild(b);
+      }
+      alternativos.appendChild(fila);
+    }
+
+    // =====================================================================
+    // 3. ETAPA 1 · TALLAR UN BIFAZ (Paleolítico) — simetría axial
+    // =====================================================================
+    const P1 = (() => {
+      const g = new THREE.Group();
+      const N = 96, CX = 0, CY = 1.55;
+      const ang = (k) => (k / N) * Math.PI * 2;
+      // Forma de referencia: almendra con la punta hacia arriba (simétrica respecto al eje vertical)
+      const rT = (t) => { const a = 0.62, b = 1.0; const e = 1 / Math.sqrt((Math.cos(t) / a) ** 2 + (Math.sin(t) / b) ** 2); return e * (1 - 0.16 * Math.sin(t)); };
+      const objetivo = Array.from({ length: N }, (_, k) => rT(ang(k)));
+      // Nódulo inicial: más grande e irregular (más piedra a la derecha)
+      const inicial = objetivo.map((v, k) => { const t = ang(k); return v + 0.2 + 0.08 * Math.sin(3 * t + 0.6) + 0.06 * Math.cos(5 * t + 1.3) + 0.32 * Math.max(0, Math.cos(t - 0.4)) ** 1.5; });
+      let r = inicial.slice(), golpes = 0, hecho = false, malla = null, ctrlAng = null;
+      const matSilex = new THREE.MeshStandardMaterial({ color: 0x9c9686, roughness: 0.5, metalness: 0.05, flatShading: true });
+      const ejeMat = M.cota.clone(); ejeMat.depthTest = false;
+      const eje = linea([[CX, CY - 1.45, 0.3], [CX, CY + 1.25, 0.3]], ejeMat); eje.renderOrder = 5;
+      const fantMat = M.fantasma.clone(); fantMat.depthTest = false;
+      const guia = linea(Array.from({ length: N + 1 }, (_, k) => [CX + objetivo[k % N] * Math.cos(ang(k % N)), CY + objetivo[k % N] * Math.sin(ang(k % N)), 0.3]), fantMat);
+      guia.renderOrder = 5;
+      const percutor = new THREE.Mesh(new THREE.SphereGeometry(0.17, 16, 12), new THREE.MeshStandardMaterial({ color: 0x6b6355, roughness: 0.9 }));
+      percutor.visible = false;
+      const marca = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), new THREE.MeshBasicMaterial({ color: 0x38bdf8, depthTest: false }));
+      marca.renderOrder = 6; marca.visible = false;
+      g.add(eje, guia, percutor, marca);
+      const lascas = [];
+      const geoLasca = new THREE.TetrahedronGeometry(0.07);
+
+      function reconstruir() {
+        const s = new THREE.Shape();
+        for (let k = 0; k <= N; k++) { const kk = k % N, t = ang(kk), x = CX + r[kk] * Math.cos(t), y = CY + r[kk] * Math.sin(t); if (k) s.lineTo(x, y); else s.moveTo(x, y); }
+        if (malla) { g.remove(malla); malla.geometry.dispose(); }
+        malla = new THREE.Mesh(new THREE.ExtrudeGeometry(s, { depth: 0.06, bevelEnabled: true, bevelThickness: 0.13, bevelSize: 0.06, bevelSegments: 2, curveSegments: 1 }), matSilex);
+        malla.position.z = -0.03; g.add(malla);
+      }
+      function medidas() {
+        let dif = 0, suma = 0, dF = 0, sT = 0, izq = 0, der = 0;
+        for (let k = 0; k < N; k++) {
+          const km = ((N / 2 - k) % N + N) % N;          // espejo respecto al eje vertical: θ → π − θ
+          dif += Math.abs(r[k] - r[km]); suma += r[k]; dF += Math.abs(r[k] - objetivo[k]); sT += objetivo[k];
+          const c = Math.cos(ang(k)); if (c < -0.05) izq += r[k]; else if (c > 0.05) der += r[k];
+        }
+        return { S: 1 - dif / suma, F: 1 - dF / sT, lado: izq > der * 1.015 ? "izq" : der > izq * 1.015 ? "der" : "igual" };
+      }
+      function evaluar() {
+        if (actual !== 0) return;
+        const m = medidas();
+        metricas(["Golpes: " + golpes, "Simetría: " + Math.round(m.S * 100) + " %", "Forma de bifaz: " + Math.round(m.F * 100) + " %", "Eje de simetría: vertical"]);
+        if (hecho) return;
+        if (m.S >= 0.95 && m.F >= 0.9) { hecho = true; completar(0, "¡Bifaz terminado en " + golpes + " golpes! Sus dos mitades son casi iguales: tiene un eje de simetría."); }
+        else if (m.lado === "izq") estado("El lado izquierdo tiene más piedra que el derecho. Golpea el borde izquierdo.", "status-warn", "p1-izq");
+        else if (m.lado === "der") estado("El lado derecho tiene más piedra que el izquierdo. Golpea el borde derecho.", "status-warn", "p1-der");
+        else estado("Los dos lados están equilibrados. Sigue golpeando el borde hasta llegar a la línea discontinua.", "status-warn", "p1-igual");
+      }
+      function golpear(t) {
+        if (hecho) return;
+        t = (t % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+        for (let k = 0; k < N; k++) {
+          let d = Math.abs(ang(k) - t); d = Math.min(d, 2 * Math.PI - d);
+          const b = Math.exp(-((d / 0.24) ** 2));
+          if (b > 0.02) r[k] = Math.max(objetivo[k] - 0.03, r[k] - 0.19 * b);
+        }
+        golpes++;
+        const k = Math.round((t / (2 * Math.PI)) * N) % N, ex = CX + (r[k] + 0.25) * Math.cos(t), ey = CY + (r[k] + 0.25) * Math.sin(t);
+        percutor.position.set(ex, ey, 0.25); percutor.visible = true; percutor.userData.vida = 0.25;
+        for (let i = 0; i < (MOV_REDUCIDO ? 0 : 3); i++) {
+          const l = new THREE.Mesh(geoLasca, matSilex); l.position.set(ex, ey, 0.1);
+          l.userData = { vx: Math.cos(t) * (1 + Math.random()), vy: Math.sin(t) * (1 + Math.random()) + 1.2, vida: 0.9 };
+          g.add(l); lascas.push(l);
+        }
+        reconstruir(); evaluar();
+      }
+      function anguloPantalla(x, y) {
+        const p = enPlano(x, y); if (!p) return null;
+        const dx = p.x - CX, dy = p.y - CY, t = Math.atan2(dy, dx), d = Math.hypot(dx, dy);
+        const k = Math.round((((t % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) / (2 * Math.PI) * N) % N;
+        return { t, d, borde: r[k] };
+      }
+      reconstruir();
+      return {
+        nombre: "Tallar un bifaz", grupo: g, marco: { ancho: 3.8, alto: 3.4, cy: 1.5 },
+        nota: "Bifaz: piedra tallada por las dos caras. Entre los más antiguos conocidos están los de Kokiselei (Kenia), de hace unos 1,76 millones de años.",
+        entrar() {
+          etiqueta("eje de simetría", "geo", () => [CX, CY + 1.3, 0.3]);
+          etiqueta("forma del bifaz", "", () => (hecho ? null : [CX + 0.95, CY - 0.75, 0.3]));
+          if (!hecho) estado("Haz pinza sobre el borde de la piedra para golpearla con el percutor y quitar lascas. Intenta que los dos lados queden iguales.", "status-warn", "p1-ini");
+          evaluar();
+        },
+        alternativos() {
+          let gr = 0;
+          ctrlAng = filaRango("Punto del borde", 0, 355, 5, gr, (v) => {
+            gr = v; const t = THREE.MathUtils.degToRad(v), k = Math.round((v / 360) * N) % N;
+            marca.position.set(CX + r[k] * Math.cos(t), CY + r[k] * Math.sin(t), 0.3); marca.visible = true;
+          }, (v) => v + " grados; 0 es la derecha y 90 es arriba");
+          filaBotones([["Golpear en ese punto", () => golpear(THREE.MathUtils.degToRad(gr))]]);
+        },
+        down(x, y) {
+          const a = anguloPantalla(x, y); if (!a) return false;
+          if (a.d > a.borde * 0.55 && a.d < a.borde + 0.5) golpear(a.t);
+          else if (a.d <= a.borde * 0.55) estado("Golpea cerca del borde: las lascas salen de los bordes, no del centro.", "status-warn", "p1-centro");
+          return false;
+        },
+        move() {}, up() {},
+        tick(dt) {
+          if (percutor.visible && (percutor.userData.vida -= dt) <= 0) percutor.visible = false;
+          for (let i = lascas.length - 1; i >= 0; i--) {
+            const l = lascas[i], u = l.userData;
+            u.vy -= 4 * dt; l.position.x += u.vx * dt; l.position.y += u.vy * dt; l.rotation.x += 6 * dt; l.rotation.y += 5 * dt;
+            if ((u.vida -= dt) <= 0) { g.remove(l); lascas.splice(i, 1); }
+          }
+        }
+      };
+    })();
+
+    // =====================================================================
+    // 4. ETAPA 2 · LA MANO EN LA PARED (arte rupestre) — negativo y medida
+    // =====================================================================
+    const P2 = (() => {
+      const g = new THREE.Group();
+      const W = 4.4, H = 3.2, CY = 1.6, CW = 512, CH = Math.round(512 * H / W);
+      const PXCM = (CW / W) / 20;                   // 1 unidad = 20 cm de pared
+      const lienzo = () => { const c = document.createElement("canvas"); c.width = CW; c.height = CH; return c; };
+      const base = lienzo(), pint = lienzo(), masc = lienzo(), piel = lienzo(), comp = lienzo();
+      const cP = pint.getContext("2d", { willReadFrequently: true }), cC = comp.getContext("2d");
+      // Roca: textura determinista
+      (() => {
+        const c = base.getContext("2d"); let sem = 7;
+        const azar = () => ((sem = (sem * 16807) % 2147483647) / 2147483647);
+        c.fillStyle = "#c9a57b"; c.fillRect(0, 0, CW, CH);
+        for (let i = 0; i < 900; i++) { c.fillStyle = "rgba(" + (110 + azar() * 90 | 0) + "," + (80 + azar() * 60 | 0) + "," + (50 + azar() * 40 | 0) + "," + (0.05 + azar() * 0.12).toFixed(2) + ")"; c.beginPath(); c.arc(azar() * CW, azar() * CH, 4 + azar() * 26, 0, Math.PI * 2); c.fill(); }
+        c.strokeStyle = "rgba(70,50,30,.25)"; c.lineWidth = 1.5;
+        for (let i = 0; i < 7; i++) { c.beginPath(); let x = azar() * CW, y = azar() * CH; c.moveTo(x, y); for (let j = 0; j < 6; j++) { x += (azar() - 0.5) * 60; y += azar() * 40; c.lineTo(x, y); } c.stroke(); }
+      })();
+      // Mano de referencia: 20 cm de la muñeca a la punta del dedo corazón
+      const MX = CW / 2, MY = CH * 0.86;
+      function dibujarMano(c, extra) {
+        const s = PXCM;
+        c.lineCap = "round"; c.lineJoin = "round";
+        const palma = { w: 8.6 * s, h: 11 * s };
+        c.beginPath();
+        const x0 = MX - palma.w / 2 - extra, y0 = MY - palma.h - extra, w = palma.w + 2 * extra, h = palma.h + 2 * extra + 1.5 * s, rad = 2.2 * s + extra;
+        c.moveTo(x0 + rad, y0); c.arcTo(x0 + w, y0, x0 + w, y0 + h, rad); c.arcTo(x0 + w, y0 + h, x0, y0 + h, rad); c.arcTo(x0, y0 + h, x0, y0, rad); c.arcTo(x0, y0, x0 + w, y0, rad); c.fill();
+        const dedos = [[-3.1, -0.17, 7.6], [-1.0, -0.05, 9.0], [1.15, 0.07, 8.3], [3.15, 0.2, 6.6]];
+        c.lineWidth = 1.9 * s + 2 * extra;
+        for (const [dx, a, l] of dedos) { const bx = MX + dx * s, by = MY - palma.h + 0.6 * s; c.beginPath(); c.moveTo(bx, by); c.lineTo(bx + Math.sin(a) * l * s, by - Math.cos(a) * l * s); c.stroke(); }
+        c.lineWidth = 2.2 * s + 2 * extra;
+        const tx = MX - palma.w / 2 + 0.6 * s, ty = MY - 3.8 * s; c.beginPath(); c.moveTo(tx, ty); c.lineTo(tx - Math.cos(0.75) * 6.2 * s, ty - Math.sin(0.75) * 6.2 * s); c.stroke();
+      }
+      (() => { const c = masc.getContext("2d"); c.fillStyle = c.strokeStyle = "#fff"; dibujarMano(c, 0); })();
+      (() => { const c = piel.getContext("2d"); c.drawImage(masc, 0, 0); c.globalCompositeOperation = "source-in"; c.fillStyle = "#d8a07a"; c.fillRect(0, 0, CW, CH); })();
+      // Puntos del halo alrededor de la mano para medir cuánto pigmento hay
+      const halo = [];
+      (() => {
+        const hc = lienzo(), c = hc.getContext("2d"); c.fillStyle = c.strokeStyle = "#fff"; dibujarMano(c, 20);
+        const dh = c.getImageData(0, 0, CW, CH).data, dm = masc.getContext("2d").getImageData(0, 0, CW, CH).data;
+        for (let y = 2; y < CH; y += 6) for (let x = 2; x < CW; x += 6) { const i = (y * CW + x) * 4 + 3; if (dh[i] > 0 && dm[i] === 0) halo.push(i); }
+      })();
+      const tex = new THREE.CanvasTexture(comp); tex.colorSpace = THREE.SRGBColorSpace;
+      const pared = new THREE.Mesh(new THREE.PlaneGeometry(W, H), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95 }));
+      pared.position.set(0, CY, 0); g.add(pared);
+      // Tablillas de respuesta (fase de medida)
+      const OPC = [["10 cm", 10], ["20 cm", 20], ["40 cm", 40]];
+      const tablillas = OPC.map((o, i) => { const t = caja(1.0, 0.5, 0.08, new THREE.MeshStandardMaterial({ color: 0x8a5a2b, roughness: 0.8 })); t.position.set(2.95, CY + 0.8 - i * 0.8, 0.05); t.visible = false; t.userData.cm = o[1]; g.add(t); return t; });
+      let fase = "soplar", soplando = false, cobertura = 0, sucio = false, tMedida = 0, hecho = false, intentos = 0;
+
+      function componer() {
+        cC.globalCompositeOperation = "source-over";
+        cC.drawImage(base, 0, 0); cC.drawImage(pint, 0, 0);
+        if (fase === "soplar") { cC.globalAlpha = 0.95; cC.drawImage(piel, 0, 0); cC.globalAlpha = 1; }
+        if (fase !== "soplar") {
+          cC.strokeStyle = "rgba(255,255,255,.55)"; cC.lineWidth = 1;
+          const paso = 5 * PXCM;
+          for (let x = MX % paso; x < CW; x += paso) { cC.beginPath(); cC.moveTo(x, 0); cC.lineTo(x, CH); cC.stroke(); }
+          for (let y = MY % paso; y < CH; y += paso) { cC.beginPath(); cC.moveTo(0, y); cC.lineTo(CW, y); cC.stroke(); }
+        }
+        tex.needsUpdate = true;
+      }
+      function soplar(u, v, n = 34) {
+        const cx = u * CW, cy = (1 - v) * CH;
+        cP.globalCompositeOperation = "source-over"; cP.fillStyle = "rgba(150,40,22,0.28)";
+        for (let i = 0; i < n; i++) {
+          const a = Math.random() * Math.PI * 2, d = Math.sqrt(-2 * Math.log(Math.random() + 1e-6)) * 11;
+          cP.beginPath(); cP.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d, 1.2 + Math.random() * 2.2, 0, Math.PI * 2); cP.fill();
+        }
+        cP.globalCompositeOperation = "destination-out"; cP.drawImage(masc, 0, 0); cP.globalCompositeOperation = "source-over";
+        sucio = true; componer();
+      }
+      function medirCobertura() {
+        const d = cP.getImageData(0, 0, CW, CH).data; let n = 0;
+        for (const i of halo) if (d[i] > 70) n++;
+        cobertura = n / halo.length; sucio = false;
+        if (fase === "soplar" && cobertura >= 0.7) {
+          fase = "medir"; tablillas.forEach((t) => (t.visible = true)); componer(); refrescar();
+          estado("¡Retiras la mano y aparece en negativo! Cada cuadro mide 5 cm. ¿Cuánto mide la mano de la muñeca a la punta del dedo corazón? Haz pinza sobre una tablilla.", "status-ok", "p2-medir");
+        } else refrescar();
+      }
+      function responder(cm) {
+        if (hecho) return;
+        intentos++;
+        if (cm === 20) { hecho = true; fase = "hecho"; completar(1, "¡Exacto! La mano mide 4 cuadros de 5 cm: 4 × 5 = 20 cm. Ahora mide tu mano con una regla y compárala."); }
+        else estado("No es " + cm + " cm. Cuenta los cuadros de la muñeca a la punta del dedo más largo: cada uno mide 5 cm.", "status-error", "p2-mal-" + cm);
+        refrescar();
+      }
+      function refrescar() {
+        if (actual !== 1) return;
+        metricas(["Pigmento alrededor de la mano: " + Math.round(cobertura * 100) + " %", "Fase: " + (fase === "soplar" ? "soplar pigmento" : fase === "medir" ? "medir la mano" : "terminada"), "Cuadrícula: 5 cm", "Intentos de medida: " + intentos]);
+      }
+      function uvDe(x, y) { const h = rayo(x, y).intersectObject(pared, false)[0]; return h && h.uv ? h.uv : null; }
+      componer();
+      return {
+        nombre: "La mano en la pared", grupo: g, marco: { ancho: 6.6, alto: 3.6, cy: 1.6 },
+        nota: "Manos en negativo: se apoyaba la mano en la roca y se soplaba pigmento alrededor. En El Castillo (Cantabria) hay una con más de 37 300 años.",
+        entrar() {
+          etiqueta("pared de la cueva", "", () => [-1.55, CY + 1.45]);
+          OPC.forEach((o, i) => etiqueta(o[0], "geo", () => (fase === "medir" || fase === "hecho" ? [2.95, CY + 0.8 - i * 0.8 + 0.42, 0.1] : null)));
+          if (fase === "soplar") estado("Tu mano está apoyada en la pared. Haz pinza junto a sus bordes y muévete para soplar el pigmento alrededor.", "status-warn", "p2-ini");
+          refrescar();
+        },
+        alternativos() {
+          filaBotones([["Soplar pigmento alrededor", () => {
+            if (fase !== "soplar") return;
+            for (let i = 0; i < 40; i++) { const idx = halo[(Math.random() * halo.length) | 0] - 3, px = (idx / 4) % CW, py = Math.floor(idx / 4 / CW); soplar(px / CW, 1 - py / CH, 14); }
+            medirCobertura();
+          }]]);
+          filaBotones(OPC.map((o) => ["Mide " + o[0], () => { if (fase === "medir") responder(o[1]); }]));
+        },
+        down(x, y) {
+          if (fase === "soplar") { const uv = uvDe(x, y); if (!uv) return false; soplando = true; soplar(uv.x, uv.y); return true; }
+          if (fase === "medir") { const h = rayo(x, y).intersectObjects(tablillas, false)[0]; if (h) responder(h.object.userData.cm); }
+          return false;
+        },
+        move(x, y) { if (soplando) { const uv = uvDe(x, y); if (uv) soplar(uv.x, uv.y); } },
+        up() { if (soplando) { soplando = false; medirCobertura(); } },
+        tick(dt) { tMedida += dt; if (sucio && tMedida > 0.3) { tMedida = 0; medirCobertura(); } }
+      };
+    })();
+
+    // =====================================================================
+    // 5. ETAPA 3 · MODELAR UNA VASIJA (Neolítico) — cuerpo de revolución, capacidad, friso
+    // =====================================================================
+    const P3 = (() => {
+      const g = new THREE.Group();
+      g.add(suelo(5));
+      const CM = 20;                                   // 1 unidad = 20 cm
+      const NA = 6, HS = Array.from({ length: NA }, (_, j) => 0.12 + j * 0.24);
+      const OBJ = [0.42, 0.66, 0.78, 0.7, 0.48, 0.55];
+      const rr = Array(NA).fill(0.45);
+      let sel = 0, arrastre = null, fase = "modelar", sellos = 0, hecho = false, malla = null, ctrlSel = null, ctrlAnch = null;
+      const matBarro = new THREE.MeshStandardMaterial({ color: 0x9a6b45, roughness: 0.85, side: THREE.DoubleSide });
+      const matAsa = new THREE.MeshBasicMaterial({ color: 0xc2843a, depthTest: false }), matAsaSel = new THREE.MeshBasicMaterial({ color: 0xfacc15, depthTest: false });
+      const asas = HS.map(() => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 8), matAsa); m.renderOrder = 6; g.add(m); return m; });
+      const fant = M.fantasma.clone(); fant.depthTest = false;
+      const guiaD = linea(OBJ.map((r, j) => [r, HS[j], 0]), fant), guiaI = linea(OBJ.map((r, j) => [-r, HS[j], 0]), fant);
+      guiaD.renderOrder = guiaI.renderOrder = 5; g.add(guiaD, guiaI);
+      const matConcha = new THREE.MeshStandardMaterial({ color: 0x3b2414, roughness: 0.9 });
+      const geoConcha = new THREE.TorusGeometry(0.045, 0.011, 4, 10, Math.PI);
+      const conchas = [];
+      function perfil() {
+        const pts = [new THREE.Vector2(rr[0] * 0.85, 0)].concat(rr.map((r, j) => new THREE.Vector2(r, HS[j])));
+        const c = new THREE.SplineCurve(pts).getPoints(48);
+        return [new THREE.Vector2(0.001, 0)].concat(c);
+      }
+      function capacidad(pts) {                       // π ∫ r² dh  (en unidades³; 1 u³ = 8 L)
+        let v = 0; for (let i = 1; i < pts.length; i++) { const dh = pts[i].y - pts[i - 1].y; if (dh > 0) v += Math.PI * ((pts[i].x + pts[i - 1].x) / 2) ** 2 * dh; }
+        return v * 8;
+      }
+      function reconstruir() {
+        const pts = perfil();
+        if (malla) { g.remove(malla); malla.geometry.dispose(); }
+        malla = new THREE.Mesh(new THREE.LatheGeometry(pts, 56), matBarro); g.add(malla);
+        asas.forEach((a, j) => { a.position.set(rr[j], HS[j], 0); a.material = j === sel && fase === "modelar" ? matAsaSel : matAsa; a.visible = fase === "modelar"; });
+        guiaD.visible = guiaI.visible = fase === "modelar";
+        refrescar(pts);
+      }
+      function parecido() { let d = 0; for (let j = 0; j < NA; j++) d += Math.abs(rr[j] - OBJ[j]); return Math.max(0, 1 - d / NA / 0.3); }
+      function ponerRadio(j, v) {
+        rr[j] = clamp(v, 0.2, 0.95);
+        if (Math.abs(rr[j] - OBJ[j]) < 0.045) rr[j] = OBJ[j];
+        reconstruir();
+        if (fase === "modelar" && rr.every((r, k) => Math.abs(r - OBJ[k]) < 0.05)) {
+          fase = "decorar"; reconstruir();
+          estado("¡Forma conseguida! Ahora decora como en el Neolítico: haz pinza sobre la vasija para imprimir el borde de una concha.", "status-ok", "p3-decorar");
+        }
+      }
+      function imprimir(punto, normal) {
+        if (fase !== "decorar") return;
+        const c = new THREE.Mesh(geoConcha, matConcha);
+        c.position.copy(punto).addScaledVector(normal, 0.004); c.lookAt(punto.clone().add(normal));
+        g.add(c); conchas.push(c); sellos++;
+        if (sellos >= 8 && !hecho) { hecho = true; fase = "hecho"; completar(2, "¡Vasija decorada! La misma marca repetida a la misma distancia forma un friso: un movimiento de traslación."); }
+        else if (!hecho) estado("Conchas impresas: " + sellos + " de 8. Intenta dejar la misma distancia entre una y otra.", "status-warn", "p3-c" + sellos);
+        refrescar();
+      }
+      function imprimirFriso() {
+        if (fase !== "decorar") return;
+        const j = 2, k = sellos % 8, a = -Math.PI / 2 + (k - 3.5) * (Math.PI / 9), r = rr[j];
+        const p = new THREE.Vector3(Math.cos(a) * r, HS[j], -Math.sin(a) * r), n = new THREE.Vector3(Math.cos(a), 0, -Math.sin(a));
+        imprimir(p, n);
+      }
+      function refrescar(pts) {
+        if (actual !== 2) return;
+        metricas([fase === "modelar" ? "Anillo elegido: " + (sel + 1) + " (anchura " + Math.round(rr[sel] * CM * 2) + " cm)" : "Forma: lista", "Parecido con el modelo: " + Math.round(parecido() * 100) + " %", "Capacidad aprox.: " + fmt(capacidad(pts || perfil()), 1) + " L", "Conchas impresas: " + sellos]);
+        ctrlSel && ctrlSel.poner(sel + 1); ctrlAnch && ctrlAnch.poner(Math.round(rr[sel] * CM * 2));
+      }
+      reconstruir();
+      return {
+        nombre: "Modelar una vasija", grupo: g, marco: { ancho: 2.6, alto: 2.0, cy: 0.7 },
+        nota: "Sin torno: el barro se modelaba a mano, a menudo con rollos (churros). La cerámica cardial se decoraba con el borde de una concha de berberecho.",
+        entrar() {
+          etiqueta("eje de giro", "geo", () => [0, HS[NA - 1] + 0.3]);
+          etiqueta("modelo", "", () => (fase === "modelar" ? [-OBJ[3] - 0.25, HS[3]] : null));
+          if (fase === "modelar") estado("Haz pinza sobre un punto naranja del borde y mueve la mano hacia fuera o hacia dentro hasta encajar con la línea del modelo.", "status-warn", "p3-ini");
+          reconstruir();
+        },
+        alternativos() {
+          ctrlSel = filaRango("Anillo (1 = abajo)", 1, NA, 1, sel + 1, (v) => { sel = v - 1; reconstruir(); }, (v) => "anillo " + v);
+          ctrlAnch = filaRango("Anchura (cm)", 8, 38, 1, Math.round(rr[sel] * CM * 2), (v) => { if (fase === "modelar") ponerRadio(sel, v / CM / 2); }, (v) => v + " centímetros de diámetro");
+          filaBotones([["Imprimir una concha", imprimirFriso]]);
+        },
+        down(x, y) {
+          if (fase === "modelar") {
+            const p = enPlano(x, y); if (!p) return false;
+            let mejor = -1, dm = 1e9;
+            for (let j = 0; j < NA; j++) { const d = Math.hypot(Math.abs(p.x) - rr[j], p.y - HS[j]); if (d < dm) { dm = d; mejor = j; } }
+            if (dm > 0.3) return false;
+            sel = mejor; arrastre = { px: Math.abs(p.x), r0: rr[mejor] }; reconstruir(); return true;
+          }
+          if (fase === "decorar") {
+            const h = rayo(x, y).intersectObject(malla, false)[0];
+            if (h && h.face) { const n = h.face.normal.clone(); if (n.z < 0) n.negate(); imprimir(h.point, n.normalize()); }
+          }
+          return false;
+        },
+        // Ganancia 0,5: el borde se mueve a media velocidad que la mano, para poder afinar con la pinza
+        move(x, y) { if (!arrastre) return; const p = enPlano(x, y); if (p) ponerRadio(sel, arrastre.r0 + 0.5 * (Math.abs(p.x) - arrastre.px)); },
+        up() { arrastre = null; },
+        tick() {}
+      };
+    })();
+
+    // =====================================================================
+    // 6. ETAPA 4 · ORIENTAR EL DOLMEN (megalitismo) — ángulos y puntos cardinales
+    // =====================================================================
+    const P4 = (() => {
+      const g = new THREE.Group();
+      const R = 2.1;
+      const suelo4 = new THREE.Mesh(new THREE.CircleGeometry(R, 96), new THREE.MeshStandardMaterial({ color: 0xa8956a, roughness: 1 }));
+      suelo4.position.z = -0.03; g.add(suelo4);
+      const horizonte = new THREE.Mesh(new THREE.RingGeometry(R - 0.04, R + 0.02, 96), new THREE.MeshBasicMaterial({ color: 0x5b4636 }));
+      g.add(horizonte);
+      for (let a = 0; a < 360; a += 30) { const t = THREE.MathUtils.degToRad(a), l = a % 90 === 0 ? 0.22 : 0.11; g.add(linea([[Math.sin(t) * (R - l), Math.cos(t) * (R - l), 0.01], [Math.sin(t) * R, Math.cos(t) * R, 0.01]], M.oscuro)); }
+      const sol = new THREE.Mesh(new THREE.SphereGeometry(0.2, 20, 14), new THREE.MeshBasicMaterial({ color: 0xfbbf24 }));
+      sol.position.set(R + 0.32, 0, 0.05); g.add(sol);
+      const dolmen = new THREE.Group(); g.add(dolmen);
+      const tumulo = new THREE.Mesh(new THREE.CircleGeometry(1.05, 64), new THREE.MeshStandardMaterial({ color: 0x7d6b45, roughness: 1, transparent: true, opacity: 0.75 }));
+      tumulo.position.set(0, 0.25, 0); dolmen.add(tumulo);
+      const matLosa = new THREE.MeshStandardMaterial({ color: 0x8f8a80, roughness: 0.8 });
+      for (let i = 0; i < 9; i++) { const a = -Math.PI * 0.8 + (i / 8) * Math.PI * 1.6 + Math.PI / 2 + Math.PI; const l = caja(0.22, 0.09, 0.14, matLosa); l.position.set(Math.cos(a) * 0.36, Math.sin(a) * 0.36, 0.07); l.rotation.z = a + Math.PI / 2; dolmen.add(l); }
+      for (let y = 0.48; y <= 1.62; y += 0.19) for (const x of [-0.19, 0.19]) { const l = caja(0.09, 0.17, 0.14, matLosa); l.position.set(x, y, 0.07); dolmen.add(l); }
+      const flecha = linea([[0, 0, 0.16], [0, 1.95, 0.16]], M.cota); dolmen.add(flecha);
+      const haz = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape([new THREE.Vector2(R + 0.32, 0.2), new THREE.Vector2(R + 0.32, -0.2), new THREE.Vector2(0, -0.12), new THREE.Vector2(0, 0.12)])), new THREE.MeshBasicMaterial({ color: 0xfde68a, transparent: true, opacity: 0, depthWrite: false }));
+      haz.position.z = 0.2; g.add(haz);
+      let az = 215, hecho = false, arrastre = false, ctrl = null, luz = 0;
+      const CARD = ["norte", "noreste", "este", "sureste", "sur", "suroeste", "oeste", "noroeste"];
+      const cardinal = (a) => CARD[Math.round(a / 45) % 8];
+      function poner(v) {
+        az = ((Math.round(v) % 360) + 360) % 360;
+        if (Math.abs(az - 90) <= 4) az = 90;
+        dolmen.rotation.z = -THREE.MathUtils.degToRad(az);
+        ctrl && ctrl.poner(az);
+        if (actual !== 3) return;
+        metricas(["Orientación del corredor: " + az + "°", "Mira hacia el " + cardinal(az), "Sol del equinoccio: 90° (este)", "Diferencia: " + Math.min(Math.abs(az - 90), 360 - Math.abs(az - 90)) + "°"]);
+        if (hecho) return;
+        if (az === 90) { hecho = true; completar(3, "¡El sol del equinoccio entra por el corredor hasta la cámara! El corredor mira al este: 90° desde el norte, un ángulo recto."); }
+        else estado("El corredor mira hacia el " + cardinal(az) + " (" + az + "°). Gíralo para que el sol del equinoccio entre hasta la cámara.", "status-warn", "p4-" + cardinal(az));
+      }
+      poner(az);
+      return {
+        nombre: "Orientar el dolmen", grupo: g, marco: { ancho: 6.0, alto: 5.0, cy: 0 },
+        nota: "Vista desde arriba. Simplificación: con el horizonte plano, en los equinoccios el sol sale justo por el este (90°).",
+        entrar() {
+          [["N", 0], ["E", 90], ["S", 180], ["O", 270]].forEach(([l, a]) => { const t = THREE.MathUtils.degToRad(a); etiqueta(l, "geo", () => [Math.sin(t) * (R + 0.02), Math.cos(t) * (R + 0.02) + (a === 180 ? -0.05 : 0.17)]); });
+          etiqueta("sol del equinoccio", "", () => [R - 0.15, 0.62]);
+          etiqueta("cámara", "", () => [0, -0.12]).el.classList.add("abajo");
+          etiqueta("corredor", "geo", () => { const t = THREE.MathUtils.degToRad(az); return [Math.sin(t) * 1.75, Math.cos(t) * 1.75 + 0.15, 0.2]; });
+          poner(az);
+          if (!hecho) estado("Haz pinza sobre el dolmen y gira la mano: el corredor apunta hacia donde la muevas. Haz que mire al sol del equinoccio.", "status-warn", "p4-ini");
+        },
+        alternativos() { ctrl = filaRango("Orientación (°)", 0, 359, 1, az, poner, (v) => v + " grados desde el norte, hacia el " + cardinal(v)); },
+        down(x, y) { const p = enPlano(x, y); if (!p || Math.hypot(p.x, p.y) > R) return false; arrastre = true; poner(THREE.MathUtils.radToDeg(Math.atan2(p.x, p.y))); return true; },
+        move(x, y) { if (!arrastre) return; const p = enPlano(x, y); if (p) poner(THREE.MathUtils.radToDeg(Math.atan2(p.x, p.y))); },
+        up() { arrastre = false; },
+        tick(dt) { luz = clamp(luz + (hecho ? dt : -dt) * 0.8, 0, 0.55); haz.material.opacity = luz; }
+      };
+    })();
+
+    // =====================================================================
+    // 7. ETAPA 5 · CANARIAS: la pintadera — simetría de rotación y de reflexión
+    // =====================================================================
+    const P5 = (() => {
+      const g = new THREE.Group();
+      g.add(suelo(8));
+      const T = 512, XS = -1.7, XI = 1.75, CY = 1.45, RS = 0.95;
+      const lienzo = () => { const c = document.createElement("canvas"); c.width = c.height = T; return c; };
+      const dib = lienzo(), cara = lienzo(), imp = lienzo(), tinta = lienzo();
+      const cD = dib.getContext("2d"), cF = cara.getContext("2d"), cI = imp.getContext("2d"), cT = tinta.getContext("2d");
+      cI.fillStyle = "#e9d3b1"; cI.fillRect(0, 0, T, T);
+      const texF = new THREE.CanvasTexture(cara), texI = new THREE.CanvasTexture(imp);
+      texF.colorSpace = texI.colorSpace = THREE.SRGBColorSpace;
+      const matBarro = new THREE.MeshStandardMaterial({ color: 0xa8714a, roughness: 0.85 });
+      const sello = new THREE.Mesh(new THREE.CylinderGeometry(RS, RS, 0.24, 64), [matBarro, new THREE.MeshStandardMaterial({ map: texF, roughness: 0.85 }), matBarro]);
+      sello.rotation.x = Math.PI / 2; sello.position.set(XS, CY, 0); g.add(sello);
+      const lamina = new THREE.Mesh(new THREE.PlaneGeometry(2.1, 2.1), new THREE.MeshStandardMaterial({ map: texI, roughness: 0.95 }));
+      lamina.position.set(XI, CY, 0); g.add(lamina);
+      let orden = 6, trazo = null, largo = 0, impresiones = 0, hecho = false;
+      function componerCara() {
+        cF.fillStyle = "#b07a4f"; cF.fillRect(0, 0, T, T);
+        cF.strokeStyle = "rgba(255,255,255,.28)"; cF.lineWidth = 2; cF.setLineDash([6, 8]);
+        for (let k = 0; k < orden; k++) { const a = (k / orden) * Math.PI * 2; cF.beginPath(); cF.moveTo(T / 2, T / 2); cF.lineTo(T / 2 + Math.cos(a) * T / 2, T / 2 + Math.sin(a) * T / 2); cF.stroke(); }
+        cF.setLineDash([]); cF.drawImage(dib, 0, 0); texF.needsUpdate = true;
+      }
+      function segmento(a, b) {
+        cD.strokeStyle = "#3a2214"; cD.lineWidth = 12; cD.lineCap = "round";
+        for (let k = 0; k < orden; k++) {
+          const t = (k / orden) * Math.PI * 2, c = Math.cos(t), s = Math.sin(t);
+          const rot = (p) => [T / 2 + (p[0] - T / 2) * c - (p[1] - T / 2) * s, T / 2 + (p[0] - T / 2) * s + (p[1] - T / 2) * c];
+          const A = rot(a), B = rot(b); cD.beginPath(); cD.moveTo(A[0], A[1]); cD.lineTo(B[0], B[1]); cD.stroke();
+        }
+        largo += Math.hypot(b[0] - a[0], b[1] - a[1]); componerCara(); refrescar();
+      }
+      function borrar() { cD.clearRect(0, 0, T, T); largo = 0; componerCara(); refrescar(); }
+      function cambiarOrden(n) { orden = n; borrar(); estado("Orden " + n + ": tu dibujo se repetirá " + n + " veces girando " + Math.round(360 / n) + "° cada vez.", "status-warn", "p5-orden-" + n); }
+      function figura(tipo) {
+        const c = T / 2, pts = tipo === "triangulo" ? [[c + 60, c - 18], [c + 200, c - 50], [c + 200, c + 14], [c + 60, c - 18]] : [[c + 120, c - 60], [c + 170, c - 20], [c + 200, c + 30]];
+        for (let i = 1; i < pts.length; i++) segmento(pts[i - 1], pts[i]);
+      }
+      function estampar(u, v) {
+        if (largo < 260) { estado("Dibuja un poco más en la pintadera antes de estampar.", "status-warn", "p5-poco"); return; }
+        cT.clearRect(0, 0, T, T); cT.save(); cT.translate(T, 0); cT.scale(-1, 1); cT.drawImage(dib, 0, 0); cT.restore();   // el sello imprime al revés
+        cT.globalCompositeOperation = "source-in"; cT.fillStyle = "#9b2d20"; cT.fillRect(0, 0, T, T); cT.globalCompositeOperation = "source-over";
+        const L = Math.round(T * 2 * RS / 2.1), x = clamp(u * T, L / 2, T - L / 2), y = clamp((1 - v) * T, L / 2, T - L / 2);
+        cI.globalAlpha = 0.9; cI.drawImage(tinta, x - L / 2, y - L / 2, L, L); cI.globalAlpha = 1; texI.needsUpdate = true;
+        impresiones++; refrescar();
+        if (!hecho) { hecho = true; completar(4, "¡Impresión hecha! Fíjate: el sello imprime el dibujo al revés, como en un espejo (simetría axial)."); abrirPanel("panel-final"); }
+      }
+      function uv(obj, x, y) { const h = rayo(x, y).intersectObject(obj, false)[0]; return h && h.uv ? { h, uv: h.uv } : null; }
+      function refrescar() {
+        if (actual !== 4) return;
+        metricas(["Simetría de rotación: orden " + orden, "Giro entre repeticiones: 360° : " + orden + " = " + Math.round(360 / orden) + "°", "Dibujo: " + Math.min(100, Math.round(largo / 2.6)) + " %", "Impresiones: " + impresiones]);
+      }
+      componerCara();
+      return {
+        nombre: "La pintadera canaria", grupo: g, marco: { ancho: 5.8, alto: 3.0, cy: 1.45 },
+        nota: "Las pintaderas son sellos de barro cocido de Gran Canaria con dibujos geométricos. La nuestra es circular; en El Museo Canario la mayoría son rectangulares o cuadradas.",
+        entrar() {
+          etiqueta("tu pintadera", "", () => [XS, CY + RS + 0.3]);
+          etiqueta("donde se estampa", "", () => [XI, CY + 1.3]);
+          etiqueta("impresión (al revés)", "geo", () => (impresiones ? [XI, CY - 1.15] : null)).el.classList.add("abajo");
+          if (!hecho) estado("Haz pinza sobre la pintadera y dibuja en un sector: el dibujo se repite al girar. Después haz pinza sobre la lámina para estampar.", "status-warn", "p5-ini");
+          refrescar();
+        },
+        alternativos() {
+          filaBotones([["Orden 4", () => cambiarOrden(4)], ["Orden 6", () => cambiarOrden(6)], ["Orden 8", () => cambiarOrden(8)]]);
+          filaBotones([["Añadir triángulo", () => figura("triangulo")], ["Añadir línea", () => figura("linea")], ["Borrar", borrar]]);
+          filaBotones([["Estampar", () => estampar(0.5, 0.5)]]);
+        },
+        down(x, y) {
+          const s = uv(sello, x, y);
+          if (s && s.h.face && s.h.face.materialIndex === 1) { trazo = [s.uv.x * T, (1 - s.uv.y) * T]; return true; }
+          const l = uv(lamina, x, y);
+          if (l) estampar(l.uv.x, l.uv.y);
+          return false;
+        },
+        move(x, y) {
+          if (!trazo) return;
+          const s = uv(sello, x, y);
+          if (s && s.h.face && s.h.face.materialIndex === 1) { const p = [s.uv.x * T, (1 - s.uv.y) * T]; if (Math.hypot(p[0] - trazo[0], p[1] - trazo[1]) > 4) { segmento(trazo, p); trazo = p; } }
+        },
+        up() { trazo = null; },
+        tick() {}
+      };
+    })();
+
+    // =====================================================================
+    // 8. GESTOR DE ETAPAS (proceso evolutivo)
+    // =====================================================================
+    const ETAPAS = [P1, P2, P3, P4, P5];
+    ETAPAS.forEach((e) => { e.grupo.visible = false; scene.add(e.grupo); });
+    const CLAVE = "lasManos.prehistoria.progreso";
+    let hechas = [false, false, false, false, false];
+    try { const s = JSON.parse(localStorage.getItem(CLAVE) || "null"); if (Array.isArray(s) && s.length === 5) hechas = s.map(Boolean); } catch (e) {}
+    const botonesEtapa = [...document.querySelectorAll("#etapas button")];
+
+    function disponible(i) { return DOCENTE || i === 0 || hechas[i - 1] || hechas[i]; }
+    function pintarProgreso() {
+      botonesEtapa.forEach((b, i) => {
+        b.disabled = !disponible(i);
+        b.classList.toggle("hecha", hechas[i]);
+        if (i === actual) b.setAttribute("aria-current", "step"); else b.removeAttribute("aria-current");
+        b.setAttribute("aria-label", "Etapa " + (i + 1) + ": " + ETAPAS[i].nombre + (hechas[i] ? ", completada" : "") + (b.disabled ? ", bloqueada" : ""));
+      });
+      $("btn-siguiente").disabled = !(actual < 4 && hechas[actual]);
+      $("btn-siguiente").textContent = actual < 4 ? "Siguiente etapa →" : "Capítulo terminado";
+      $("btn-anterior").disabled = actual <= 0;
+    }
+    function completar(i, mensaje) {
+      estado(mensaje, "status-ok", "completa-" + i);
+      if (!hechas[i]) { hechas[i] = true; try { localStorage.setItem(CLAVE, JSON.stringify(hechas)); } catch (e) {} }
+      pintarProgreso();
+    }
+    function irA(i, apilar = true) {
+      if (!disponible(i) || i === actual) return;
+      if (etapa) { etapa.grupo.visible = false; etapa.up && etapa.up(); }
+      captura = false; agarre = null;
+      actual = i; etapa = ETAPAS[i]; etapa.grupo.visible = true;
+      $("titulo-etapa").textContent = "Etapa " + (i + 1) + " · " + etapa.nombre;
+      notaDiv.textContent = etapa.nota;
+      limpiarEtiquetas();
+      alternativos.replaceChildren();
+      etapa.alternativos();
+      categoriaPrevia = "";
+      marco = etapa.marco;
+      etapa.entrar();
+      pintarProgreso();
+      encuadrar();
+      if (apilar) history.pushState({ p: "etapa", i }, "");
+    }
+    botonesEtapa.forEach((b, i) => b.addEventListener("click", () => irA(i)));
+    $("btn-siguiente").addEventListener("click", () => irA(actual + 1));
+    $("btn-anterior").addEventListener("click", () => irA(actual - 1));
+
+    // =====================================================================
+    // 9. PUNTERO COMÚN: pinza o dedo/ratón
+    // =====================================================================
+    let captura = false;
+    function pDown(x, y) { captura = !!(etapa && etapa.down(x, y)); return captura; }
+    function pMove(x, y) { if (!etapa) return; if (captura) etapa.move(x, y); else if (etapa.hover) etapa.hover(x, y); }
+    function pUp(x, y) { if (captura && etapa) etapa.up(x, y); captura = false; }
+
+    let punteroId = null;
+    lienzo3d.addEventListener("pointerdown", (e) => { if (pDown(e.clientX, e.clientY)) { punteroId = e.pointerId; lienzo3d.setPointerCapture(e.pointerId); } });
+    lienzo3d.addEventListener("pointermove", (e) => { if (punteroId === null || e.pointerId === punteroId) pMove(e.clientX, e.clientY); });
+    const soltar = (e) => { if (e.pointerId === punteroId) { pUp(e.clientX, e.clientY); punteroId = null; } };
+    lienzo3d.addEventListener("pointerup", soltar);
+    lienzo3d.addEventListener("pointercancel", soltar);
+
+    // =====================================================================
+    // 10. MANOS (MediaPipe, cámara frontal, RA «espejo»)
+    // =====================================================================
+    const PERMITIR_MODELO_REMOTO = false;   // con false, si falta modelo/hand_landmarker.task no se recurre a Google
+    const URL_TASKS = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
+    const URL_MODELO = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
+    const CONEX = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+    const PINZA_CIERRA = 0.33, PINZA_ABRE = 0.5;
+    let detector = null, modo = null, lastVideoTime = -1, lastTimestampMs = 0, agarre = null;
+    let delegado = "", erroresDeteccion = 0, ultimaClave = "", visionFS = null, rutaModeloUsada = "", recreando = false;
+    const camaraDiv = $("camara");
+    function indicadorCamara(texto, clase) {
+      camaraDiv.hidden = !texto;
+      if (camaraDiv.textContent !== texto) camaraDiv.textContent = texto;
+      camaraDiv.className = clase || "";
+    }
+    const pinza = {}, suav = {};
+
+    function videoAPantalla(nx, ny) {
+      const W = escena.clientWidth, H = escena.clientHeight, vw = video.videoWidth || 640, vh = video.videoHeight || 480;
+      const s = Math.max(W / vw, H / vh), dw = vw * s, dh = vh * s;
+      return { x: (W - dw) / 2 + (1 - nx) * dw, y: (H - dh) / 2 + ny * dh };
+    }
+    async function abrirCamara() {
+      if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        const e = new Error("la cámara solo funciona si la página se abre desde https o desde el propio equipo (localhost)"); e.name = "ContextoInseguro"; throw e;
+      }
+      video.srcObject = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
+      await video.play();
+    }
+    function cerrarCamara() {
+      if (modo === "manos") indicadorCamara("Cámara: en pausa", "aviso");
+      if (video.srcObject) { video.srcObject.getTracks().forEach((t) => t.stop()); video.srcObject = null; }
+      if (agarre) { pUp(0, 0); agarre = null; }
+      ctxM.clearRect(0, 0, escena.clientWidth, escena.clientHeight);
+    }
+    async function existeLocal(ruta) { try { return (await fetch(ruta, { method: "HEAD", cache: "no-store" })).ok; } catch (e) { return false; } }
+    async function iniciarManos() {
+      estado("Preparando la cámara y el detector de manos…", "status-warn", "cargando");
+      await abrirCamara();
+      const { FilesetResolver, HandLandmarker } = await import("@mediapipe/tasks-vision");
+      const wasmLocal = await existeLocal("./wasm/vision_wasm_internal.js");
+      if (!wasmLocal && !PERMITIR_MODELO_REMOTO) { const e = new Error("falta la carpeta wasm/ junto a la actividad"); e.name = "SinModelo"; throw e; }
+      const rutaWasm = wasmLocal ? "./wasm" : URL_TASKS + "/wasm";
+      const modeloLocal = await existeLocal("./modelo/hand_landmarker.task");
+      if (!modeloLocal && !PERMITIR_MODELO_REMOTO) { const e = new Error("falta el archivo modelo/hand_landmarker.task en la carpeta de la actividad"); e.name = "SinModelo"; throw e; }
+      indicadorCamara("Cámara: preparando el detector de manos…", "aviso");
+      visionFS = { FilesetResolver, HandLandmarker, vision: await FilesetResolver.forVisionTasks(rutaWasm) };
+      rutaModeloUsada = modeloLocal ? "./modelo/hand_landmarker.task" : URL_MODELO;
+      await crearDetector("GPU");
+      categoriaPrevia = ""; etapa.entrar();
+      estado("Cámara lista. Muestra una mano y junta el pulgar y el índice (pinza) sobre lo que quieras mover.", "status-ok", "camara-lista");
+    }
+    async function crearDetector(preferido) {
+      const { HandLandmarker, vision } = visionFS;
+      const opciones = (delegate) => ({ baseOptions: { modelAssetPath: rutaModeloUsada, delegate }, runningMode: "VIDEO", numHands: 2 });
+      if (detector) { try { detector.close(); } catch (e) {} detector = null; }
+      if (preferido === "GPU") {
+        try { detector = await HandLandmarker.createFromOptions(vision, opciones("GPU")); delegado = "GPU"; }
+        catch (e) { detector = await HandLandmarker.createFromOptions(vision, opciones("CPU")); delegado = "CPU"; }
+      } else { detector = await HandLandmarker.createFromOptions(vision, opciones("CPU")); delegado = "CPU"; }
+      erroresDeteccion = 0; lastTimestampMs = 0; lastVideoTime = -1; ultimaClave = "";
+      indicadorCamara("Cámara activa · buscando manos (" + delegado + ")", "ok");
+    }
+    // Si la detección falla repetidamente (frecuente con la GPU en algunas tabletas), se pasa a CPU
+    async function fallosDeteccion() {
+      if (recreando) return;
+      recreando = true;
+      try {
+        if (delegado === "GPU") { indicadorCamara("Cámara: la GPU falla; cambiando a CPU…", "aviso"); await crearDetector("CPU"); }
+        else throw new Error("CPU");
+      } catch (e) {
+        detector = null;
+        indicadorCamara("Cámara: el detector de manos no funciona en este dispositivo", "error");
+        empezarTactil("El detector de manos no funciona en este dispositivo. Puedes seguir con el dedo o con los controles.");
+      } finally { recreando = false; }
+    }
+    function dibujarMano(pts, cerrada, activa) {
+      ctxM.lineCap = "round"; ctxM.lineWidth = 7;
+      ctxM.strokeStyle = activa ? "rgba(74,222,128,.95)" : "rgba(194,132,58,.95)";
+      ctxM.beginPath();
+      for (const [a, b] of CONEX) { ctxM.moveTo(pts[a].x, pts[a].y); ctxM.lineTo(pts[b].x, pts[b].y); }
+      ctxM.stroke();
+      ctxM.fillStyle = "#faf7f2";
+      for (const p of pts) { ctxM.beginPath(); ctxM.arc(p.x, p.y, 3.5, 0, Math.PI * 2); ctxM.fill(); }
+      const m = { x: (pts[4].x + pts[8].x) / 2, y: (pts[4].y + pts[8].y) / 2 };
+      ctxM.beginPath(); ctxM.arc(m.x, m.y, 14, 0, Math.PI * 2); ctxM.lineWidth = 3; ctxM.strokeStyle = "#38bdf8"; ctxM.stroke();
+      if (cerrada) { ctxM.fillStyle = "rgba(56,189,248,.6)"; ctxM.fill(); }
+    }
+    function procesarManos() {
+      if (!detector || video.readyState < 2 || video.currentTime === lastVideoTime) return;
+      lastVideoTime = video.currentTime;
+      const nowMs = Math.max(lastTimestampMs + 1, Math.floor(performance.now())); lastTimestampMs = nowMs;
+      let res;
+      try { res = detector.detectForVideo(video, nowMs); erroresDeteccion = 0; }
+      catch (e) { if (++erroresDeteccion > 15) fallosDeteccion(); return; }
+      ctxM.clearRect(0, 0, escena.clientWidth, escena.clientHeight);
+      const lista = res.landmarks || [], lados = res.handednesses || res.handedness || [], vistas = new Set();
+      let primeraLibre = null;
+      lista.forEach((mano, i) => {
+        const lado = (lados[i] && lados[i][0] && lados[i][0].categoryName) || ("m" + i);
+        vistas.add(lado);
+        const vw = video.videoWidth || 640, vh = video.videoHeight || 480;
+        const d = (a, b) => Math.hypot((mano[a].x - mano[b].x) * vw, (mano[a].y - mano[b].y) * vh);
+        const antes = !!pinza[lado], ratio = d(4, 8) / (d(0, 9) || 1);
+        pinza[lado] = antes ? ratio < PINZA_ABRE : ratio < PINZA_CIERRA;
+        const pts = mano.map((p) => videoAPantalla(p.x, p.y));
+        const medio = { x: (pts[4].x + pts[8].x) / 2, y: (pts[4].y + pts[8].y) / 2 };
+        const s = suav[lado] || medio; suav[lado] = { x: s.x + (medio.x - s.x) * 0.5, y: s.y + (medio.y - s.y) * 0.5 };
+        const pm = suav[lado];
+        if (!agarre && pinza[lado] && !antes && pDown(pm.x, pm.y)) agarre = { lado, perdidas: 0 };
+        if (agarre && agarre.lado === lado) {
+          agarre.perdidas = 0;
+          if (pinza[lado]) pMove(pm.x, pm.y); else { pUp(pm.x, pm.y); agarre = null; }
+        } else if (!agarre && !primeraLibre) primeraLibre = pm;
+        dibujarMano(pts, pinza[lado], agarre && agarre.lado === lado);
+      });
+      if (!agarre && primeraLibre) pMove(primeraLibre.x, primeraLibre.y);
+      if (agarre && !vistas.has(agarre.lado) && ++agarre.perdidas > 8) { pUp(0, 0); agarre = null; }
+      for (const k of Object.keys(pinza)) if (!vistas.has(k)) { delete pinza[k]; delete suav[k]; }
+      const n = lista.length, clave = n + "|" + (agarre ? 1 : 0);
+      if (clave !== ultimaClave) {
+        ultimaClave = clave;
+        indicadorCamara("Cámara activa · " + (n === 0 ? "no veo ninguna mano" : n === 1 ? "1 mano" : n + " manos") + (agarre ? " · agarrando" : "") + " (" + delegado + ")", n === 0 ? "aviso" : "ok");
+      }
+    }
+
+    // =====================================================================
+    // 11. BUCLE Y CONTROLES GENERALES
+    // =====================================================================
+    const reloj = new THREE.Clock();
+    renderer.setAnimationLoop(() => {
+      const dt = Math.min(reloj.getDelta(), 0.1);
+      if (modo === "manos") procesarManos();
+      if (etapa) etapa.tick(dt);
+      actualizarEtiquetas();
+      renderer.render(scene, camera);
+    });
+
+    const INFO = [
+      `<h3>El bifaz</h3><p>Es una herramienta de piedra tallada por las dos caras. Para hacerla se golpeaba el borde de una piedra con otra, el <strong>percutor</strong>, y se iban quitando trozos llamados <strong>lascas</strong>. Los primeros bifaces no los hizo nuestra especie, sino especies humanas más antiguas, como <em>Homo erectus</em>.</p>
+       <h3>Simetría</h3><p>Muchos bifaces tienen un <strong>eje de simetría</strong>: si los doblaras por la mitad, los dos lados casi coincidirían. Conseguirlo exige pensar cada golpe antes de darlo.</p>
+       <h3>¿Desde cuándo?</h3><p>Entre los bifaces más antiguos que se conocen están los de Kokiselei (Kenia), de hace unos 1,76 millones de años. En la península ibérica, en el Barranc de la Boella (Tarragona), hay bifaces de hace alrededor de un millón de años.</p>
+       <p class="fuente">Lepre et al. (2011), <em>Nature</em>, 477, 82-85, doi:10.1038/nature10372 · Vallverdú et al. (2014), <em>PLoS ONE</em>, 9(7), e103634, doi:10.1371/journal.pone.0103634. La piedra de la actividad es un modelo.</p>`,
+      `<h3>Manos en negativo</h3><p>Se apoyaba la mano sobre la roca y se soplaba pigmento alrededor, con la boca o con un tubo. Al retirar la mano quedaba su silueta sin pintar: una mano en <strong>negativo</strong>.</p>
+       <h3>Patrimonio</h3><p>En la cueva de El Castillo (Puente Viesgo, Cantabria) hay una mano en negativo con más de 37 300 años. Forma parte de «Cueva de Altamira y arte rupestre paleolítico del norte de España», Patrimonio Mundial de la UNESCO.</p>
+       <h3>Un debate abierto</h3><p>En 2018 un equipo propuso que una mano de la cueva de Maltravieso (Cáceres) tenía más de 64 000 años y que la habrían pintado neandertales. Otros especialistas no están de acuerdo. La ciencia también avanza así: discutiendo las pruebas.</p>
+       <h3>Medir sin regla</h3><p>Una cuadrícula permite medir: si cada cuadro mide 5 cm, basta con contarlos y multiplicar. ¿Cuántos cuadros ocuparía tu mano?</p>
+       <p class="fuente">Pike et al. (2012), <em>Science</em>, 336, 1409-1413, doi:10.1126/science.1219957 · Hoffmann et al. (2018), <em>Science</em>, 359, 912-915, doi:10.1126/science.aap7778 · White et al. (2020), <em>Journal of Human Evolution</em>, 144, 102640, doi:10.1016/j.jhevol.2019.102640 · UNESCO, Lista del Patrimonio Mundial, n.º 310. La mano de la actividad es un modelo de 20 cm.</p>`,
+      `<h3>El barro del Neolítico</h3><p>En el Neolítico las personas empezaron a cultivar, a criar animales y a guardar alimentos. Para guardarlos modelaron vasijas de barro a mano, sin torno, a menudo uniendo rollos de arcilla («churros»), y las cocían al fuego.</p>
+       <h3>Un cuerpo de revolución</h3><p>Una vasija es un perfil que gira alrededor de un eje, igual que un cilindro, un cono o una esfera. Por eso, al cambiar la anchura de cada anillo, cambia toda la forma.</p>
+       <h3>Cerámica cardial</h3><p>Muchas de las primeras vasijas neolíticas de la península ibérica se decoraban presionando el barro con el borde de una concha de berberecho, que antes se clasificaba en el género <em>Cardium</em> (hoy <em>Cerastoderma</em>): por eso se llama cerámica <strong>cardial</strong>. En la Cova de l'Or (Alicante) se han datado semillas de trigo de esos niveles hacia el 5300 a. C.</p>
+       <h3>¿Cuánto cabe?</h3><p>La capacidad se calcula sumando capas muy finas de la vasija. La de la pantalla es aproximada: no tiene en cuenta el grosor de la pared.</p>
+       <p class="fuente">Zilhão, J. (2001), <em>PNAS</em>, 98(24), 14180-14185, doi:10.1073/pnas.241522898. Las medidas de la vasija de la actividad son inventadas.</p>`,
+      `<h3>Los megalitos</h3><p>Hace más de 6000 años, comunidades campesinas levantaron monumentos con piedras enormes. Los dólmenes eran construcciones funerarias con una cámara y, muchas veces, un corredor de entrada, cubiertas por un montículo de tierra llamado túmulo.</p>
+       <h3>Patrimonio: los dólmenes de Antequera</h3><p>Menga, Viera y El Romeral (Málaga) son Patrimonio Mundial desde 2016. Menga se construyó hace unos 5600-5800 años y su mayor piedra de cubierta pesa unas 150 toneladas. Su corredor no mira al sol, sino a una montaña, la Peña de los Enamorados. En Viera, en cambio, el sol del equinoccio entra por el corredor hasta la cámara.</p>
+       <h3>Ángulos y puntos cardinales</h3><p>Medimos la orientación en grados desde el norte, girando como las agujas del reloj: el este está a 90°, el sur a 180° y el oeste a 270°. En nuestro modelo el horizonte es plano; en la realidad, las montañas cambian un poco el punto por donde sale el sol.</p>
+       <p class="fuente">UNESCO, «Antequera Dolmens Site» (2016) · Lozano Rodríguez et al. (2024), <em>Science Advances</em>, doi:10.1126/sciadv.adp1295 · Junta de Andalucía, Conjunto Arqueológico Dólmenes de Antequera. El dolmen de la actividad es un modelo simplificado.</p>`,
+      `<h3>Las pintaderas</h3><p>Son sellos de barro cocido de Gran Canaria con dibujos geométricos, como triángulos y líneas, y casi siempre con un mango, a menudo perforado. El Museo Canario conserva más de doscientas.</p>
+       <h3>¿Para qué servían?</h3><p>No lo sabemos con seguridad. Se ha propuesto que servían para decorar la piel o el pan, como adornos o amuletos, o como marcas de propiedad. Cuando nadie lo dejó escrito, los arqueólogos proponen hipótesis y las ponen a prueba.</p>
+       <h3>Geometría en las paredes</h3><p>En la Cueva Pintada de Gáldar, la población indígena de Gran Canaria decoró una cámara con motivos exclusivamente geométricos, en rojo y blanco sobre fondo negro.</p>
+       <h3>¿Prehistoria en Canarias?</h3><p>Las primeras personas llegaron a las islas desde el norte de África hace unos dos mil años; la fecha exacta todavía se discute. Sus descendientes vivieron sin metales hasta la conquista castellana del siglo XV. Por eso algunos libros hablan de «Prehistoria de Canarias», aunque muchos especialistas prefieren decir «época prehispánica» o «indígena». Las edades de la historia son una manera de ordenar el tiempo y no encajan igual en todos los lugares.</p>
+       <p class="fuente">El Museo Canario, catálogo «Pintaderas» · Turespaña, ficha «Cueva Pintada» · Velasco-Vázquez et al. (2021), <em>Complutum</em>, 32(1), 167-189, doi:10.5209/cmpl.76453. La pintadera de la actividad es circular para mostrar la simetría de rotación.</p>`
+    ];
+    let focoPrevio = null;
+    function abrirPanel(id) { focoPrevio = document.activeElement; const p = $(id); p.hidden = false; p.querySelector("button").focus(); }
+    function cerrarPanel(p) { p.hidden = true; if (focoPrevio && document.contains(focoPrevio)) focoPrevio.focus(); }
+    $("btn-saber").addEventListener("click", () => {
+      $("t-info").textContent = "Etapa " + (actual + 1) + " · " + etapa.nombre;
+      $("cuerpo-info").innerHTML = INFO[actual];   // contenido estático propio, sin datos externos
+      abrirPanel("panel-info");
+    });
+    function mostrarAlternativo(v) { alternativos.hidden = !v; $("btn-alternativo").setAttribute("aria-pressed", String(v)); }
+    $("btn-alternativo").addEventListener("click", () => mostrarAlternativo(alternativos.hidden));
+    $("btn-imagen").addEventListener("click", (e) => {
+      const v = !video.classList.contains("visible");
+      video.classList.toggle("visible", v);
+      M.suelo.opacity = v ? 0.55 : 0.9;
+      e.currentTarget.setAttribute("aria-pressed", String(v));
+      e.currentTarget.textContent = v ? "Ocultar mi imagen" : "Mostrar mi imagen";
+    });
+    // ---------- Portada, capítulo y botón «atrás» ----------
+    const inicioDlg = $("inicio");
+    const irPortada = (hash = "") => { salirDeActividad(); location.href = "index.html" + location.search + hash; };
+    function salirDeActividad() {
+      document.querySelectorAll(".panel:not([hidden])").forEach((p) => (p.hidden = true));
+      if (modo === "manos") cerrarCamara();
+      modo = null;
+      if (video.classList.contains("visible")) $("btn-imagen").click();
+      $("btn-imagen").hidden = true;
+      indicadorCamara("");
+    }
+    function mostrarInicio(apilar = true) {
+      salirDeActividad();
+      inicioDlg.hidden = false;
+      if (apilar) history.pushState({ p: "inicio" }, "");
+      $("btn-manos").focus({ preventScroll: true });
+    }
+    function entrarEnEtapa() {
+      if (actual < 0) irA(primeraEtapa()); else history.pushState({ p: "etapa", i: actual }, "");
+    }
+    $("btn-volver-portada").addEventListener("click", () => irPortada());
+    $("btn-linea").addEventListener("click", () => irPortada());
+    $("btn-ir-roma").addEventListener("click", () => irPortada("#roma"));
+    window.addEventListener("popstate", (e) => {
+      const st = e.state || { p: "inicio" };
+      if (st.p === "inicio") mostrarInicio(false);
+      else if (st.p === "etapa") {
+        document.querySelectorAll(".panel:not([hidden])").forEach((p) => (p.hidden = true));
+        inicioDlg.hidden = true;
+        if (!modo) { modo = "tactil"; mostrarAlternativo(true); }
+        irA(st.i, false);
+      }
+    });
+    history.replaceState({ p: "inicio" }, "");
+
+    function primeraEtapa() { let i = hechas.findIndex((h) => !h); return i < 0 ? 4 : i; }
+    function empezarTactil(mensaje) {
+      const venia = !$("inicio").hidden;
+      modo = "tactil"; $("inicio").hidden = true;
+      mostrarAlternativo(true);
+      if (venia || actual < 0) entrarEnEtapa();
+      if (mensaje) estado(mensaje, "status-warn", "msg-" + mensaje.length);
+      const f = alternativos.querySelector("input,button"); if (f) f.focus();
+    }
+    $("btn-tactil").addEventListener("click", () => empezarTactil());
+    $("btn-manos").addEventListener("click", async () => {
+      $("inicio").hidden = true; modo = "manos"; $("btn-imagen").hidden = false;
+      if ($("chk-imagen").checked && !video.classList.contains("visible")) $("btn-imagen").click();
+      entrarEnEtapa();
+      try { await iniciarManos(); }
+      catch (err) {
+        cerrarCamara(); detector = null; modo = null; $("btn-imagen").hidden = true;
+        indicadorCamara("Cámara: no disponible (" + (err.name || "error") + ")", "error");
+        if (video.classList.contains("visible")) $("btn-imagen").click();
+        const motivos = { NotAllowedError: "no se ha dado permiso para usar la cámara", NotFoundError: "no se ha encontrado ninguna cámara", NotReadableError: "otra aplicación está usando la cámara", ContextoInseguro: err.message, SinModelo: err.message + " (consulta modelo/LEEME.txt y el LEEME del paquete)" };
+        empezarTactil("No se puede construir con las manos: " + (motivos[err.name] || "no se ha podido preparar el detector de manos") + ". Puedes hacerlo con el dedo o con los controles.");
+      }
+    });
+    document.addEventListener("visibilitychange", async () => {
+      if (modo !== "manos") return;
+      if (document.hidden) cerrarCamara();
+      else { try { await abrirCamara(); indicadorCamara("Cámara activa (" + delegado + ")", "ok"); ultimaClave = ""; } catch (e) { modo = "tactil"; empezarTactil("La cámara se ha desactivado. Puedes seguir con el dedo o con los controles."); } }
+    });
+    window.addEventListener("pagehide", cerrarCamara);
+    // ---------- Diagnóstico de cámara y manos ----------
+    const listaDiag = $("lista-diag");
+    function filaDiag(clase, texto, consejo) {
+      const li = document.createElement("li"); li.className = "r-" + clase; li.textContent = texto;
+      if (consejo) { const sm = document.createElement("small"); sm.textContent = consejo; li.appendChild(sm); }
+      listaDiag.appendChild(li); return li;
+    }
+    async function tamanoLocal(ruta) {
+      try { const r = await fetch(ruta, { method: "HEAD", cache: "no-store" }); return r.ok ? parseInt(r.headers.get("content-length") || "0", 10) || -1 : 0; }
+      catch (e) { return 0; }
+    }
+    async function diagnosticoBasico() {
+      listaDiag.replaceChildren();
+      const proto = location.protocol, local = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
+      if (proto === "file:") filaDiag("error", "La página se ha abierto con doble clic (file://).", "Ábrela desde GitHub Pages o con un servidor: python3 -m http.server 8000 y http://localhost:8000.");
+      else if (!window.isSecureContext) filaDiag("error", "La dirección no es segura (" + proto + "//" + location.host + ").", "La cámara solo funciona con https o en localhost. En GitHub Pages la dirección empieza por https://.");
+      else filaDiag("ok", "Dirección segura (" + (local ? "localhost" : "https") + ").");
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) filaDiag("ok", "El navegador permite usar la cámara.");
+      else if (!window.isSecureContext) filaDiag("error", "El navegador bloquea la cámara por la dirección no segura.", "Se resuelve al abrir la página con https.");
+      else filaDiag("error", "Este navegador no ofrece acceso a la cámara.", "Prueba con Chrome, Edge o Safari actualizados.");
+      try {
+        const st = await navigator.permissions.query({ name: "camera" });
+        if (st.state === "denied") filaDiag("error", "El permiso de cámara está bloqueado para esta página.", "Pulsa el candado o el icono de la barra de direcciones y permite la cámara; después recarga la página.");
+        else filaDiag(st.state === "granted" ? "ok" : "aviso", st.state === "granted" ? "Permiso de cámara concedido." : "El navegador pedirá permiso para usar la cámara.", st.state === "granted" ? "" : "Cuando aparezca el aviso, pulsa «Permitir».");
+      } catch (e) { filaDiag("aviso", "No se puede consultar el permiso de cámara en este navegador.", "Se pedirá al empezar; pulsa «Permitir»."); }
+      const wasm = await tamanoLocal("./wasm/vision_wasm_internal.wasm");
+      filaDiag(wasm ? "ok" : "error", wasm ? "Motor de detección (WASM) presente." : "Falta la carpeta wasm/ junto a la página.", wasm ? "" : "Sube también la carpeta wasm/ completa.");
+      const mod = await tamanoLocal("./modelo/hand_landmarker.task");
+      if (mod > 1000000 || mod === -1) filaDiag("ok", "Modelo de manos presente" + (mod > 0 ? " (" + (mod / 1048576).toFixed(1).replace(".", ",") + " MB)." : "."));
+      else if (mod > 0) filaDiag("error", "El archivo del modelo es demasiado pequeño (" + mod + " bytes): probablemente está dañado o es un enlace.", "Vuelve a descargarlo y súbelo de nuevo a modelo/.");
+      else if (PERMITIR_MODELO_REMOTO) filaDiag("aviso", "No hay modelo local: se descargará de Google al empezar.");
+      else filaDiag("error", "Falta el modelo de manos (modelo/hand_landmarker.task).", "Es la causa más frecuente. Descárgalo con el enlace de modelo/LEEME.txt, guárdalo con ese nombre exacto en la carpeta modelo/ y súbelo.");
+      filaDiag(renderer.getContext() ? "ok" : "error", renderer.getContext() ? "Gráficos 3D (WebGL) disponibles." : "WebGL no disponible.");
+    }
+    async function pruebaReal() {
+      const btn = $("btn-prueba"); btn.disabled = true;
+      const fila = filaDiag("aviso", "Prueba real: abriendo la cámara…");
+      const yaActiva = modo === "manos" && detector && video.srcObject;
+      try {
+        if (!yaActiva) {
+          await abrirCamara();
+          const { FilesetResolver, HandLandmarker } = await import("@mediapipe/tasks-vision");
+          const modeloLocal = await existeLocal("./modelo/hand_landmarker.task");
+          if (!modeloLocal && !PERMITIR_MODELO_REMOTO) { const e = new Error("falta el modelo"); e.name = "SinModelo"; throw e; }
+          fila.firstChild.textContent = "Prueba real: preparando el detector…";
+          const wasmLocal = await existeLocal("./wasm/vision_wasm_internal.js");
+          if (!wasmLocal && !PERMITIR_MODELO_REMOTO) { const e = new Error("falta wasm/"); e.name = "SinModelo"; throw e; }
+          visionFS = { FilesetResolver, HandLandmarker, vision: await FilesetResolver.forVisionTasks(wasmLocal ? "./wasm" : URL_TASKS + "/wasm") };
+          rutaModeloUsada = modeloLocal ? "./modelo/hand_landmarker.task" : URL_MODELO;
+          await crearDetector("GPU");
+        }
+        fila.firstChild.textContent = "Prueba real: muestra una mano a la cámara…";
+        let fotogramas = 0, maxManos = 0, fallos = 0, ultimo = -1, ts = 0;
+        const fin = performance.now() + 4000;
+        await new Promise((ok) => {
+          const paso = () => {
+            if (performance.now() > fin) return ok();
+            if (video.readyState >= 2 && video.currentTime !== ultimo) {
+              ultimo = video.currentTime; ts = Math.max(ts + 1, Math.floor(performance.now()));
+              try { const r = detector.detectForVideo(video, ts); fotogramas++; maxManos = Math.max(maxManos, (r.landmarks || []).length); } catch (e) { fallos++; }
+            }
+            requestAnimationFrame(paso);
+          };
+          paso();
+        });
+        lastTimestampMs = ts;
+        const fps = (fotogramas / 4).toFixed(1).replace(".", ",");
+        if (fotogramas === 0) { fila.className = "r-error"; fila.firstChild.textContent = "Prueba real: el detector no ha procesado ninguna imagen (" + fallos + " fallos, " + delegado + ")."; }
+        else if (maxManos === 0) { fila.className = "r-aviso"; fila.firstChild.textContent = "Prueba real: la cámara y el detector funcionan (" + fps + " imágenes/s, " + delegado + "), pero no he visto ninguna mano."; fila.appendChild(Object.assign(document.createElement("small"), { textContent: "Acerca la mano a 30-60 cm de la cámara, con buena luz y la palma hacia la pantalla, y repite la prueba." })); }
+        else { fila.className = "r-ok"; fila.firstChild.textContent = "Prueba real: manos detectadas (" + maxManos + "), " + fps + " imágenes/s con " + delegado + "."; if (fotogramas / 4 < 8) fila.appendChild(Object.assign(document.createElement("small"), { textContent: "Va lento: el movimiento puede notarse a saltos en este dispositivo." })); }
+      } catch (err) {
+        fila.className = "r-error";
+        const m = { NotAllowedError: "permiso de cámara denegado", NotFoundError: "no hay cámara", NotReadableError: "otra aplicación usa la cámara", ContextoInseguro: "la dirección no es https", SinModelo: "falta el modelo de manos en modelo/ o el motor en wasm/" };
+        fila.firstChild.textContent = "Prueba real: no se ha podido completar (" + (m[err.name] || err.message || err.name) + ").";
+      } finally {
+        if (!yaActiva) { if (detector) { try { detector.close(); } catch (e) {} } detector = null; if (video.srcObject) { video.srcObject.getTracks().forEach((t) => t.stop()); video.srcObject = null; } }
+        btn.disabled = false;
+      }
+    }
+    $("btn-diag").addEventListener("click", async () => { abrirPanel("panel-diag"); await diagnosticoBasico(); });
+    $("btn-prueba").addEventListener("click", pruebaReal);
+    if (new URLSearchParams(location.search).has("diagnostico")) { abrirPanel("panel-diag"); diagnosticoBasico(); }
+
+    document.querySelectorAll("[data-cerrar]").forEach((b) => b.addEventListener("click", () => cerrarPanel(b.closest(".panel"))));
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") document.querySelectorAll(".panel:not([hidden])").forEach(cerrarPanel); });
+
+    pintarProgreso();
+    encuadrar();
+    $("btn-manos").focus({ preventScroll: true });
+  </script>
+</body>
+</html>

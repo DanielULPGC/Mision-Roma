@@ -1,17 +1,52 @@
-# Misión Roma v3.1 · edición para GitHub Pages
+# Las manos que construyeron la historia · v3.2.1 (edición para GitHub Pages)
 
 Proyecto «Las manos que construyeron la historia». Geometría, patrimonio histórico y realidad aumentada en Educación Primaria (5.º y 6.º).
 
 ## Marco del proyecto
 
-La página se abre con la portada del proyecto «Las manos que construyeron la historia», que incluye una línea del tiempo. El recorrido va **desde la Prehistoria en adelante**: Prehistoria, Edad Antigua, Edad Media, Edad Moderna y Edad Contemporánea. Misión Roma es el capítulo de la **Edad Antigua**; los demás figuran como «en preparación».
+La página se abre con la portada del proyecto «Las manos que construyeron la historia», que incluye una línea del tiempo. El recorrido va **desde la Prehistoria en adelante**: Prehistoria, Edad Antigua, Edad Media, Edad Moderna y Edad Contemporánea. Hay dos capítulos disponibles:
+
+| Edad | Capítulo | Archivo |
+|---|---|---|
+| Prehistoria | **Las primeras manos** | `prehistoria.html` |
+| Edad Antigua | **Misión Roma · El acueducto** | `index.html` (abre la portada; `index.html#roma` abre el capítulo directamente) |
+
+La Edad Media, la Edad Moderna y la Edad Contemporánea figuran como «en preparación». Al terminar la Prehistoria, un botón lleva directamente a Misión Roma.
 
 **Navegación:**
 - «← Línea del tiempo» vuelve a la portada y apaga la cámara.
 - «← Etapa anterior» y «Siguiente etapa →» mueven entre etapas.
 - El botón «atrás» del navegador o de la tableta recorre el mismo camino a la inversa.
 
-## El proceso evolutivo
+## Capítulo «Las primeras manos» (Prehistoria)
+
+| Etapa | Área | Qué hace el alumnado con las manos | Contenidos |
+|---|---|---|---|
+| 1. Tallar un bifaz | Geometría | Golpea el borde de una piedra para quitar lascas hasta que los dos lados son iguales. | Simetría axial, eje de simetría. |
+| 2. La mano en la pared | Arte rupestre, medida | Sopla pigmento alrededor de una mano apoyada y mide el negativo con una cuadrícula de 5 cm. | Negativo/positivo, medida, multiplicación. |
+| 3. Modelar una vasija | Geometría, medida | Ensancha o estrecha los anillos del barro hasta encajar con el modelo y lo decora con conchas. | Cuerpo de revolución, capacidad en litros, friso (traslación). |
+| 4. Orientar el dolmen | Geografía, geometría | Gira el corredor del dolmen hasta que el sol del equinoccio entra en la cámara. | Ángulos en grados, puntos cardinales. |
+| 5. La pintadera canaria | Patrimonio canario, geometría | Dibuja en un sector de la pintadera, que se repite al girar, y la estampa. | Simetría de rotación (360° : n), reflexión al estampar. |
+
+**Fuentes del capítulo:**
+- Lepre et al. (2011), *Nature*, 477, 82-85, https://doi.org/10.1038/nature10372
+- Vallverdú et al. (2014), *PLoS ONE*, 9(7), e103634, https://doi.org/10.1371/journal.pone.0103634
+- Pike et al. (2012), *Science*, 336, 1409-1413, https://doi.org/10.1126/science.1219957
+- Hoffmann et al. (2018), *Science*, 359, 912-915, https://doi.org/10.1126/science.aap7778 (presentado como debate)
+- White et al. (2020), *Journal of Human Evolution*, 144, 102640, https://doi.org/10.1016/j.jhevol.2019.102640
+- Zilhão (2001), *PNAS*, 98(24), 14180-14185, https://doi.org/10.1073/pnas.241522898
+- Lozano Rodríguez et al. (2024), *Science Advances*, https://doi.org/10.1126/sciadv.adp1295
+- UNESCO, bienes n.º 310 (Altamira y arte rupestre del norte de España) y «Antequera Dolmens Site» (2016)
+- El Museo Canario, catálogo «Pintaderas»
+- Velasco-Vázquez et al. (2021), *Complutum*, 32(1), 167-189, https://doi.org/10.5209/cmpl.76453
+
+**Simplificaciones declaradas:**
+- La piedra, la mano (20 cm), la vasija y el dolmen son modelos.
+- En la etapa 4, el horizonte es plano.
+- La pintadera es circular, para mostrar la simetría de rotación; las reales son mayoritariamente rectangulares.
+- La fecha de llegada de la primera población a Canarias («hace unos dos mil años») se presenta como discutida.
+
+## Capítulo «Misión Roma» (Edad Antigua): el proceso evolutivo
 
 La actividad sigue el orden de una obra hidráulica real, en cinco etapas. Cada etapa se desbloquea al completar la anterior.
 

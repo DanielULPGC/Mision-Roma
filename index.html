@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Misión Roma · Las manos que construyeron la historia</title>
   <!--
-    Misión Roma v3.1 (edición para GitHub Pages) · Proyecto «Las manos que construyeron la historia»
+    Misión Roma v3.2.1 (edición para GitHub Pages) · Proyecto «Las manos que construyeron la historia»
     Geometría, patrimonio histórico y realidad aumentada en Educación Primaria (5.º-6.º)
 
     Proceso evolutivo en cinco etapas, todas manipulables con las manos (pinza) o con alternativas DUA:
@@ -23,6 +23,8 @@
     v3.1: marco introductorio del proyecto con línea del tiempo (Prehistoria → Edad Contemporánea; Misión Roma
     es el capítulo de la Edad Antigua), botones «Etapa anterior» y «Línea del tiempo», y navegación con el
     botón «atrás» del navegador o de la tableta (History API).
+    v3.2: la portada enlaza también el capítulo de la Prehistoria (prehistoria.html); index.html#roma abre
+    directamente la presentación de Misión Roma.
   -->
   <script type="importmap">
   {
@@ -118,7 +120,7 @@
     @media (orientation: landscape) and (max-height: 520px){
       #hud{right:auto;width:290px;padding:7px 10px}
       #hud h1{font-size:.88rem} #hud .lema{visibility:hidden}
-      .metricas{font-size:.72rem} #estado{font-size:.74rem} #nota{font-size:.62rem}
+      .metricas{font-size:.72rem} #estado{font-size:.74rem} #nota{display:none}
       #controles{left:10px;right:auto;width:290px;justify-content:flex-start;gap:5px}
       #controles button{padding:6px 9px;font-size:.76rem}
       #alternativos{padding:5px 9px}
@@ -165,11 +167,12 @@
     <div class="tarjeta">
       <p class="antetitulo">Geometría, patrimonio histórico y realidad aumentada</p>
       <h2 id="t-portada">Las manos que construyeron la historia</h2>
-      <p>Desde la Prehistoria, las personas han cambiado el mundo con sus manos: tallaron piedras, cultivaron la tierra, levantaron muros y llevaron el agua de un lugar a otro. De casi todas ellas no conocemos el nombre, pero sí lo que construyeron.</p>
+      <p>Desde la Prehistoria, los seres humanos han cambiado el mundo con sus manos: tallaron piedras, cultivaron la tierra, levantaron muros y llevaron el agua de un lugar a otro. De casi todas ellas no conocemos el nombre, pero sí lo que construyeron.</p>
       <p>En este proyecto recorrerás la historia en orden, desde la Prehistoria hasta hoy. En cada época construirás algo con tus propias manos y descubrirás la geometría y el patrimonio que hay detrás.</p>
       <h3>La línea del tiempo</h3>
       <ol class="linea" aria-label="Edades de la historia">
-        <li class="era"><span class="era-nombre">Prehistoria</span><span class="era-fecha">Hasta la aparición de la escritura, hacia el 3000 a. C.</span><span class="era-estado">Capítulo en preparación</span></li>
+        <li class="era activa"><span class="era-nombre">Prehistoria</span><span class="era-fecha">Hasta la aparición de la escritura, hacia el 3000 a. C.</span><span class="era-estado">Capítulo disponible: Las primeras manos</span>
+          <button type="button" class="principal" id="btn-entrar-prehistoria">Entrar en Las primeras manos</button></li>
         <li class="era activa"><span class="era-nombre">Edad Antigua</span><span class="era-fecha">Desde la escritura hasta el 476 d. C.</span><span class="era-estado">Capítulo disponible: Misión Roma · El acueducto</span>
           <button type="button" class="principal" id="btn-entrar-roma">Entrar en Misión Roma</button></li>
         <li class="era"><span class="era-nombre">Edad Media</span><span class="era-fecha">Del 476 al 1492</span><span class="era-estado">Capítulo en preparación</span></li>
@@ -322,8 +325,12 @@
       const W = escena.clientWidth, H = escena.clientHeight;
       renderer.setSize(W, H, false);
       camera.aspect = W / H;
-      const hud = $("hud").getBoundingClientRect(), ctr = $("controles").getBoundingClientRect();
       const lateral = window.matchMedia("(orientation: landscape) and (max-height: 520px)").matches;
+      // En horizontal, HUD y controles comparten columna: el HUD se limita al espacio libre y se desplaza
+      const hudEl = $("hud");
+      if (lateral) { hudEl.style.maxHeight = Math.max(110, $("controles").getBoundingClientRect().top - hudEl.offsetTop - 10) + "px"; hudEl.style.overflowY = "auto"; }
+      else { hudEl.style.maxHeight = ""; hudEl.style.overflowY = ""; }
+      const hud = hudEl.getBoundingClientRect(), ctr = $("controles").getBoundingClientRect();
       const z = lateral
         ? { x0: Math.max(hud.right, ctr.right) + 8, x1: W - 8, y0: 8, y1: H - 8 }
         : { x0: 8, x1: W - 8, y0: hud.bottom + 8, y1: ctr.top - 8 };
@@ -967,7 +974,9 @@
       estado("Preparando la cámara y el detector de manos…", "status-warn", "cargando");
       await abrirCamara();
       const { FilesetResolver, HandLandmarker } = await import("@mediapipe/tasks-vision");
-      const rutaWasm = (await existeLocal("./wasm/vision_wasm_internal.js")) ? "./wasm" : URL_TASKS + "/wasm";
+      const wasmLocal = await existeLocal("./wasm/vision_wasm_internal.js");
+      if (!wasmLocal && !PERMITIR_MODELO_REMOTO) { const e = new Error("falta la carpeta wasm/ junto a la actividad"); e.name = "SinModelo"; throw e; }
+      const rutaWasm = wasmLocal ? "./wasm" : URL_TASKS + "/wasm";
       const modeloLocal = await existeLocal("./modelo/hand_landmarker.task");
       if (!modeloLocal && !PERMITIR_MODELO_REMOTO) { const e = new Error("falta el archivo modelo/hand_landmarker.task en la carpeta de la actividad"); e.name = "SinModelo"; throw e; }
       indicadorCamara("Cámara: preparando el detector de manos…", "aviso");
@@ -1113,7 +1122,7 @@
       salirDeActividad();
       inicioDlg.hidden = true; portada.hidden = false;
       if (apilar) history.pushState({ p: "portada" }, "");
-      $("btn-entrar-roma").focus({ preventScroll: true });
+      $("btn-entrar-prehistoria").focus({ preventScroll: true });
     }
     function mostrarInicio(apilar = true) {
       salirDeActividad();
@@ -1126,6 +1135,7 @@
       if (actual < 0) irA(primeraEtapa()); else history.pushState({ p: "etapa", i: actual }, "");
     }
     $("btn-entrar-roma").addEventListener("click", () => mostrarInicio());
+    $("btn-entrar-prehistoria").addEventListener("click", () => { location.href = "prehistoria.html" + location.search; });
     $("btn-volver-portada").addEventListener("click", () => { if (history.state && history.state.p === "inicio") history.back(); else mostrarPortada(); });
     $("btn-linea").addEventListener("click", () => mostrarPortada());
     window.addEventListener("popstate", (e) => {
@@ -1139,7 +1149,8 @@
         irA(st.i, false);
       }
     });
-    history.replaceState({ p: "portada" }, "");
+    const abrirRoma = location.hash === "#roma";
+    history.replaceState({ p: "portada" }, "", location.pathname + location.search);
 
     function primeraEtapa() { let i = hechas.findIndex((h) => !h); return i < 0 ? 4 : i; }
     function empezarTactil(mensaje) {
@@ -1160,7 +1171,7 @@
         cerrarCamara(); detector = null; modo = null; $("btn-imagen").hidden = true;
         indicadorCamara("Cámara: no disponible (" + (err.name || "error") + ")", "error");
         if (video.classList.contains("visible")) $("btn-imagen").click();
-        const motivos = { NotAllowedError: "no se ha dado permiso para usar la cámara", NotFoundError: "no se ha encontrado ninguna cámara", NotReadableError: "otra aplicación está usando la cámara", ContextoInseguro: err.message, SinModelo: err.message + " (las instrucciones están en modelo/LEEME.txt)" };
+        const motivos = { NotAllowedError: "no se ha dado permiso para usar la cámara", NotFoundError: "no se ha encontrado ninguna cámara", NotReadableError: "otra aplicación está usando la cámara", ContextoInseguro: err.message, SinModelo: err.message + " (consulta modelo/LEEME.txt y el LEEME del paquete)" };
         empezarTactil("No se puede construir con las manos: " + (motivos[err.name] || "no se ha podido preparar el detector de manos") + ". Puedes hacerlo con el dedo o con los controles.");
       }
     });
@@ -1215,7 +1226,9 @@
           const modeloLocal = await existeLocal("./modelo/hand_landmarker.task");
           if (!modeloLocal && !PERMITIR_MODELO_REMOTO) { const e = new Error("falta el modelo"); e.name = "SinModelo"; throw e; }
           fila.firstChild.textContent = "Prueba real: preparando el detector…";
-          visionFS = { FilesetResolver, HandLandmarker, vision: await FilesetResolver.forVisionTasks((await existeLocal("./wasm/vision_wasm_internal.js")) ? "./wasm" : URL_TASKS + "/wasm") };
+          const wasmLocal = await existeLocal("./wasm/vision_wasm_internal.js");
+          if (!wasmLocal && !PERMITIR_MODELO_REMOTO) { const e = new Error("falta wasm/"); e.name = "SinModelo"; throw e; }
+          visionFS = { FilesetResolver, HandLandmarker, vision: await FilesetResolver.forVisionTasks(wasmLocal ? "./wasm" : URL_TASKS + "/wasm") };
           rutaModeloUsada = modeloLocal ? "./modelo/hand_landmarker.task" : URL_MODELO;
           await crearDetector("GPU");
         }
@@ -1240,7 +1253,7 @@
         else { fila.className = "r-ok"; fila.firstChild.textContent = "Prueba real: manos detectadas (" + maxManos + "), " + fps + " imágenes/s con " + delegado + "."; if (fotogramas / 4 < 8) fila.appendChild(Object.assign(document.createElement("small"), { textContent: "Va lento: el movimiento puede notarse a saltos en este dispositivo." })); }
       } catch (err) {
         fila.className = "r-error";
-        const m = { NotAllowedError: "permiso de cámara denegado", NotFoundError: "no hay cámara", NotReadableError: "otra aplicación usa la cámara", ContextoInseguro: "la dirección no es https", SinModelo: "falta el modelo de manos en modelo/" };
+        const m = { NotAllowedError: "permiso de cámara denegado", NotFoundError: "no hay cámara", NotReadableError: "otra aplicación usa la cámara", ContextoInseguro: "la dirección no es https", SinModelo: "falta el modelo de manos en modelo/ o el motor en wasm/" };
         fila.firstChild.textContent = "Prueba real: no se ha podido completar (" + (m[err.name] || err.message || err.name) + ").";
       } finally {
         if (!yaActiva) { if (detector) { try { detector.close(); } catch (e) {} } detector = null; if (video.srcObject) { video.srcObject.getTracks().forEach((t) => t.stop()); video.srcObject = null; } }
@@ -1256,7 +1269,7 @@
 
     pintarProgreso();
     encuadrar();
-    $("btn-entrar-roma").focus({ preventScroll: true });
+    if (abrirRoma) mostrarInicio(); else $("btn-entrar-prehistoria").focus({ preventScroll: true });
   </script>
 </body>
 </html>
