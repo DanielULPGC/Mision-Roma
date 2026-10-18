@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Misión Roma · Las manos que construyeron la historia</title>
   <!--
-    Misión Roma v3.0.2 (edición para GitHub Pages) · Proyecto «Las manos que construyeron la historia»
+    Misión Roma v3.1 (edición para GitHub Pages) · Proyecto «Las manos que construyeron la historia»
     Geometría, patrimonio histórico y realidad aumentada en Educación Primaria (5.º-6.º)
 
     Proceso evolutivo en cinco etapas, todas manipulables con las manos (pinza) o con alternativas DUA:
@@ -20,6 +20,9 @@
     El terreno, las fincas y las cifras de las etapas 1 y 5 son inventados con fines didácticos (declarado).
     v3.0.2: indicador permanente del estado de la cámara, opción de ver la propia imagen desde el inicio,
     panel «Comprobar cámara y manos» (también con ?diagnostico) y cambio automático a CPU si la GPU falla.
+    v3.1: marco introductorio del proyecto con línea del tiempo (Prehistoria → Edad Contemporánea; Misión Roma
+    es el capítulo de la Edad Antigua), botones «Etapa anterior» y «Línea del tiempo», y navegación con el
+    botón «atrás» del navegador o de la tableta (History API).
   -->
   <script type="importmap">
   {
@@ -87,7 +90,7 @@
     #alternativos .fila{display:flex;align-items:center;gap:8px;font-size:.82rem}
     #alternativos .fila label{min-width:92px}
     #alternativos input[type=range]{flex:1;accent-color:var(--ocre)}
-    #inicio,.panel{position:absolute;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;
+    #portada,#inicio,.panel{position:absolute;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;
       background:rgba(28,25,23,.82);padding:16px}
     .tarjeta{background:#292524;border:1px solid rgba(255,255,255,.2);border-radius:14px;padding:18px;max-width:540px;
       max-height:88vh;overflow:auto;line-height:1.45;-webkit-user-select:text;user-select:text}
@@ -96,11 +99,25 @@
     .tarjeta p,.tarjeta li{margin:6px 0;font-size:.92rem}
     .tarjeta .botones{display:flex;flex-direction:column;gap:8px;margin-top:14px}
     .privacidad,.fuente{font-size:.76rem;opacity:.8}
+    #portada{background:linear-gradient(rgba(28,25,23,.92),rgba(28,25,23,.97))}
+    #portada .tarjeta{max-width:620px}
+    .antetitulo{font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ocre);margin:0 0 2px;font-weight:700}
+    .linea{list-style:none;margin:10px 0 6px 6px;padding:0 0 0 14px;border-left:3px solid var(--ocre);display:flex;flex-direction:column;gap:8px}
+    .era{position:relative;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05)}
+    .era::before{content:"";position:absolute;left:-22px;top:13px;width:11px;height:11px;border-radius:50%;background:#44403c;border:2px solid var(--ocre)}
+    .era.activa{background:rgba(194,132,58,.16);border:1px solid var(--ocre)}
+    .era.activa::before{background:var(--ocre)}
+    .era-nombre{display:block;font-weight:700}
+    .era-fecha{display:block;font-size:.8rem;opacity:.8}
+    .era-estado{display:block;font-size:.78rem;opacity:.7;margin-top:2px}
+    .era button{width:100%;margin-top:8px}
+    .cabecera{display:flex;align-items:center;justify-content:space-between;gap:8px}
+    #btn-linea{padding:4px 9px;font-size:.72rem;border-radius:7px;flex:none}
     [hidden]{display:none!important}
     @media (prefers-reduced-motion: reduce){ #video{transition:none} }
     @media (orientation: landscape) and (max-height: 520px){
       #hud{right:auto;width:290px;padding:7px 10px}
-      #hud h1{font-size:.88rem} #hud .lema{display:none}
+      #hud h1{font-size:.88rem} #hud .lema{visibility:hidden}
       .metricas{font-size:.72rem} #estado{font-size:.74rem} #nota{font-size:.62rem}
       #controles{left:10px;right:auto;width:290px;justify-content:flex-start;gap:5px}
       #controles button{padding:6px 9px;font-size:.76rem}
@@ -117,7 +134,10 @@
   </main>
 
   <header id="hud">
-    <p class="lema">Las manos que construyeron la historia</p>
+    <div class="cabecera">
+      <p class="lema">Las manos que construyeron la historia</p>
+      <button type="button" id="btn-linea">← Línea del tiempo</button>
+    </div>
     <h1 id="titulo-etapa">Misión Roma</h1>
     <ol id="etapas" aria-label="Etapas de la misión">
       <li><button type="button" data-etapa="0">1 Terreno</button></li>
@@ -137,19 +157,41 @@
     <button type="button" id="btn-saber">Saber más</button>
     <button type="button" id="btn-imagen" aria-pressed="false" hidden>Mostrar mi imagen</button>
     <button type="button" id="btn-alternativo" aria-pressed="false">Otra forma de mover</button>
-    <button type="button" id="btn-siguiente" class="principal" disabled>Siguiente etapa</button>
+    <button type="button" id="btn-anterior" disabled>← Etapa anterior</button>
+    <button type="button" id="btn-siguiente" class="principal" disabled>Siguiente etapa →</button>
   </nav>
 
-  <section id="inicio" role="dialog" aria-modal="true" aria-labelledby="t-inicio">
+  <section id="portada" role="dialog" aria-modal="true" aria-labelledby="t-portada">
     <div class="tarjeta">
-      <h2 id="t-inicio">Misión Roma</h2>
-      <p><strong>Las manos que construyeron la historia</strong></p>
+      <p class="antetitulo">Geometría, patrimonio histórico y realidad aumentada</p>
+      <h2 id="t-portada">Las manos que construyeron la historia</h2>
+      <p>Desde la Prehistoria, las personas han cambiado el mundo con sus manos: tallaron piedras, cultivaron la tierra, levantaron muros y llevaron el agua de un lugar a otro. De casi todas ellas no conocemos el nombre, pero sí lo que construyeron.</p>
+      <p>En este proyecto recorrerás la historia en orden, desde la Prehistoria hasta hoy. En cada época construirás algo con tus propias manos y descubrirás la geometría y el patrimonio que hay detrás.</p>
+      <h3>La línea del tiempo</h3>
+      <ol class="linea" aria-label="Edades de la historia">
+        <li class="era"><span class="era-nombre">Prehistoria</span><span class="era-fecha">Hasta la aparición de la escritura, hacia el 3000 a. C.</span><span class="era-estado">Capítulo en preparación</span></li>
+        <li class="era activa"><span class="era-nombre">Edad Antigua</span><span class="era-fecha">Desde la escritura hasta el 476 d. C.</span><span class="era-estado">Capítulo disponible: Misión Roma · El acueducto</span>
+          <button type="button" class="principal" id="btn-entrar-roma">Entrar en Misión Roma</button></li>
+        <li class="era"><span class="era-nombre">Edad Media</span><span class="era-fecha">Del 476 al 1492</span><span class="era-estado">Capítulo en preparación</span></li>
+        <li class="era"><span class="era-nombre">Edad Moderna</span><span class="era-fecha">Del 1492 al 1789</span><span class="era-estado">Capítulo en preparación</span></li>
+        <li class="era"><span class="era-nombre">Edad Contemporánea</span><span class="era-fecha">Desde el 1789 hasta hoy</span><span class="era-estado">Capítulo en preparación</span></li>
+      </ol>
+      <p class="fuente">Las fechas son los límites convencionales que se usan en la escuela para ordenar el tiempo. Los cambios entre una edad y otra fueron lentos y no ocurrieron a la vez en todos los lugares.</p>
+    </div>
+  </section>
+
+  <section id="inicio" role="dialog" aria-modal="true" aria-labelledby="t-inicio" hidden>
+    <div class="tarjeta">
+      <p class="antetitulo">Edad Antigua</p>
+      <h2 id="t-inicio">Misión Roma · El acueducto</h2>
+      <p>Hace unos dos mil años, los romanos construyeron acueductos para llevar agua a sus ciudades por todo su territorio, también en Hispania. Algunos, como el de Segovia, siguen en pie.</p>
       <p>Hay que llevar agua desde un manantial hasta una ciudad, como hacían los romanos. Lo harás en cinco etapas, igual que en una obra de verdad: leer el terreno, nivelar el canal, construir, medir como los romanos y, al final, descubrir cómo se reparte el agua en Canarias.</p>
       <p>Con la cámara, junta el <strong>pulgar y el índice</strong> (haz pinza) sobre lo que quieras mover y desplaza la mano.</p>
       <div class="botones">
         <button type="button" class="principal" id="btn-manos">Construir con mis manos (cámara)</button>
         <button type="button" id="btn-tactil">Construir con el dedo, el ratón o el teclado</button>
         <button type="button" id="btn-diag">Comprobar cámara y manos</button>
+        <button type="button" id="btn-volver-portada">← Volver a la línea del tiempo</button>
       </div>
       <label class="opcion"><input type="checkbox" id="chk-imagen"> <span>Ver mi imagen de la cámara detrás del acueducto (realidad aumentada). Si no lo marcas, solo se ven unas manos dibujadas.</span></label>
       <p class="privacidad">La cámara se usa solo para localizar las manos. La imagen se procesa en este dispositivo: no se graba ni se envía. Tu imagen solo se muestra si marcas la casilla o pulsas «Mostrar mi imagen».</p>
@@ -840,14 +882,15 @@
         b.setAttribute("aria-label", "Etapa " + (i + 1) + ": " + ETAPAS[i].nombre + (hechas[i] ? ", completada" : "") + (b.disabled ? ", bloqueada" : ""));
       });
       $("btn-siguiente").disabled = !(actual < 4 && hechas[actual]);
-      $("btn-siguiente").textContent = actual < 4 ? "Siguiente etapa" : "Misión terminada";
+      $("btn-siguiente").textContent = actual < 4 ? "Siguiente etapa →" : "Misión terminada";
+      $("btn-anterior").disabled = actual <= 0;
     }
     function completar(i, mensaje) {
       estado(mensaje, "status-ok", "completa-" + i);
       if (!hechas[i]) { hechas[i] = true; try { localStorage.setItem(CLAVE, JSON.stringify(hechas)); } catch (e) {} }
       pintarProgreso();
     }
-    function irA(i) {
+    function irA(i, apilar = true) {
       if (!disponible(i) || i === actual) return;
       if (etapa) { etapa.grupo.visible = false; etapa.up && etapa.up(); }
       captura = false; agarre = null;
@@ -862,9 +905,11 @@
       etapa.entrar();
       pintarProgreso();
       encuadrar();
+      if (apilar) history.pushState({ p: "etapa", i }, "");
     }
     botonesEtapa.forEach((b, i) => b.addEventListener("click", () => irA(i)));
     $("btn-siguiente").addEventListener("click", () => irA(actual + 1));
+    $("btn-anterior").addEventListener("click", () => irA(actual - 1));
 
     // =====================================================================
     // 9. PUNTERO COMÚN: pinza o dedo/ratón
@@ -1054,11 +1099,54 @@
       e.currentTarget.setAttribute("aria-pressed", String(v));
       e.currentTarget.textContent = v ? "Ocultar mi imagen" : "Mostrar mi imagen";
     });
+    // ---------- Portada, capítulo y botón «atrás» ----------
+    const portada = $("portada"), inicioDlg = $("inicio");
+    function salirDeActividad() {
+      document.querySelectorAll(".panel:not([hidden])").forEach((p) => (p.hidden = true));
+      if (modo === "manos") cerrarCamara();
+      modo = null;
+      if (video.classList.contains("visible")) $("btn-imagen").click();
+      $("btn-imagen").hidden = true;
+      indicadorCamara("");
+    }
+    function mostrarPortada(apilar = true) {
+      salirDeActividad();
+      inicioDlg.hidden = true; portada.hidden = false;
+      if (apilar) history.pushState({ p: "portada" }, "");
+      $("btn-entrar-roma").focus({ preventScroll: true });
+    }
+    function mostrarInicio(apilar = true) {
+      salirDeActividad();
+      portada.hidden = true; inicioDlg.hidden = false;
+      if (apilar) history.pushState({ p: "inicio" }, "");
+      $("btn-manos").focus({ preventScroll: true });
+    }
+    function entrarEnEtapa() {
+      portada.hidden = true;
+      if (actual < 0) irA(primeraEtapa()); else history.pushState({ p: "etapa", i: actual }, "");
+    }
+    $("btn-entrar-roma").addEventListener("click", () => mostrarInicio());
+    $("btn-volver-portada").addEventListener("click", () => { if (history.state && history.state.p === "inicio") history.back(); else mostrarPortada(); });
+    $("btn-linea").addEventListener("click", () => mostrarPortada());
+    window.addEventListener("popstate", (e) => {
+      const st = e.state || { p: "portada" };
+      if (st.p === "portada") mostrarPortada(false);
+      else if (st.p === "inicio") mostrarInicio(false);
+      else if (st.p === "etapa") {
+        document.querySelectorAll(".panel:not([hidden])").forEach((p) => (p.hidden = true));
+        portada.hidden = true; inicioDlg.hidden = true;
+        if (!modo) { modo = "tactil"; mostrarAlternativo(true); }
+        irA(st.i, false);
+      }
+    });
+    history.replaceState({ p: "portada" }, "");
+
     function primeraEtapa() { let i = hechas.findIndex((h) => !h); return i < 0 ? 4 : i; }
     function empezarTactil(mensaje) {
+      const venia = !$("inicio").hidden;
       modo = "tactil"; $("inicio").hidden = true;
       mostrarAlternativo(true);
-      if (actual < 0) irA(primeraEtapa());
+      if (venia || actual < 0) entrarEnEtapa();
       if (mensaje) estado(mensaje, "status-warn", "msg-" + mensaje.length);
       const f = alternativos.querySelector("input,button"); if (f) f.focus();
     }
@@ -1066,7 +1154,7 @@
     $("btn-manos").addEventListener("click", async () => {
       $("inicio").hidden = true; modo = "manos"; $("btn-imagen").hidden = false;
       if ($("chk-imagen").checked && !video.classList.contains("visible")) $("btn-imagen").click();
-      if (actual < 0) irA(primeraEtapa());
+      entrarEnEtapa();
       try { await iniciarManos(); }
       catch (err) {
         cerrarCamara(); detector = null; modo = null; $("btn-imagen").hidden = true;
@@ -1168,7 +1256,7 @@
 
     pintarProgreso();
     encuadrar();
-    $("btn-manos").focus();
+    $("btn-entrar-roma").focus({ preventScroll: true });
   </script>
 </body>
 </html>

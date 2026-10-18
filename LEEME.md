@@ -1,6 +1,15 @@
-# Misión Roma v3.0.2 · edición para GitHub Pages
+# Misión Roma v3.1 · edición para GitHub Pages
 
 Proyecto «Las manos que construyeron la historia». Geometría, patrimonio histórico y realidad aumentada en Educación Primaria (5.º y 6.º).
+
+## Marco del proyecto
+
+La página se abre con la portada del proyecto «Las manos que construyeron la historia», que incluye una línea del tiempo. El recorrido va **desde la Prehistoria en adelante**: Prehistoria, Edad Antigua, Edad Media, Edad Moderna y Edad Contemporánea. Misión Roma es el capítulo de la **Edad Antigua**; los demás figuran como «en preparación».
+
+**Navegación:**
+- «← Línea del tiempo» vuelve a la portada y apaga la cámara.
+- «← Etapa anterior» y «Siguiente etapa →» mueven entre etapas.
+- El botón «atrás» del navegador o de la tableta recorre el mismo camino a la inversa.
 
 ## El proceso evolutivo
 
