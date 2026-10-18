@@ -1,4 +1,4 @@
-# Las manos que construyeron la historia · v3.4 (edición para GitHub Pages)
+# Las manos que construyeron la historia · v3.5 (edición para GitHub Pages)
 
 Proyecto «Las manos que construyeron la historia». Geometría, patrimonio histórico y realidad aumentada en Educación Primaria (5.º y 6.º).
 
@@ -92,6 +92,9 @@ Todas las etapas se pueden hacer de tres formas:
 - **Modo docente.** Añade `?docente` a la dirección (por ejemplo, `http://localhost:8000/?docente`) para abrir cualquier etapa sin completar las anteriores.
 - **Progreso.** Las etapas completadas se recuerdan solo en ese navegador. Para reiniciar, borra los datos del sitio en el navegador.
 - **«Saber más».** Cada etapa tiene un panel con la explicación, preguntas y la fuente.
+- **Decorados (v3.5).** Cada etapa tiene un telón pintado en el navegador acorde con su época y lugar (sabana del lago Turkana, cueva, aldea neolítica, cumbres de Gran Canaria, valle de Segovia, barranco con bancales, Toledo, obra de una catedral, nave gótica, patio nazarí, puerto de Mallorca), con suelo, niebla y luz propios. Al mostrar la imagen de la cámara, el decorado se retira.
+- **Bifaz (v3.5).** El nódulo empieza cubierto de córtex; cada golpe saca una lasca invasora de una cara distinta (talla bifacial), con negativos en abanico, ondas de percusión y retoque final del filo. Puede conservar córtex en la base, como muchos bifaces.
+- **Cerámica cardial (v3.5).** Pasta parda bruñida con manchas de cocción. Las impresiones se graban en la superficie de la vasija (siguen su curvatura) y reproducen el borde dentado de la valva de berberecho; se ordenan en una franja del hombro, como en la decoración cardial.
 - **Calidad gráfica.** Por defecto se usa la calidad alta: materiales con textura (granito, caliza, barro, sílex, latón, estuco, vidriado, pergamino y madera), sombras suaves, reflejos, aristas biseladas, trazos con grosor real y lienzos de 1024 a 1536 píxeles. Las texturas se generan en el propio navegador, sin descargar imágenes. Si el equipo no llega a 24 imágenes por segundo durante unos 4 segundos, la actividad quita las sombras y baja la resolución por sí sola.
   - `?calidad=ligera` arranca directamente en modo ligero (útil en tabletas antiguas).
   - `?calidad=alta` mantiene siempre la calidad máxima (útil para proyectar en la pizarra digital o hacer capturas).
@@ -184,6 +187,7 @@ Su uso con menores debe valorarse con el delegado o la delegada de protección d
 - Encuadre comprobado en móvil vertical, móvil horizontal y tableta.
 - Sin peticiones externas salvo el modelo, cuando falta y está permitido.
 - La cámara se apaga cuando el detector no arranca.
+- Decorados, bifaz y cerámica cardial (v3.5): recorridos de los tres capítulos sin errores, accesibilidad sin violaciones y capturas revisadas.
 - Calidad gráfica alta (v3.4): recorridos de los tres capítulos repetidos sin errores, capturas de las quince etapas revisadas y modo ligero comprobado.
 
 **Pendiente:**
