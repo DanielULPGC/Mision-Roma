@@ -1,4 +1,4 @@
-# Misión Roma v3.0.1 · edición para GitHub Pages
+# Misión Roma v3.0.2 · edición para GitHub Pages
 
 Proyecto «Las manos que construyeron la historia». Geometría, patrimonio histórico y realidad aumentada en Educación Primaria (5.º y 6.º).
 
@@ -78,6 +78,22 @@ No funciona con doble clic: los navegadores bloquean los módulos y la cámara e
 ### 4. Comprobar la integridad
 
 Ejecuta `sha256sum -c MANIFIESTO.txt`. Además, la página verifica `lib/three.module.js` y `lib/vision_bundle.mjs` con SRI.
+
+## Si la cámara no funciona
+
+Pulsa **«Comprobar cámara y manos»** en la pantalla de inicio, o abre la dirección añadiendo `?diagnostico`. El panel revisa cada requisito y propone la solución. «Probar la cámara ahora» hace una prueba de 4 segundos e indica si ve manos y a qué velocidad.
+
+| Síntoma | Causa | Solución |
+|---|---|---|
+| «Falta el archivo modelo/hand_landmarker.task» | No se ha subido el modelo (es la causa más frecuente). | Descárgalo con el enlace de `modelo/LEEME.txt`, guárdalo con ese nombre exacto en `modelo/` y súbelo al repositorio. |
+| No pasa nada al abrir el archivo | Se ha abierto con doble clic (`file://`). | Usa la dirección de GitHub Pages o un servidor local. |
+| «La dirección no es segura» | Página servida por `http://` desde otra máquina. | Usa `https://` (GitHub Pages lo hace por defecto) o `localhost`. |
+| «Permiso de cámara denegado» | Se pulsó «Bloquear». | Permite la cámara desde el candado de la barra de direcciones y recarga. |
+| La cámara funciona pero no veo nada del vídeo | La imagen está oculta por privacidad. | Marca «Ver mi imagen…» al empezar o pulsa «Mostrar mi imagen». |
+| «No veo ninguna mano» | Distancia, luz o encuadre. | Mano a 30-60 cm de la cámara, con buena luz y la palma hacia la pantalla. |
+| Va a saltos | Equipo lento. | Si la GPU falla, la página cambia sola a CPU. Si sigue lento, usa el modo táctil. |
+
+El indicador **«Cámara: …»**, bajo el panel superior, muestra en todo momento si la cámara está activa, cuántas manos ve y si se está agarrando algo.
 
 ## Privacidad
 

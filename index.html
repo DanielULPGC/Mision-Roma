@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Misión Roma · Las manos que construyeron la historia</title>
   <!--
-    Misión Roma v3.0.1 (edición para GitHub Pages) · Proyecto «Las manos que construyeron la historia»
+    Misión Roma v3.0.2 (edición para GitHub Pages) · Proyecto «Las manos que construyeron la historia»
     Geometría, patrimonio histórico y realidad aumentada en Educación Primaria (5.º-6.º)
 
     Proceso evolutivo en cinco etapas, todas manipulables con las manos (pinza) o con alternativas DUA:
@@ -18,6 +18,8 @@
     Se conservan de v2.2: RA «espejo» con cámara frontal, pinza normalizada con histéresis, privacidad por
     defecto, apagado de cámara, contexto seguro, SRI, librerías y WASM locales, PERMITIR_MODELO_REMOTO.
     El terreno, las fincas y las cifras de las etapas 1 y 5 son inventados con fines didácticos (declarado).
+    v3.0.2: indicador permanente del estado de la cámara, opción de ver la propia imagen desde el inicio,
+    panel «Comprobar cámara y manos» (también con ?diagnostico) y cambio automático a CPU si la GPU falla.
   -->
   <script type="importmap">
   {
@@ -64,6 +66,16 @@
     #estado{margin-top:6px;font-size:.85rem;font-weight:700}
     .status-ok{color:var(--ok)} .status-warn{color:var(--aviso)} .status-error{color:var(--error)}
     #nota{font-size:.68rem;opacity:.75;margin-top:4px}
+    #camara{margin-top:5px;font-size:.76rem;font-weight:700;padding:3px 8px;border-radius:6px;background:rgba(255,255,255,.08)}
+    #camara.ok{color:var(--ok)} #camara.aviso{color:var(--aviso)} #camara.error{color:var(--error)}
+    .opcion{display:flex;gap:8px;align-items:flex-start;font-size:.9rem;margin-top:10px}
+    .opcion input{width:20px;height:20px;accent-color:var(--ocre);flex:none;margin-top:1px}
+    #lista-diag{list-style:none;padding:0;margin:8px 0}
+    #lista-diag li{padding:6px 0;border-bottom:1px solid rgba(255,255,255,.12);font-size:.88rem}
+    #lista-diag .r-ok::before{content:"✓ ";color:var(--ok);font-weight:700}
+    #lista-diag .r-aviso::before{content:"! ";color:var(--aviso);font-weight:700}
+    #lista-diag .r-error::before{content:"✗ ";color:var(--error);font-weight:700}
+    #lista-diag small{display:block;opacity:.8;margin-top:2px}
     #controles{position:absolute;left:10px;right:10px;bottom:max(10px,env(safe-area-inset-bottom));
       display:flex;flex-wrap:wrap;gap:8px;justify-content:center;z-index:5}
     button{font:inherit;font-size:.86rem;font-weight:700;border-radius:10px;padding:9px 13px;
@@ -117,6 +129,7 @@
     <div id="metricas" class="metricas"></div>
     <div id="estado" class="status-warn" role="status" aria-live="polite">Elige cómo quieres construir.</div>
     <div id="nota"></div>
+    <div id="camara" role="status" aria-live="polite" hidden></div>
   </header>
 
   <nav id="controles" aria-label="Herramientas">
@@ -136,8 +149,10 @@
       <div class="botones">
         <button type="button" class="principal" id="btn-manos">Construir con mis manos (cámara)</button>
         <button type="button" id="btn-tactil">Construir con el dedo, el ratón o el teclado</button>
+        <button type="button" id="btn-diag">Comprobar cámara y manos</button>
       </div>
-      <p class="privacidad">La cámara se usa solo para localizar las manos. La imagen se procesa en este dispositivo: no se graba ni se envía. Por defecto tu imagen no se muestra; solo aparecen unas manos dibujadas. Si el modelo de detección de manos no está instalado junto a la actividad, se descarga desde internet.</p>
+      <label class="opcion"><input type="checkbox" id="chk-imagen"> <span>Ver mi imagen de la cámara detrás del acueducto (realidad aumentada). Si no lo marcas, solo se ven unas manos dibujadas.</span></label>
+      <p class="privacidad">La cámara se usa solo para localizar las manos. La imagen se procesa en este dispositivo: no se graba ni se envía. Tu imagen solo se muestra si marcas la casilla o pulsas «Mostrar mi imagen».</p>
     </div>
   </section>
 
@@ -146,6 +161,18 @@
       <h2 id="t-info">Saber más</h2>
       <div id="cuerpo-info"></div>
       <div class="botones"><button type="button" class="principal" data-cerrar>Volver a la obra</button></div>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-diag" role="dialog" aria-modal="true" hidden aria-labelledby="t-diag">
+    <div class="tarjeta">
+      <h2 id="t-diag">Comprobar cámara y manos</h2>
+      <p>Este panel revisa qué hace falta para construir con las manos. Para la prueba real, pulsa el botón y muestra una mano a la cámara durante unos segundos.</p>
+      <ul id="lista-diag"></ul>
+      <div class="botones">
+        <button type="button" class="principal" id="btn-prueba">Probar la cámara ahora</button>
+        <button type="button" data-cerrar>Cerrar</button>
+      </div>
     </div>
   </section>
 
@@ -863,6 +890,13 @@
     const CONEX = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
     const PINZA_CIERRA = 0.33, PINZA_ABRE = 0.5;
     let detector = null, modo = null, lastVideoTime = -1, lastTimestampMs = 0, agarre = null;
+    let delegado = "", erroresDeteccion = 0, ultimaClave = "", visionFS = null, rutaModeloUsada = "", recreando = false;
+    const camaraDiv = $("camara");
+    function indicadorCamara(texto, clase) {
+      camaraDiv.hidden = !texto;
+      if (camaraDiv.textContent !== texto) camaraDiv.textContent = texto;
+      camaraDiv.className = clase || "";
+    }
     const pinza = {}, suav = {};
 
     function videoAPantalla(nx, ny) {
@@ -878,6 +912,7 @@
       await video.play();
     }
     function cerrarCamara() {
+      if (modo === "manos") indicadorCamara("Cámara: en pausa", "aviso");
       if (video.srcObject) { video.srcObject.getTracks().forEach((t) => t.stop()); video.srcObject = null; }
       if (agarre) { pUp(0, 0); agarre = null; }
       ctxM.clearRect(0, 0, escena.clientWidth, escena.clientHeight);
@@ -890,11 +925,36 @@
       const rutaWasm = (await existeLocal("./wasm/vision_wasm_internal.js")) ? "./wasm" : URL_TASKS + "/wasm";
       const modeloLocal = await existeLocal("./modelo/hand_landmarker.task");
       if (!modeloLocal && !PERMITIR_MODELO_REMOTO) { const e = new Error("falta el archivo modelo/hand_landmarker.task en la carpeta de la actividad"); e.name = "SinModelo"; throw e; }
-      const vision = await FilesetResolver.forVisionTasks(rutaWasm);
-      const opciones = (delegate) => ({ baseOptions: { modelAssetPath: modeloLocal ? "./modelo/hand_landmarker.task" : URL_MODELO, delegate }, runningMode: "VIDEO", numHands: 2 });
-      try { detector = await HandLandmarker.createFromOptions(vision, opciones("GPU")); }
-      catch (e) { detector = await HandLandmarker.createFromOptions(vision, opciones("CPU")); }
+      indicadorCamara("Cámara: preparando el detector de manos…", "aviso");
+      visionFS = { FilesetResolver, HandLandmarker, vision: await FilesetResolver.forVisionTasks(rutaWasm) };
+      rutaModeloUsada = modeloLocal ? "./modelo/hand_landmarker.task" : URL_MODELO;
+      await crearDetector("GPU");
       categoriaPrevia = ""; etapa.entrar();
+      estado("Cámara lista. Muestra una mano y junta el pulgar y el índice (pinza) sobre lo que quieras mover.", "status-ok", "camara-lista");
+    }
+    async function crearDetector(preferido) {
+      const { HandLandmarker, vision } = visionFS;
+      const opciones = (delegate) => ({ baseOptions: { modelAssetPath: rutaModeloUsada, delegate }, runningMode: "VIDEO", numHands: 2 });
+      if (detector) { try { detector.close(); } catch (e) {} detector = null; }
+      if (preferido === "GPU") {
+        try { detector = await HandLandmarker.createFromOptions(vision, opciones("GPU")); delegado = "GPU"; }
+        catch (e) { detector = await HandLandmarker.createFromOptions(vision, opciones("CPU")); delegado = "CPU"; }
+      } else { detector = await HandLandmarker.createFromOptions(vision, opciones("CPU")); delegado = "CPU"; }
+      erroresDeteccion = 0; lastTimestampMs = 0; lastVideoTime = -1; ultimaClave = "";
+      indicadorCamara("Cámara activa · buscando manos (" + delegado + ")", "ok");
+    }
+    // Si la detección falla repetidamente (frecuente con la GPU en algunas tabletas), se pasa a CPU
+    async function fallosDeteccion() {
+      if (recreando) return;
+      recreando = true;
+      try {
+        if (delegado === "GPU") { indicadorCamara("Cámara: la GPU falla; cambiando a CPU…", "aviso"); await crearDetector("CPU"); }
+        else throw new Error("CPU");
+      } catch (e) {
+        detector = null;
+        indicadorCamara("Cámara: el detector de manos no funciona en este dispositivo", "error");
+        empezarTactil("El detector de manos no funciona en este dispositivo. Puedes seguir con el dedo o con los controles.");
+      } finally { recreando = false; }
     }
     function dibujarMano(pts, cerrada, activa) {
       ctxM.lineCap = "round"; ctxM.lineWidth = 7;
@@ -912,7 +972,9 @@
       if (!detector || video.readyState < 2 || video.currentTime === lastVideoTime) return;
       lastVideoTime = video.currentTime;
       const nowMs = Math.max(lastTimestampMs + 1, Math.floor(performance.now())); lastTimestampMs = nowMs;
-      let res; try { res = detector.detectForVideo(video, nowMs); } catch (e) { return; }
+      let res;
+      try { res = detector.detectForVideo(video, nowMs); erroresDeteccion = 0; }
+      catch (e) { if (++erroresDeteccion > 15) fallosDeteccion(); return; }
       ctxM.clearRect(0, 0, escena.clientWidth, escena.clientHeight);
       const lista = res.landmarks || [], lados = res.handednesses || res.handedness || [], vistas = new Set();
       let primeraLibre = null;
@@ -937,6 +999,11 @@
       if (!agarre && primeraLibre) pMove(primeraLibre.x, primeraLibre.y);
       if (agarre && !vistas.has(agarre.lado) && ++agarre.perdidas > 8) { pUp(0, 0); agarre = null; }
       for (const k of Object.keys(pinza)) if (!vistas.has(k)) { delete pinza[k]; delete suav[k]; }
+      const n = lista.length, clave = n + "|" + (agarre ? 1 : 0);
+      if (clave !== ultimaClave) {
+        ultimaClave = clave;
+        indicadorCamara("Cámara activa · " + (n === 0 ? "no veo ninguna mano" : n === 1 ? "1 mano" : n + " manos") + (agarre ? " · agarrando" : "") + " (" + delegado + ")", n === 0 ? "aviso" : "ok");
+      }
     }
 
     // =====================================================================
@@ -998,20 +1065,104 @@
     $("btn-tactil").addEventListener("click", () => empezarTactil());
     $("btn-manos").addEventListener("click", async () => {
       $("inicio").hidden = true; modo = "manos"; $("btn-imagen").hidden = false;
+      if ($("chk-imagen").checked && !video.classList.contains("visible")) $("btn-imagen").click();
       if (actual < 0) irA(primeraEtapa());
       try { await iniciarManos(); }
       catch (err) {
         cerrarCamara(); detector = null; modo = null; $("btn-imagen").hidden = true;
-        const motivos = { NotAllowedError: "no se ha dado permiso para usar la cámara", NotFoundError: "no se ha encontrado ninguna cámara", NotReadableError: "otra aplicación está usando la cámara", ContextoInseguro: err.message, SinModelo: err.message };
+        indicadorCamara("Cámara: no disponible (" + (err.name || "error") + ")", "error");
+        if (video.classList.contains("visible")) $("btn-imagen").click();
+        const motivos = { NotAllowedError: "no se ha dado permiso para usar la cámara", NotFoundError: "no se ha encontrado ninguna cámara", NotReadableError: "otra aplicación está usando la cámara", ContextoInseguro: err.message, SinModelo: err.message + " (las instrucciones están en modelo/LEEME.txt)" };
         empezarTactil("No se puede construir con las manos: " + (motivos[err.name] || "no se ha podido preparar el detector de manos") + ". Puedes hacerlo con el dedo o con los controles.");
       }
     });
     document.addEventListener("visibilitychange", async () => {
       if (modo !== "manos") return;
       if (document.hidden) cerrarCamara();
-      else { try { await abrirCamara(); } catch (e) { modo = "tactil"; empezarTactil("La cámara se ha desactivado. Puedes seguir con el dedo o con los controles."); } }
+      else { try { await abrirCamara(); indicadorCamara("Cámara activa (" + delegado + ")", "ok"); ultimaClave = ""; } catch (e) { modo = "tactil"; empezarTactil("La cámara se ha desactivado. Puedes seguir con el dedo o con los controles."); } }
     });
     window.addEventListener("pagehide", cerrarCamara);
+    // ---------- Diagnóstico de cámara y manos ----------
+    const listaDiag = $("lista-diag");
+    function filaDiag(clase, texto, consejo) {
+      const li = document.createElement("li"); li.className = "r-" + clase; li.textContent = texto;
+      if (consejo) { const sm = document.createElement("small"); sm.textContent = consejo; li.appendChild(sm); }
+      listaDiag.appendChild(li); return li;
+    }
+    async function tamanoLocal(ruta) {
+      try { const r = await fetch(ruta, { method: "HEAD", cache: "no-store" }); return r.ok ? parseInt(r.headers.get("content-length") || "0", 10) || -1 : 0; }
+      catch (e) { return 0; }
+    }
+    async function diagnosticoBasico() {
+      listaDiag.replaceChildren();
+      const proto = location.protocol, local = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
+      if (proto === "file:") filaDiag("error", "La página se ha abierto con doble clic (file://).", "Ábrela desde GitHub Pages o con un servidor: python3 -m http.server 8000 y http://localhost:8000.");
+      else if (!window.isSecureContext) filaDiag("error", "La dirección no es segura (" + proto + "//" + location.host + ").", "La cámara solo funciona con https o en localhost. En GitHub Pages la dirección empieza por https://.");
+      else filaDiag("ok", "Dirección segura (" + (local ? "localhost" : "https") + ").");
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) filaDiag("ok", "El navegador permite usar la cámara.");
+      else if (!window.isSecureContext) filaDiag("error", "El navegador bloquea la cámara por la dirección no segura.", "Se resuelve al abrir la página con https.");
+      else filaDiag("error", "Este navegador no ofrece acceso a la cámara.", "Prueba con Chrome, Edge o Safari actualizados.");
+      try {
+        const st = await navigator.permissions.query({ name: "camera" });
+        if (st.state === "denied") filaDiag("error", "El permiso de cámara está bloqueado para esta página.", "Pulsa el candado o el icono de la barra de direcciones y permite la cámara; después recarga la página.");
+        else filaDiag(st.state === "granted" ? "ok" : "aviso", st.state === "granted" ? "Permiso de cámara concedido." : "El navegador pedirá permiso para usar la cámara.", st.state === "granted" ? "" : "Cuando aparezca el aviso, pulsa «Permitir».");
+      } catch (e) { filaDiag("aviso", "No se puede consultar el permiso de cámara en este navegador.", "Se pedirá al empezar; pulsa «Permitir»."); }
+      const wasm = await tamanoLocal("./wasm/vision_wasm_internal.wasm");
+      filaDiag(wasm ? "ok" : "error", wasm ? "Motor de detección (WASM) presente." : "Falta la carpeta wasm/ junto a la página.", wasm ? "" : "Sube también la carpeta wasm/ completa.");
+      const mod = await tamanoLocal("./modelo/hand_landmarker.task");
+      if (mod > 1000000 || mod === -1) filaDiag("ok", "Modelo de manos presente" + (mod > 0 ? " (" + (mod / 1048576).toFixed(1).replace(".", ",") + " MB)." : "."));
+      else if (mod > 0) filaDiag("error", "El archivo del modelo es demasiado pequeño (" + mod + " bytes): probablemente está dañado o es un enlace.", "Vuelve a descargarlo y súbelo de nuevo a modelo/.");
+      else if (PERMITIR_MODELO_REMOTO) filaDiag("aviso", "No hay modelo local: se descargará de Google al empezar.");
+      else filaDiag("error", "Falta el modelo de manos (modelo/hand_landmarker.task).", "Es la causa más frecuente. Descárgalo con el enlace de modelo/LEEME.txt, guárdalo con ese nombre exacto en la carpeta modelo/ y súbelo.");
+      filaDiag(renderer.getContext() ? "ok" : "error", renderer.getContext() ? "Gráficos 3D (WebGL) disponibles." : "WebGL no disponible.");
+    }
+    async function pruebaReal() {
+      const btn = $("btn-prueba"); btn.disabled = true;
+      const fila = filaDiag("aviso", "Prueba real: abriendo la cámara…");
+      const yaActiva = modo === "manos" && detector && video.srcObject;
+      try {
+        if (!yaActiva) {
+          await abrirCamara();
+          const { FilesetResolver, HandLandmarker } = await import("@mediapipe/tasks-vision");
+          const modeloLocal = await existeLocal("./modelo/hand_landmarker.task");
+          if (!modeloLocal && !PERMITIR_MODELO_REMOTO) { const e = new Error("falta el modelo"); e.name = "SinModelo"; throw e; }
+          fila.firstChild.textContent = "Prueba real: preparando el detector…";
+          visionFS = { FilesetResolver, HandLandmarker, vision: await FilesetResolver.forVisionTasks((await existeLocal("./wasm/vision_wasm_internal.js")) ? "./wasm" : URL_TASKS + "/wasm") };
+          rutaModeloUsada = modeloLocal ? "./modelo/hand_landmarker.task" : URL_MODELO;
+          await crearDetector("GPU");
+        }
+        fila.firstChild.textContent = "Prueba real: muestra una mano a la cámara…";
+        let fotogramas = 0, maxManos = 0, fallos = 0, ultimo = -1, ts = 0;
+        const fin = performance.now() + 4000;
+        await new Promise((ok) => {
+          const paso = () => {
+            if (performance.now() > fin) return ok();
+            if (video.readyState >= 2 && video.currentTime !== ultimo) {
+              ultimo = video.currentTime; ts = Math.max(ts + 1, Math.floor(performance.now()));
+              try { const r = detector.detectForVideo(video, ts); fotogramas++; maxManos = Math.max(maxManos, (r.landmarks || []).length); } catch (e) { fallos++; }
+            }
+            requestAnimationFrame(paso);
+          };
+          paso();
+        });
+        lastTimestampMs = ts;
+        const fps = (fotogramas / 4).toFixed(1).replace(".", ",");
+        if (fotogramas === 0) { fila.className = "r-error"; fila.firstChild.textContent = "Prueba real: el detector no ha procesado ninguna imagen (" + fallos + " fallos, " + delegado + ")."; }
+        else if (maxManos === 0) { fila.className = "r-aviso"; fila.firstChild.textContent = "Prueba real: la cámara y el detector funcionan (" + fps + " imágenes/s, " + delegado + "), pero no he visto ninguna mano."; fila.appendChild(Object.assign(document.createElement("small"), { textContent: "Acerca la mano a 30-60 cm de la cámara, con buena luz y la palma hacia la pantalla, y repite la prueba." })); }
+        else { fila.className = "r-ok"; fila.firstChild.textContent = "Prueba real: manos detectadas (" + maxManos + "), " + fps + " imágenes/s con " + delegado + "."; if (fotogramas / 4 < 8) fila.appendChild(Object.assign(document.createElement("small"), { textContent: "Va lento: el movimiento puede notarse a saltos en este dispositivo." })); }
+      } catch (err) {
+        fila.className = "r-error";
+        const m = { NotAllowedError: "permiso de cámara denegado", NotFoundError: "no hay cámara", NotReadableError: "otra aplicación usa la cámara", ContextoInseguro: "la dirección no es https", SinModelo: "falta el modelo de manos en modelo/" };
+        fila.firstChild.textContent = "Prueba real: no se ha podido completar (" + (m[err.name] || err.message || err.name) + ").";
+      } finally {
+        if (!yaActiva) { if (detector) { try { detector.close(); } catch (e) {} } detector = null; if (video.srcObject) { video.srcObject.getTracks().forEach((t) => t.stop()); video.srcObject = null; } }
+        btn.disabled = false;
+      }
+    }
+    $("btn-diag").addEventListener("click", async () => { abrirPanel("panel-diag"); await diagnosticoBasico(); });
+    $("btn-prueba").addEventListener("click", pruebaReal);
+    if (new URLSearchParams(location.search).has("diagnostico")) { abrirPanel("panel-diag"); diagnosticoBasico(); }
+
     document.querySelectorAll("[data-cerrar]").forEach((b) => b.addEventListener("click", () => cerrarPanel(b.closest(".panel"))));
     document.addEventListener("keydown", (e) => { if (e.key === "Escape") document.querySelectorAll(".panel:not([hidden])").forEach(cerrarPanel); });
 
