@@ -55,4 +55,4 @@ Protocolo ARQ-3D-01, fase 1, adoptada de forma parcial. Para cada elemento recon
 
 | Elemento | Afirmación | Fuente | Certeza |
 |---|---|---|---|
-| Modelo de manos | `hand_landmarker.task`, float16, versión 1; SHA-256 `fbc2a300…cde1` y 7 819 105 bytes | Coincidencia de tres copias independientes (un paquete de npm y dos repositorios de Hugging Face); la descarga directa de Google no fue posible desde el entorno de trabajo | Documentado con cautela: conviene confirmarlo con la descarga oficial |
+| Modelo de manos | `hand_landmarker.task`, float16, versión 1; SHA-256 `fbc2a300…cde1` y 7 819 105 bytes | Coincidencia de tres copias independientes (un paquete de npm y dos repositorios de Hugging Face); la descarga directa de Google no fue posible desde el entorno de trabajo | Documentado: la descarga oficial de la usuaria (19-10-2026) tiene la misma huella |

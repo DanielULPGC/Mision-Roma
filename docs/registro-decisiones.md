@@ -20,3 +20,4 @@ Protocolo ARQ-3D-01, fase 3, adoptada de forma parcial. Las decisiones están or
 | 3.6 | Pintadera: excisión y forma rómbica | Completan las técnicas y formas del catálogo (excisión en 60 piezas; rómbica en 3) | — |
 | 3.6 | Precisar el poblamiento de Canarias: estable hacia los siglos II-III d. C., en debate | Velasco Vázquez et al. (2020), dataciones de vida corta | «Hace unos dos mil años», sin matiz |
 | 3.6 | Declarar que Prehistoria y Edad Antigua son saberes de Historia del segundo ciclo en el currículo canario | Contraste con el Anexo 2 del Decreto 211/2022 | Silenciar el desajuste de ciclo |
+| 3.6.1 | Incluir `modelo/hand_landmarker.task` aportado por la usuaria (descarga oficial de Google) | Tamaño (7 819 105 bytes) y huella SHA-256 idénticos a los esperados; el detector arranca con él | Mantener el modelo fuera del repositorio |
