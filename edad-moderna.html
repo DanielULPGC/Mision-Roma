@@ -38,9 +38,9 @@
     #escena{position:fixed;inset:0;background:linear-gradient(#cfe3ec 0%,#e9dfcc 62%,#b89c78 100%)}
     #video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);opacity:0;transition:opacity .3s}
     #video.visible{opacity:1}
-    #lienzo3d,#lienzoManos{position:absolute;inset:0;width:100%;height:100%}
+    #lienzo3d,#lienzoManos,#lienzoEfectos{position:absolute;inset:0;width:100%;height:100%}
     #lienzo3d{touch-action:none}
-    #lienzoManos{pointer-events:none}
+    #lienzoManos,#lienzoEfectos{pointer-events:none}
     .etq{position:absolute;transform:translate(-50%,-100%);background:var(--panel);color:var(--texto);font-variant-numeric:tabular-nums;
       font-size:.76rem;padding:3px 7px;border-radius:6px;white-space:nowrap;pointer-events:none}
     .etq.geo{background:rgba(194,132,58,.95);color:#1c1917;font-weight:600}
@@ -103,13 +103,19 @@
     .era-estado{display:block;font-size:.78rem;opacity:.7;margin-top:2px}
     .era button{width:100%;margin-top:8px}
     .cabecera{display:flex;align-items:center;justify-content:space-between;gap:8px}
-    #btn-linea{padding:4px 9px;font-size:.72rem;border-radius:7px;flex:none}
+    #btn-linea,#btn-sonido{padding:4px 9px;font-size:.72rem;border-radius:7px;flex:none}
+    .cabecera .lema{flex:1}
+    #btn-sonido[aria-pressed="false"]{text-decoration:line-through;opacity:.75}
+    #pista{margin-top:6px;font-size:.8rem;line-height:1.35;padding:6px 8px;border-radius:8px;background:rgba(56,189,248,.14);border-left:3px solid var(--agua)}
+    .llamativa{border-color:var(--agua)!important;box-shadow:0 0 0 3px rgba(56,189,248,.6)}
+    @media (prefers-reduced-motion: no-preference){ .llamativa{animation:latido 1.3s ease-in-out infinite} }
+    @keyframes latido{50%{box-shadow:0 0 0 8px rgba(56,189,248,.12)}}
     [hidden]{display:none!important}
     @media (prefers-reduced-motion: reduce){ #video{transition:none} }
     @media (orientation: landscape) and (max-height: 520px){
       #hud{right:auto;width:290px;padding:7px 10px}
       #hud h1{font-size:.88rem} #hud .lema{visibility:hidden}
-      .metricas{font-size:.72rem} #estado{font-size:.74rem} #nota{display:none}
+      .metricas{font-size:.72rem} #estado{font-size:.74rem} #nota{display:none} #pista{font-size:.72rem;padding:4px 7px}
       #controles{left:10px;right:auto;width:290px;justify-content:flex-start;gap:5px}
       #controles button{padding:6px 9px;font-size:.76rem}
       #alternativos{padding:5px 9px}
@@ -121,12 +127,14 @@
     <video id="video" playsinline muted aria-hidden="true"></video>
     <canvas id="lienzo3d" role="img" aria-label="Escena 3D de la etapa actual. Los elementos marcados se pueden mover con la pinza, con el dedo o con los controles alternativos."></canvas>
     <canvas id="lienzoManos" aria-hidden="true"></canvas>
+    <canvas id="lienzoEfectos" aria-hidden="true"></canvas>
     <div id="etiquetas" aria-hidden="true"></div>
   </main>
 
   <header id="hud">
     <div class="cabecera">
       <p class="lema">Las manos que construyeron la historia</p>
+      <button type="button" id="btn-sonido" aria-pressed="true">Sonido</button>
       <button type="button" id="btn-linea">← Línea del tiempo</button>
     </div>
     <h1 id="titulo-etapa">Nuevos horizontes</h1>
@@ -139,12 +147,14 @@
     </ol>
     <div id="metricas" class="metricas"></div>
     <div id="estado" class="status-warn" role="status" aria-live="polite">Elige cómo quieres construir.</div>
+    <div id="pista" role="status" aria-live="polite" hidden></div>
     <div id="nota"></div>
     <div id="camara" role="status" aria-live="polite" hidden></div>
   </header>
 
   <nav id="controles" aria-label="Herramientas">
     <div id="alternativos" hidden></div>
+    <button type="button" id="btn-pista">Pista</button>
     <button type="button" id="btn-saber">Saber más</button>
     <button type="button" id="btn-imagen" aria-pressed="false" hidden>Mostrar mi imagen</button>
     <button type="button" id="btn-alternativo" aria-pressed="false">Otra forma de mover</button>
@@ -227,17 +237,161 @@
     const DOCENTE = new URLSearchParams(location.search).has("docente");
 
     let categoriaPrevia = "";
-    let actual = -1, etapa = null;
+    let actual = -1, etapa = null, captura = false;
     function estado(texto, clase = "status-warn", categoria = texto) {
+      cambiosJuego++; ultimaActividad = performance.now();
       if (categoria === categoriaPrevia) return;
       categoriaPrevia = categoria;
       estadoTxt.textContent = texto;
       estadoTxt.className = clase;
+      retroalimentar(clase, categoria);
     }
     function metricas(lineas) {
       while (metricasDiv.children.length < lineas.length) metricasDiv.appendChild(document.createElement("div"));
       while (metricasDiv.children.length > lineas.length) metricasDiv.lastChild.remove();
-      lineas.forEach((t, i) => { if (metricasDiv.children[i].textContent !== t) metricasDiv.children[i].textContent = t; });
+      lineas.forEach((t, i) => { if (metricasDiv.children[i].textContent !== t) { metricasDiv.children[i].textContent = t; cambiosJuego++; } });
+    }
+
+    // ---------------------------------------------------------------------
+    // Retroalimentación de juego (v3.8): sonido opcional, pistas graduadas, anillos de agarre,
+    // aviso de pinza fallida y celebración al completar. Sin archivos externos: el sonido se sintetiza.
+    // ---------------------------------------------------------------------
+    const CLAVE_SONIDO = "lasManos.sonido";
+    let sonidoActivo = true;
+    try { sonidoActivo = localStorage.getItem(CLAVE_SONIDO) !== "no"; } catch (e) {}
+    let audioCtx = null;
+    const ultimoSonido = {};
+    let cambiosJuego = 0;        // cambios visibles (mensajes y métricas): indican si una pinza ha tenido efecto
+    let erroresEtapa = 0, ultimoError = 0, ultimaActividad = performance.now(), fallosSeguidos = 0, anillosPantalla = [];
+    const nivelPista = [], efectos = [];
+    const lienzoEf = $("lienzoEfectos"), ctxE = lienzoEf.getContext("2d");
+    function prepararAudio() {
+      try {
+        if (!audioCtx) { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null; audioCtx = new AC(); }
+        if (audioCtx.state === "suspended") audioCtx.resume();
+      } catch (e) { return null; }
+      return audioCtx;
+    }
+    // El navegador solo deja sonar después de un gesto: se prepara el audio con el primer toque o tecla
+    ["pointerdown", "keydown"].forEach((ev) => document.addEventListener(ev, () => { if (sonidoActivo) prepararAudio(); }, { capture: true, passive: true }));
+    function sonar(tipo) {
+      if (!sonidoActivo) return;
+      const ahora = performance.now();
+      if (ahora - (ultimoSonido[tipo] || 0) < (tipo === "error" ? 1200 : 140)) return;
+      ultimoSonido[tipo] = ahora;
+      const ac = prepararAudio(); if (!ac || ac.state !== "running") return;
+      try {
+        const t0 = ac.currentTime + 0.01;
+        const nota = (f, ini, dur, forma = "sine", vol = 0.07, f2 = f) => {
+          const o = ac.createOscillator(), gn = ac.createGain();
+          o.type = forma; o.frequency.setValueAtTime(f, t0 + ini);
+          if (f2 !== f) o.frequency.exponentialRampToValueAtTime(f2, t0 + ini + dur);
+          gn.gain.setValueAtTime(0.0001, t0 + ini); gn.gain.exponentialRampToValueAtTime(vol, t0 + ini + 0.015); gn.gain.exponentialRampToValueAtTime(0.0001, t0 + ini + dur);
+          o.connect(gn).connect(ac.destination); o.start(t0 + ini); o.stop(t0 + ini + dur + 0.03);
+        };
+        if (tipo === "agarre") nota(520, 0, 0.06, "triangle", 0.045);
+        else if (tipo === "ok") { nota(660, 0, 0.12); nota(880, 0.09, 0.18); }
+        else if (tipo === "error") nota(240, 0, 0.24, "triangle", 0.06, 170);
+        else if (tipo === "fin") [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => nota(f, i * 0.1, i === 3 ? 0.5 : 0.16, "triangle", 0.065));
+      } catch (e) {}
+    }
+    function retroalimentar(clase, categoria) {
+      const mal = /-mal/.test(categoria) || clase === "status-error";
+      // Durante un arrastre los avisos cambian sin parar: solo cuentan como error las respuestas y las acciones sueltas
+      if (mal && !captura) {
+        sonar("error");
+        const ahora = performance.now();
+        if (ahora - ultimoError > 2500) { ultimoError = ahora; if (++erroresEtapa >= 2) $("btn-pista").classList.add("llamativa"); }
+      } else if (clase === "status-ok" && !categoria.startsWith("completa-") && !mal) sonar("ok");
+    }
+    function verPista(texto) { const c = $("pista"); c.hidden = false; c.textContent = texto; }
+    function mostrarPista() {
+      if (!etapa) return;
+      const lista = etapa.pistas && etapa.pistas.length ? etapa.pistas : [etapa.nota];
+      const n = nivelPista[actual] || 0, k = n % lista.length;
+      nivelPista[actual] = n + 1;
+      verPista("Pista " + (k + 1) + " de " + lista.length + ": " + lista[k]);
+      $("btn-pista").classList.remove("llamativa");
+      $("btn-pista").textContent = lista.length > 1 ? "Otra pista" : "Pista";
+      erroresEtapa = 0; ultimaActividad = performance.now();
+    }
+    function reiniciarAyudas() {
+      $("pista").hidden = true; $("btn-pista").classList.remove("llamativa"); $("btn-pista").textContent = "Pista";
+      $("btn-siguiente").classList.remove("llamativa");
+      erroresEtapa = 0; fallosSeguidos = 0; ultimaActividad = performance.now();
+    }
+    // Una pinza (o un toque) que no ha tenido ningún efecto deja una onda naranja; tres seguidas, una ayuda
+    function intentarAgarre(x, y) {
+      const antes = cambiosJuego, ok = pDown(x, y);
+      if (ok) { onda(x, y, "ok"); sonar("agarre"); fallosSeguidos = 0; }
+      else if (cambiosJuego === antes) {
+        onda(x, y, "fallo");
+        if (++fallosSeguidos >= 3) {
+          fallosSeguidos = 0;
+          verPista(anillosPantalla.length ? "Los anillos azules marcan lo que puedes mover. " + (modo === "manos" ? "Acerca allí la pinza: cuando el círculo de tus dedos se ponga verde, júntalos." : "Toca justo dentro de un anillo y arrastra.")
+            : (modo === "manos" ? "Junta el pulgar y el índice justo encima de lo que quieras mover o tocar." : "Toca justo encima de lo que quieras mover o tocar."));
+        }
+      } else fallosSeguidos = 0;
+      return ok;
+    }
+    function onda(x, y, tipo) { efectos.push({ tipo, x, y, t: 0, dur: tipo === "ok" ? 0.35 : 0.5 }); }
+    function celebrar(i) {
+      efectos.push({ tipo: "rotulo", texto: "¡Etapa " + (i + 1) + " completada!", t: 0, dur: 1.8 });
+      if (MOV_REDUCIDO) return;
+      const W = escena.clientWidth, COL = ["#c2843a", "#4ade80", "#38bdf8", "#facc15", "#f87171", "#faf7f2"];
+      for (let k = 0; k < 90; k++) efectos.push({ tipo: "confeti", x: W * (0.2 + Math.random() * 0.6), y: escena.clientHeight * 0.32, vx: (Math.random() - 0.5) * 520, vy: -220 - Math.random() * 380, r: Math.random() * 6, vr: (Math.random() - 0.5) * 12, c: COL[k % COL.length], t: 0, dur: 1.6 + Math.random() * 0.5 });
+    }
+    function calcularAnillos() {
+      anillosPantalla = [];
+      if (!etapa || !etapa.agarres || !modo || captura || hechas[actual]) return;
+      if (document.querySelector(".panel:not([hidden])")) return;
+      let lista = [];
+      try { lista = etapa.agarres() || []; } catch (e) { lista = []; }
+      for (const p of lista) { v3.set(p[0], p[1], p[2] || 0); etapa.grupo.localToWorld(v3); anillosPantalla.push(aPantalla(v3.x, v3.y, v3.z)); }
+    }
+    let efectosPintados = false;
+    function pintarEfectos(dt) {
+      const W = escena.clientWidth, H = escena.clientHeight;
+      calcularAnillos();
+      if (!efectos.length && !anillosPantalla.length) { if (efectosPintados) { ctxE.clearRect(0, 0, W, H); efectosPintados = false; } return; }
+      efectosPintados = true; ctxE.clearRect(0, 0, W, H);
+      const t = performance.now() / 1000;
+      ctxE.lineCap = "round";
+      for (const a of anillosPantalla) {
+        const r = MOV_REDUCIDO ? 22 : 20 + 3 * Math.sin(t * 4);
+        ctxE.beginPath(); ctxE.arc(a.x, a.y, r, 0, Math.PI * 2);
+        ctxE.fillStyle = "rgba(56,189,248,.12)"; ctxE.fill();
+        ctxE.setLineDash([7, 6]); ctxE.lineDashOffset = MOV_REDUCIDO ? 0 : -t * 18; ctxE.lineWidth = 3; ctxE.strokeStyle = "rgba(56,189,248,.95)"; ctxE.stroke();
+        ctxE.setLineDash([]);
+      }
+      for (let i = efectos.length - 1; i >= 0; i--) {
+        const e = efectos[i]; e.t += dt; const f = Math.min(1, e.t / e.dur);
+        if (e.tipo === "ok" || e.tipo === "fallo") {
+          const r = MOV_REDUCIDO ? 26 : 14 + f * 30;
+          ctxE.globalAlpha = 1 - f; ctxE.lineWidth = 4; ctxE.strokeStyle = e.tipo === "ok" ? "#4ade80" : "#fb923c";
+          if (e.tipo === "fallo") ctxE.setLineDash([5, 6]);
+          ctxE.beginPath(); ctxE.arc(e.x, e.y, r, 0, Math.PI * 2); ctxE.stroke(); ctxE.setLineDash([]);
+        } else if (e.tipo === "confeti") {
+          e.vy += 900 * dt; e.x += e.vx * dt; e.y += e.vy * dt; e.r += e.vr * dt;
+          ctxE.globalAlpha = 1 - Math.max(0, (f - 0.7) / 0.3);
+          ctxE.save(); ctxE.translate(e.x, e.y); ctxE.rotate(e.r); ctxE.fillStyle = e.c; ctxE.fillRect(-5, -3, 10, 6); ctxE.restore();
+        } else if (e.tipo === "rotulo") {
+          ctxE.globalAlpha = f < 0.15 ? f / 0.15 : f > 0.75 ? (1 - f) / 0.25 : 1;
+          const fs = Math.round(Math.min(W / 14, 46));
+          ctxE.font = "800 " + fs + "px system-ui, sans-serif"; ctxE.textAlign = "center"; ctxE.textBaseline = "middle";
+          ctxE.lineWidth = 6; ctxE.strokeStyle = "rgba(28,25,23,.85)"; ctxE.strokeText(e.texto, W / 2, H * 0.42);
+          ctxE.fillStyle = "#4ade80"; ctxE.fillText(e.texto, W / 2, H * 0.42);
+        }
+        ctxE.globalAlpha = 1;
+        if (e.t >= e.dur) efectos.splice(i, 1);
+      }
+    }
+    // Si pasan 45 s sin ningún cambio en una etapa sin terminar, el botón «Pista» llama la atención
+    function revisarInactividad() {
+      if (!etapa || !modo || hechas[actual]) return;
+      const ahora = performance.now();
+      if (document.querySelector("[role=dialog]:not([hidden])")) { ultimaActividad = ahora; return; }
+      if (ahora - ultimaActividad > 45000) $("btn-pista").classList.add("llamativa");
     }
 
     // =====================================================================
@@ -957,6 +1111,8 @@
       const dpr = Math.min(window.devicePixelRatio, 2);
       lienzoManos.width = W * dpr; lienzoManos.height = H * dpr;
       ctxM.setTransform(dpr, 0, 0, dpr, 0, 0);
+      lienzoEf.width = W * dpr; lienzoEf.height = H * dpr;
+      ctxE.setTransform(dpr, 0, 0, dpr, 0, 0); efectosPintados = true;
     }
     window.addEventListener("resize", encuadrar);
     new ResizeObserver(encuadrar).observe($("hud"));
@@ -1088,6 +1244,8 @@
       construir();
       return {
         nombre: "Las velas de la carabela", grupo: g, marco: { ancho: 7.2, alto: 4.2, cy: 1.9 }, fondo: "gomera",
+        pistas: ["Haz pinza sobre la esfera naranja, en la esquina de la vela, y lleva la mano a la derecha hasta el final de la verga.", "Triángulo: base × altura : 2. Rectángulo: base × altura. Con la misma base y la misma altura, compara las dos áreas."],
+        agarres() { return fase === "vela" ? [[asa.position.x, asa.position.y, 0.4]] : []; },
         nota: "Agosto de 1492: la flota de Colón se detuvo en Gran Canaria y La Gomera. Allí se reparó la Pinta y una carabela cambió sus velas latinas (triangulares) por redondas.",
         entrar() {
           etiqueta("vela", "", () => [XM - B / 2 - 0.35, (YB + YT) / 2, 0.4]);
@@ -1184,6 +1342,8 @@
       function uvDe(x, y) { const h = rayo(x, y).intersectObject(lienzoM, false)[0]; return h && h.uv ? [h.uv.x * CW, (1 - h.uv.y) * CH] : null; }
       return {
         nombre: "La perspectiva del Renacimiento", grupo: g, marco: { ancho: 6.6, alto: 3.8, cy: 1.75 }, fondo: "florencia",
+        pistas: ["Haz pinza sobre el cuadro y mueve la mano: el punto naranja te sigue. Primero llévalo a la línea azul discontinua del horizonte.", "Después desplázalo a izquierda o derecha hasta que las líneas grises sigan los dos bordes rojos de la plaza."],
+        agarres() { return fase === "fuga" ? [[pf[0] / CW * W - W / 2, CY + H / 2 - pf[1] / CH * H, 0.1]] : []; },
         nota: "En el Renacimiento, los pintores aprendieron a dibujar la profundidad: las rectas que se alejan parecen juntarse en un punto de fuga situado en la línea del horizonte.",
         entrar() {
           etiqueta("punto de fuga", "geo", () => { const x = (fase === "fuga" ? pf[0] : FX) / CW * W - W / 2, y = CY + H / 2 - (fase === "fuga" ? pf[1] : HZ) / CH * H; return [x, y + 0.22, 0.1]; });
@@ -1275,6 +1435,7 @@
       poner(ANG0);
       return {
         nombre: "La ciudadela de Jaca", grupo: g, marco: { ancho: 6.6, alto: 4.6, cy: 0 }, fondo: "cenital",
+        pistas: ["Haz pinza junto a la muralla, no en el centro, y gira la mano alrededor del centro. Al soltar, se coloca el baluarte.", "Una vuelta son 360° y hay 5 baluartes: repártelos por igual. Si te equivocas, haz pinza en el centro para quitar el último."],
         nota: "Vista desde arriba. Las ciudadelas con baluartes en punta se diseñaron para resistir la artillería. La de Jaca (Huesca), del siglo XVI, tiene planta pentagonal.",
         entrar() {
           etiqueta("centro", "", () => [0, -0.25, 0.3]);
@@ -1366,6 +1527,8 @@
       function rayoDe(x, y) { const p = enPlano(x, y); return p; }
       return {
         nombre: "La expedición al meridiano", grupo: g, marco: { ancho: 7.2, alto: 4.5, cy: MCY }, fondo: "andes",
+        pistas: ["Haz pinza sobre una esfera naranja, la del rayo A o la del rayo B, y gira la mano alrededor de su punto.", "El rayo A debe marcar 62° y el B, 70°. Para medir, cuenta los tramos de 2 km de la escala que caben de A a la cumbre."],
+        agarres() { return fase === "angulos" ? [[asaA.position.x, asaA.position.y, 0.2], [asaB.position.x, asaB.position.y, 0.2]] : []; },
         nota: "Entre 1735 y 1744, cerca de Quito, una expedición midió un grado de meridiano con una cadena de triángulos. Participaron los marinos españoles Jorge Juan y Antonio de Ulloa.",
         entrar() {
           etiqueta("A", "geo", () => [A[0] - 0.2, A[1] - 0.25, 0.2]); etiqueta("B", "geo", () => [Bp[0] + 0.2, Bp[1] - 0.25, 0.2]);
@@ -1471,6 +1634,8 @@
       colocarPinon();
       return {
         nombre: "El ingenio de azúcar", grupo: g, marco: { ancho: 7.4, alto: 4.4, cy: 1.75 }, fondo: "canaveral",
+        pistas: ["Primero haz pinza sobre la compuerta de la acequia y súbela del todo para que el agua mueva la rueda.", "Después haz pinza sobre la rueda dentada pequeña y sube o baja la mano. Busca el número de dientes que cabe 4 veces en 40."],
+        agarres() { return fase === "agua" ? [[compuerta.position.x, compuerta.position.y, 0]] : fase === "engranaje" ? [[pinon.position.x, pinon.position.y, ZG + 0.1]] : []; },
         nota: "Siglo XVI: en Gran Canaria, Tenerife, La Palma y La Gomera hubo decenas de ingenios. La mayoría usaba la fuerza del agua. Modelo simplificado.",
         entrar() {
           etiqueta("compuerta", "", () => [RX + 0.05, RY + RR + 1.15 + apertura * 0.45, 0]);
@@ -1530,9 +1695,12 @@
       $("btn-anterior").disabled = actual <= 0;
     }
     function completar(i, mensaje) {
+      const nueva = !hechas[i];
       estado(mensaje, "status-ok", "completa-" + i);
-      if (!hechas[i]) { hechas[i] = true; try { localStorage.setItem(CLAVE, JSON.stringify(hechas)); } catch (e) {} }
+      if (nueva) { hechas[i] = true; try { localStorage.setItem(CLAVE, JSON.stringify(hechas)); } catch (e) {} }
       pintarProgreso();
+      $("pista").hidden = true; $("btn-pista").classList.remove("llamativa");
+      if (nueva) { sonar("fin"); celebrar(i); if (i < 4) $("btn-siguiente").classList.add("llamativa"); }
     }
     function irA(i, apilar = true) {
       if (!disponible(i) || i === actual) return;
@@ -1545,6 +1713,7 @@
       alternativos.replaceChildren();
       etapa.alternativos();
       categoriaPrevia = "";
+      reiniciarAyudas();
       marco = etapa.marco;
       DEC.poner(etapa);
       etapa.entrar();
@@ -1559,13 +1728,12 @@
     // =====================================================================
     // 9. PUNTERO COMÚN: pinza o dedo/ratón
     // =====================================================================
-    let captura = false;
     function pDown(x, y) { captura = !!(etapa && etapa.down(x, y)); return captura; }
     function pMove(x, y) { if (!etapa) return; if (captura) etapa.move(x, y); else if (etapa.hover) etapa.hover(x, y); }
     function pUp(x, y) { if (captura && etapa) etapa.up(x, y); captura = false; }
 
     let punteroId = null;
-    lienzo3d.addEventListener("pointerdown", (e) => { if (pDown(e.clientX, e.clientY)) { punteroId = e.pointerId; lienzo3d.setPointerCapture(e.pointerId); } });
+    lienzo3d.addEventListener("pointerdown", (e) => { if (intentarAgarre(e.clientX, e.clientY)) { punteroId = e.pointerId; lienzo3d.setPointerCapture(e.pointerId); } });
     lienzo3d.addEventListener("pointermove", (e) => { if (punteroId === null || e.pointerId === punteroId) pMove(e.clientX, e.clientY); });
     const soltar = (e) => { if (e.pointerId === punteroId) { pUp(e.clientX, e.clientY); punteroId = null; } };
     lienzo3d.addEventListener("pointerup", soltar);
@@ -1650,7 +1818,7 @@
         empezarTactil("El detector de manos no funciona en este dispositivo. Puedes seguir con el dedo o con los controles.");
       } finally { recreando = false; }
     }
-    function dibujarMano(pts, cerrada, activa) {
+    function dibujarMano(pts, cerrada, activa, cerca = false) {
       ctxM.lineCap = "round"; ctxM.lineWidth = 7;
       ctxM.strokeStyle = activa ? "rgba(74,222,128,.95)" : "rgba(194,132,58,.95)";
       ctxM.beginPath();
@@ -1659,8 +1827,9 @@
       ctxM.fillStyle = "#faf7f2";
       for (const p of pts) { ctxM.beginPath(); ctxM.arc(p.x, p.y, 3.5, 0, Math.PI * 2); ctxM.fill(); }
       const m = { x: (pts[4].x + pts[8].x) / 2, y: (pts[4].y + pts[8].y) / 2 };
-      ctxM.beginPath(); ctxM.arc(m.x, m.y, 14, 0, Math.PI * 2); ctxM.lineWidth = 3; ctxM.strokeStyle = "#38bdf8"; ctxM.stroke();
-      if (cerrada) { ctxM.fillStyle = "rgba(56,189,248,.6)"; ctxM.fill(); }
+      // El círculo de la pinza se pone verde cuando está sobre algo que se puede agarrar
+      ctxM.beginPath(); ctxM.arc(m.x, m.y, cerca ? 17 : 14, 0, Math.PI * 2); ctxM.lineWidth = cerca ? 4 : 3; ctxM.strokeStyle = cerca ? "#4ade80" : "#38bdf8"; ctxM.stroke();
+      if (cerrada) { ctxM.fillStyle = cerca ? "rgba(74,222,128,.6)" : "rgba(56,189,248,.6)"; ctxM.fill(); }
     }
     function procesarManos() {
       if (!detector || video.readyState < 2 || video.currentTime === lastVideoTime) return;
@@ -1683,12 +1852,13 @@
         const medio = { x: (pts[4].x + pts[8].x) / 2, y: (pts[4].y + pts[8].y) / 2 };
         const s = suav[lado] || medio; suav[lado] = { x: s.x + (medio.x - s.x) * 0.5, y: s.y + (medio.y - s.y) * 0.5 };
         const pm = suav[lado];
-        if (!agarre && pinza[lado] && !antes && pDown(pm.x, pm.y)) agarre = { lado, perdidas: 0 };
+        if (!agarre && pinza[lado] && !antes && intentarAgarre(pm.x, pm.y)) agarre = { lado, perdidas: 0 };
         if (agarre && agarre.lado === lado) {
           agarre.perdidas = 0;
           if (pinza[lado]) pMove(pm.x, pm.y); else { pUp(pm.x, pm.y); agarre = null; }
         } else if (!agarre && !primeraLibre) primeraLibre = pm;
-        dibujarMano(pts, pinza[lado], agarre && agarre.lado === lado);
+        const cerca = !agarre && anillosPantalla.some((a) => Math.hypot(a.x - pm.x, a.y - pm.y) < 42);
+        dibujarMano(pts, pinza[lado], agarre && agarre.lado === lado, cerca);
       });
       if (!agarre && primeraLibre) pMove(primeraLibre.x, primeraLibre.y);
       if (agarre && !vistas.has(agarre.lado) && ++agarre.perdidas > 8) { pUp(0, 0); agarre = null; }
@@ -1719,6 +1889,8 @@
       if (etapa) { etapa.tick(dt); if (cuadros++ % 30 === 0) prepararSombras(etapa.grupo); }
       actualizarEtiquetas();
       renderer.render(scene, camera);
+      pintarEfectos(dt);
+      if (cuadros % 60 === 0) revisarInactividad();
       fpsN++;
       const ahora = performance.now();
       if (ahora - fpsT0 > 2000) {
@@ -1757,6 +1929,14 @@
       $("cuerpo-info").innerHTML = INFO[actual];   // contenido estático propio, sin datos externos
       abrirPanel("panel-info");
     });
+    $("btn-pista").addEventListener("click", mostrarPista);
+    function pintarSonido() { $("btn-sonido").setAttribute("aria-pressed", String(sonidoActivo)); }
+    $("btn-sonido").addEventListener("click", () => {
+      sonidoActivo = !sonidoActivo; pintarSonido();
+      try { localStorage.setItem(CLAVE_SONIDO, sonidoActivo ? "si" : "no"); } catch (e) {}
+      if (sonidoActivo) { prepararAudio(); setTimeout(() => sonar("ok"), 30); }
+    });
+    pintarSonido();
     function mostrarAlternativo(v) { alternativos.hidden = !v; $("btn-alternativo").setAttribute("aria-pressed", String(v)); }
     $("btn-alternativo").addEventListener("click", () => mostrarAlternativo(alternativos.hidden));
     $("btn-imagen").addEventListener("click", (e) => {

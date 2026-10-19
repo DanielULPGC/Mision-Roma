@@ -1,4 +1,4 @@
-# Las manos que construyeron la historia · v3.7 (edición para GitHub Pages)
+# Las manos que construyeron la historia · v3.8 (edición para GitHub Pages)
 
 Proyecto «Las manos que construyeron la historia». Geometría, patrimonio histórico y realidad aumentada en Educación Primaria (5.º y 6.º).
 
@@ -111,6 +111,13 @@ Todas las etapas se pueden hacer de tres formas:
 
 ## Para el profesorado
 
+- **Ayudas de juego (v3.8).** Son comunes a los cinco capítulos:
+  - **Pista.** Cada etapa tiene dos pistas graduadas: la primera dice qué hacer y dónde; la segunda orienta el razonamiento sin dar la respuesta hecha. El botón se ilumina tras dos errores o tras 45 segundos sin avances.
+  - **Anillos de agarre.** Unos anillos azules marcan lo que se puede mover mientras la etapa no está terminada. Con la cámara, el círculo de la pinza se pone verde cuando está sobre uno de ellos. En las etapas donde elegir el lugar es la propia tarea (el valle, el centro del arco, el borde del bifaz) no se muestran, para no dar la solución.
+  - **Respuesta a la pinza.** Una onda verde confirma que se ha agarrado algo; una onda naranja discontinua indica que la pinza no ha tocado nada. Tras tres pinzas fallidas seguidas aparece una ayuda.
+  - **Celebración.** Al completar una etapa por primera vez aparece un rótulo, confeti (no se muestra si el sistema pide reducir el movimiento) y el botón «Siguiente etapa» se ilumina.
+  - **Sonido.** Sonidos breves y suaves, sintetizados en el navegador sin archivos: acierto, error, agarre y fanfarria final. El botón «Sonido» del panel superior los activa o desactiva, y la elección se recuerda en el navegador. Ningún mensaje depende solo del sonido.
+  - **Faro de Maspalomas.** Los haces y los segundos por vuelta se controlan ahora por separado: la linterna cambia los haces y la esfera de la relojería, el tiempo. Antes, un mismo gesto cambiaba las dos cosas.
 - **Modo docente.** Añade `?docente` a la dirección (por ejemplo, `http://localhost:8000/?docente`) para abrir cualquier etapa sin completar las anteriores.
 - **Progreso.** Las etapas completadas se recuerdan solo en ese navegador. Para reiniciar, borra los datos del sitio en el navegador.
 - **«Saber más».** Cada etapa tiene un panel con la explicación, preguntas y la fuente.
@@ -230,6 +237,7 @@ Su uso con menores debe valorarse con el delegado o la delegada de protección d
 - Encuadre comprobado en móvil vertical, móvil horizontal y tableta.
 - Sin peticiones externas salvo el modelo, cuando falta y está permitido.
 - La cámara se apaga cuando el detector no arranca.
+- v3.8: ayudas de juego comunes. Probadas pistas, aviso tras dos errores, celebración, anillos, ayuda tras tres pinzas fallidas, sonido desactivable y nuevo control del faro. Regresión de los cinco capítulos sin errores, axe sin violaciones y HTML válido.
 - v3.7: capítulos de la Edad Moderna y de la Edad Contemporánea. Recorridos completos de sus diez etapas, accesibilidad sin violaciones (portada, etapas, «Saber más» y panel final), HTML válido y sin peticiones externas. Regresión de los tres capítulos anteriores sin errores.
 - v3.6.1: con el modelo de manos incluido, el diagnóstico confirma su huella. El detector arranca con una cámara simulada (GPU) sin peticiones externas; la detección de una mano real queda pendiente de probar en el aula.
 - v3.6: pared de la cueva integrada en la roca; pintadera con excisión y forma rómbica; comprobación de la huella del modelo en el diagnóstico; fecha del poblamiento de Canarias precisada (siglos II-III d. C., en debate). Regresión completa sin errores.
