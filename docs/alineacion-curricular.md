@@ -1,0 +1,76 @@
+# Alineación curricular · «Las manos que construyeron la historia»
+
+Marco: Decreto 211/2022, de 10 de noviembre, por el que se establece la ordenación y el currículo de la Educación Primaria en la Comunidad Autónoma de Canarias (BOC n.º 231, de 23 de noviembre de 2022, anuncio 3533).
+
+**Fuente de los textos citados.** Las áreas se citan por los archivos del Anexo 2 que publica la Consejería de Educación en su página «Ordenación de la Educación Primaria»:
+- Conocimiento del Medio Natural, Social y Cultural: `anexo_2__curriculo-conocimiento_medio.pdf`, carpeta `borrador_curriculo_2023`.
+- Matemáticas: `curriculo-educacion-PRIMARIA_Matematicas.pdf`, carpeta `borrador_curriculo_2022`.
+
+La Consejería los presenta como el Anexo 2 del decreto, pero los nombres de las carpetas dicen «borrador». Antes de usar esta matriz en una programación o en un documento institucional, conviene cotejar cada código con el texto oficial del BOC.
+
+Fecha de consulta: 19-10-2026. Abreviaturas: CM = Conocimiento del Medio Natural, Social y Cultural; MAT = Matemáticas; CE = criterio de evaluación.
+
+## 1. Hallazgo principal: los ciclos
+
+Sociedades y territorios, bloque 2, «Sociedades en el tiempo», reparte las épocas así:
+
+| Ciclo | Saber básico de CM | Épocas |
+|---|---|---|
+| Segundo (3.º y 4.º) | III.2.3, III.2.4 y III.2.5 | Prehistoria y Edad Antigua |
+| Tercero (5.º y 6.º) | III.2.1 y III.2.4 | Edad Media, Edad Moderna y Edad Contemporánea, y «la sociedad indígena canaria y su modo de vida y la conquista de las islas Canarias» |
+
+**Consecuencias para el recurso, que se dirige a 5.º y 6.º:**
+- La etapa de la pintadera y el capítulo de la Edad Media encajan de lleno en el tercer ciclo.
+- Las cuatro primeras etapas de la Prehistoria y las cuatro primeras de Misión Roma desarrollan saberes de Historia del segundo ciclo. En 5.º y 6.º funcionan como activación de conocimientos previos y como contexto para la geometría y la medida, que sí son de tercer ciclo.
+- La etapa 5 de Roma (la cantonera) se refiere a la gestión del agua en Canarias en época moderna y contemporánea, así que se acerca al tercer ciclo.
+- Alternativa: usar los capítulos de Prehistoria y Edad Antigua en 3.º y 4.º, adaptando la parte matemática.
+
+## 2. Matriz por capítulo y etapa
+
+### Prehistoria · «Las primeras manos»
+
+| Etapa | CM (ciclo) | MAT, tercer ciclo (saberes) | Evidencia observable en el recurso |
+|---|---|---|---|
+| P1 Tallar un bifaz | III.2.3 y III.2.5 (2.º): técnica en la Prehistoria | III.3.1 simetrías; III.1.3 vocabulario (simetrías) | Llega a simetría ≥ 95 % y forma ≥ 90 %; explica qué es un eje de simetría |
+| P2 La mano en la pared | III.2.5 (2.º): expresiones artísticas | II.1.2 unidades de longitud; II.2.6 estimación por comparación | Elige 20 cm contando cuadros de 5 cm (4 × 5) |
+| P3 Modelar una vasija | III.2.3 (2.º): avances técnicos | II.1.2 capacidad; II.2.7 volumen (cuerpos de revolución, por aproximación); III.3.1 traslación (friso) | Ajusta el perfil al modelo; describe el friso como una traslación |
+| P4 Orientar el dolmen | III.2.5 (2.º) | II.2.10 el ángulo como giro; III.2.1 puntos cardinales | Orienta el corredor a 90° (este) |
+| P5 La pintadera canaria | III.2.1 (3.º): sociedad indígena canaria; III.2.5 (3.º): patrimonio de Canarias; CE 7.2; CE 5.3 | III.3.1 giros y simetrías; III.1.3 figuras regulares y simetrías; II.2.7 y II.2.8 áreas (círculo, triángulo, rectángulo, rombo); IV.1.2 patrones | Relaciona forma y orden de rotación; explica el reflejo y el negativo de la impresión |
+
+### Edad Antigua · «Misión Roma»
+
+| Etapa | CM (ciclo) | MAT, tercer ciclo (saberes) | Evidencia observable |
+|---|---|---|---|
+| E1 Leer el terreno | III.1.2 (2.º): mapas y escalas; III.2.3 (2.º) | I.4.2 escalas | Identifica el valle en el perfil con exageración vertical |
+| E2 Nivelar el canal | III.2.3 (2.º): avances técnicos | I.1.6 números negativos; I.1.7 porcentajes | Iguala las dos pendientes en −8 % |
+| E3 Construir el pilar | III.2.5 (2.º): patrimonio romano | II.2.7 volumen del prisma; III.1.3 radio y diámetro | 8 sillares de 0,40 m (3,20 m); luz del arco = 2 × radio |
+| E4 Cómo lo hacían los romanos | III.2.2 (2.º): fuentes escritas (Vitruvio) | I.2.11 porcentajes; II.2.2 error y precisión | Nivela el corobate; interpreta una pendiente del 0,3 % |
+| E5 El agua en Canarias | III.2.5 (3.º): patrimonio de Canarias | I.1.7 fracciones y porcentajes (½, ¼; 50 %, 25 %); I.4.1 proporcionalidad | Reparte 1/2, 1/4 y 1/4 con aberturas proporcionales |
+
+### Edad Media · «El compás y la piedra»
+
+| Etapa | CM, tercer ciclo | MAT, tercer ciclo (saberes) | Evidencia observable |
+|---|---|---|---|
+| M1 Medir con el astrolabio | III.2.1 (Edad Media); III.2.4; CE 7.1 | II.2.10 ángulos; ángulos complementarios | Mide 50° y deduce 40° |
+| M2 Del medio punto al arco apuntado | III.2.4 (arte medieval); CE 7.1 | III.4.3 conjeturas con compás; III.1.3 radio y diámetro | Traza un arco de medio punto y uno apuntado equilátero |
+| M3 Trazar el rosetón | III.2.4 | III.1.2, III.1.3 y III.1.4 construcción de figuras; III.4.3 compás | Marca 6 puntos con el radio (hexágono regular) |
+| M4 La lacería de la Alhambra | III.2.4; III.2.5 patrimonio | III.3.1 giros; II.2.10 ángulos | Gira 45° y forma estrellas de 8 puntas |
+| M5 El portulano y Canarias | III.2.1 (conquista de Canarias); CE 7.2 | III.2.1 rumbos, puntos cardinales y escalas; I.4.2 escalas | Encuentra el rumbo de 232° y estima unos 1900 km |
+
+Toda la colección se apoya también en el saber MAT III.1.4, que cita expresamente la realidad aumentada como herramienta para explorar propiedades geométricas.
+
+## 3. Instrumentos de evaluación propuestos
+
+El recurso no registra datos del alumnado: solo guarda en el navegador qué etapas están completas. Por eso la evaluación se apoya en la observación y en productos del aula:
+
+1. **Lista de control por etapa.** Usa la columna «Evidencia observable», marcando «logrado», «con ayuda» o «no logrado».
+2. **Explicación oral o escrita** de cada etapa (fase «¿Por qué?»), valorada con rúbrica de cuatro niveles en dos dimensiones:
+   - concepto geométrico o de medida (precisión del vocabulario: eje, giro, orden, área, escala);
+   - contexto histórico (época, fuente, patrimonio, cautela ante lo que no se sabe).
+3. **Producto final por capítulo**, por ejemplo una ficha de patrimonio de una pintadera del catálogo de El Museo Canario. Se evalúa con el CE 5.3 (valoración del patrimonio de Canarias) y el CE 7.2.
+
+## 4. Pendiente
+
+- Cotejar los códigos con la versión oficial del BOC.
+- Concretar la situación de aprendizaje según la normativa organizativa vigente en Canarias.
+- Revisión por el profesorado de las asignaturas implicadas.
