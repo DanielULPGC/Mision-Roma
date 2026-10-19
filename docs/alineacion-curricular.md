@@ -57,6 +57,28 @@ Sociedades y territorios, bloque 2, «Sociedades en el tiempo», reparte las ép
 | M4 La lacería de la Alhambra | III.2.4; III.2.5 patrimonio | III.3.1 giros; II.2.10 ángulos | Gira 45° y forma estrellas de 8 puntas |
 | M5 El portulano y Canarias | III.2.1 (conquista de Canarias); CE 7.2 | III.2.1 rumbos, puntos cardinales y escalas; I.4.2 escalas | Encuentra el rumbo de 232° y estima unos 1900 km |
 
+### Edad Moderna · «Nuevos horizontes»
+
+| Etapa | CM, tercer ciclo | MAT, tercer ciclo (saberes) | Evidencia observable |
+|---|---|---|---|
+| N1 Las velas de la carabela | III.2.1 (Edad Moderna; Canarias en la ruta atlántica); CE 7.1 | II.2.7 y II.2.8 áreas del triángulo y del rectángulo | Convierte la vela y explica que el triángulo es la mitad (28 m² frente a 56 m²) |
+| N2 La perspectiva del Renacimiento | III.2.4 (arte moderno) | III.3.2 semejanza; III.2.2 rectas paralelas | Sitúa el punto de fuga en el horizonte; explica el tamaño aparente |
+| N3 La ciudadela de Jaca | III.2.4; III.2.5 patrimonio | III.1.3 polígonos regulares; II.2.10 ángulos | Reparte 72°; calcula el ángulo interior de 108° |
+| N4 La expedición al meridiano | III.2.1 (ciencia en el siglo XVIII); CE 7.1 | III.3.2 semejanza; I.4.2 escalas; II.2.10 ángulos | Orienta 62° y 70°; estima unos 13 km con la escala |
+| N5 El ingenio de azúcar | III.2.1; III.2.5 patrimonio de Canarias; CE 7.2; CE 5.3 | I.4.1 proporcionalidad; I.2.1 estructura multiplicativa | Elige 10 dientes: 40 : 10 = 4 vueltas |
+
+### Edad Contemporánea · «Hierro, luz y viento»
+
+| Etapa | CM, tercer ciclo | MAT, tercer ciclo (saberes) | Evidencia observable |
+|---|---|---|---|
+| C1 El metro | III.2.1 (Edad Contemporánea); CE 7.1 | II.1.2 unidades y equivalencias; I.2.6 multiplicación con decimales | Mide con varas y metros; calcula 3 × 0,835905 m ≈ 2,51 m |
+| C2 El Puente de Vizcaya | III.2.4; III.2.5 patrimonio | III.1.3 y III.1.4 propiedades de las figuras | Explica por qué el triángulo es rígido; cuenta 8 triángulos |
+| C3 El faro de Maspalomas | III.2.5 patrimonio de Canarias; CE 5.3 | II.2.10 el ángulo como giro; II.1.2 tiempo | Ajusta T : n = 5 s; calcula 360° : 3 = 120° |
+| C4 La población de Canarias | III.1.4 demografía y migraciones en Canarias; CE 8.1 | V.1.1 y V.1.5 gráficos estadísticos; I.4.2 escala | Representa 3 censos; compara (casi × 5) |
+| C5 Gorona del Viento | III.4.6 isla sostenible; I.3.2 energías renovables y modelo de isla sostenible; CE 6.1 | I.1.7 fracciones y porcentajes; IV.3.1 igualdades | Equilibra 5 MW en tres momentos; calcula el 20 % |
+
+Con los cinco capítulos, el recurso cubre el saber III.2.1 completo del tercer ciclo (Edad Media, Moderna y Contemporánea, y la sociedad indígena canaria). La Prehistoria y la Edad Antigua quedan como antecedente.
+
 Toda la colección se apoya también en el saber MAT III.1.4, que cita expresamente la realidad aumentada como herramienta para explorar propiedades geométricas.
 
 ## 3. Instrumentos de evaluación propuestos

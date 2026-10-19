@@ -201,9 +201,10 @@
         <li><strong>Lacería:</strong> giraste piezas 45° para formar estrellas de ocho puntas y un teselado.</li>
         <li><strong>Canarias:</strong> buscaste el rumbo de Mallorca a Lanzarote y calculaste la distancia con una escala.</li>
       </ol>
-      <p>Con un compás, una regla y mucha paciencia, las manos medievales trazaron catedrales, palacios y mapas. El siguiente capítulo de la línea del tiempo, la Edad Moderna, está en preparación.</p>
+      <p>Con un compás, una regla y mucha paciencia, las manos medievales trazaron catedrales, palacios y mapas. En la Edad Moderna, las manos cruzarán el océano.</p>
       <div class="botones">
-        <button type="button" class="principal" id="btn-fin-linea">← Volver a la línea del tiempo</button>
+        <button type="button" class="principal" id="btn-ir-moderna">Continuar en la Edad Moderna: Nuevos horizontes →</button>
+        <button type="button" id="btn-fin-linea">← Volver a la línea del tiempo</button>
         <button type="button" data-cerrar>Volver a la obra</button>
       </div>
     </div>
@@ -699,6 +700,116 @@
           const az = prng(121);
           for (let i = 0; i < 7; i++) velero(c, W * (0.08 + i * 0.13 + az() * 0.04), H * (0.84 + az() * 0.06), (60 + az() * 50) * k, "#5a3c26", "#f1e8d6");
           bruma(c, H * 0.9, 0xcfd6d6, 1);
+        },
+        // La Gomera (1492): bahía de San Sebastián, acantilados, la Torre del Conde y carabelas fondeadas
+        gomera(c) {
+          cielo(c, [[0, "#5f97c8"], [0.55, "#bcd3e0"], [1, "#e4e2d6"]]);
+          nubes(c, 131, 8, H * 0.08, H * 0.36, 0xffffff, 0.7);
+          sierra(c, { base: H * 0.66, amp: 180 * k, col: "#7f8a74", sem: 133, esc: 1.8, oct: 6, luz: 0xd8dcb8, picudo: 1.1 });
+          const risco = sierra(c, { base: H * 0.76, amp: 110 * k, col: "#8c6f58", sem: 137, esc: 2.4, luz: 0xe0b994 });
+          c.fillStyle = "#3f7aa0"; c.fillRect(0, H * 0.79, W, H * 0.21); banda(c, H * 0.79, H * 0.85, 0xd2e2ea, 0.6, 0);
+          ciudad(c, W * 0.36, W * 0.62, H * 0.785, 24 * k, 139, "#f0ebe0", "#c8bfae", "#9a5a3a");
+          torre(c, W * 0.47, H * 0.785, 46 * k, 96 * k, "#d9c8a8", "#a8946f", true);
+          const az = prng(141);
+          for (let i = 0; i < 3; i++) velero(c, W * (0.18 + i * 0.25 + az() * 0.05), H * (0.86 + az() * 0.04), (90 + az() * 30) * k, "#5a3c26", "#efe6d2");
+          for (let i = 0; i < 6; i++) { const x = az() * W; palmera(c, x, risco(x) + 30 * k, (60 + az() * 30) * k, "#4f5a34"); }
+          bruma(c, H * 0.9, 0xd8dcd8, 1);
+        },
+        // Florencia en el Renacimiento: tejados, la gran cúpula y colinas de cipreses
+        florencia(c) {
+          cielo(c, [[0, "#6c9cc8"], [0.55, "#c9d8e0"], [1, "#ece2cc"]]);
+          nubes(c, 151, 7, H * 0.08, H * 0.34, 0xffffff, 0.6);
+          const col = sierra(c, { base: H * 0.74, amp: 90 * k, col: "#8d9467", sem: 153, esc: 2.2, luz: 0xd8d6a2 });
+          const az = prng(157);
+          for (let i = 0; i < 40; i++) { const x = az() * W, s = (24 + az() * 18) * k; c.fillStyle = "rgba(52,70,42,.9)"; c.beginPath(); c.ellipse(x, col(x) + 10 * k - s * 0.6, s * 0.14, s * 0.6, 0, 0, Math.PI * 2); c.fill(); }
+          ciudad(c, 0, W, H * 0.84, 30 * k, 159, "#e6d3b0", "#b99e78", "#b0603c");
+          const dx = W * 0.5, dy = H * 0.7, R = 120 * k;
+          c.fillStyle = "#e9dcc2"; c.fillRect(dx - R * 1.05, dy, R * 2.1, 70 * k);
+          const gr = c.createLinearGradient(dx - R, 0, dx + R, 0); gr.addColorStop(0, "#c46a44"); gr.addColorStop(0.5, "#d98a5c"); gr.addColorStop(1, "#9c4e30");
+          c.fillStyle = gr; c.beginPath(); c.moveTo(dx - R, dy); c.quadraticCurveTo(dx - R * 0.95, dy - R * 1.25, dx, dy - R * 1.35); c.quadraticCurveTo(dx + R * 0.95, dy - R * 1.25, dx + R, dy); c.closePath(); c.fill();
+          c.strokeStyle = "rgba(255,255,255,.75)"; c.lineWidth = 3 * k; for (const f of [-0.55, 0, 0.55]) { c.beginPath(); c.moveTo(dx + f * R, dy); c.quadraticCurveTo(dx + f * R * 0.8, dy - R * 1.1, dx, dy - R * 1.35); c.stroke(); }
+          c.fillStyle = "#f2ead8"; c.fillRect(dx - 12 * k, dy - R * 1.35 - 34 * k, 24 * k, 34 * k);
+          torre(c, W * 0.62, H * 0.84, 30 * k, 200 * k, "#efe4cc", "#c2ad86", false);
+          bruma(c, H * 0.86, 0xe4dac4, 1);
+        },
+        // Los Andes cerca de Quito (s. XVIII): volcanes nevados y el valle
+        andes(c) {
+          cielo(c, [[0, "#5a8fc4"], [0.55, "#b8cfe0"], [1, "#e2e2d6"]]);
+          nubes(c, 161, 8, H * 0.1, H * 0.4, 0xffffff, 0.65);
+          for (const [x, h, w] of [[0.22, 300, 260], [0.7, 360, 300]]) {
+            const cx = W * x, cy = H * 0.72; c.fillStyle = "#7c8496"; c.beginPath(); c.moveTo(cx - w * k, cy); c.lineTo(cx - 30 * k, cy - h * k); c.lineTo(cx + 30 * k, cy - h * k); c.lineTo(cx + w * k, cy); c.fill();
+            c.fillStyle = "#f4f6f8"; c.beginPath(); c.moveTo(cx - 30 * k, cy - h * k); c.lineTo(cx + 30 * k, cy - h * k); c.lineTo(cx + 95 * k, cy - h * k * 0.62); c.lineTo(cx + 40 * k, cy - h * k * 0.66); c.lineTo(cx, cy - h * k * 0.6); c.lineTo(cx - 50 * k, cy - h * k * 0.66); c.lineTo(cx - 95 * k, cy - h * k * 0.62); c.fill();
+          }
+          const valle = sierra(c, { base: H * 0.82, amp: 70 * k, col: "#8f9663", sem: 163, esc: 3, luz: 0xd8d3a0 });
+          const az = prng(167);
+          for (let i = 0; i < 10; i++) { const x0 = az() * W, w = (100 + az() * 200) * k; c.fillStyle = ["rgba(200,180,110,.7)", "rgba(150,160,90,.7)"][i % 2]; c.beginPath(); c.ellipse(x0, valle(x0) + 40 * k, w, 12 * k, 0, 0, Math.PI * 2); c.fill(); }
+          bruma(c, H * 0.86, 0xd8d6c4, 1);
+        },
+        // Gran Canaria (s. XVI): cañaveral, acequia y montañas, con la casa del ingenio
+        canaveral(c) {
+          cielo(c, [[0, "#5e98c8"], [0.6, "#bad2e0"], [1, "#e6dcc8"]]);
+          nubes(c, 171, 7, H * 0.1, H * 0.36);
+          sierra(c, { base: H * 0.64, amp: 200 * k, col: "#8a7466", sem: 173, esc: 1.7, oct: 6, luz: 0xe2bc98, picudo: 1.2 });
+          const loma = sierra(c, { base: H * 0.78, amp: 60 * k, col: "#7f8a50", sem: 175, esc: 3 });
+          const az = prng(177);
+          for (let y = H * 0.8; y < H; y += 9 * k) { c.strokeStyle = mezcla(0x5f8a3a, 0x9ab45a, az()); c.lineWidth = 6 * k; c.beginPath(); for (let x = 0; x <= W; x += 30 * k) c.lineTo(x, y - 14 * k * Math.abs(Math.sin(x * 0.02 + y))); c.stroke(); }
+          casa(c, W * 0.66, H * 0.8, 150 * k, 70 * k, "#efe6d4", "#c8bba0", "#9a5a3a");
+          c.strokeStyle = "rgba(120,170,200,.9)"; c.lineWidth = 6 * k; c.beginPath(); c.moveTo(W * 0.2, loma(W * 0.2) + 6 * k); c.lineTo(W * 0.66, H * 0.74); c.stroke();
+          for (let i = 0; i < 8; i++) { const x = az() * W; palmera(c, x, loma(x) + 20 * k, (60 + az() * 40) * k, "#45542e"); }
+          bruma(c, H * 0.92, 0xd9d4bc, 1);
+        },
+        // Taller del siglo XIX: pared de madera, estantes y una ventana
+        taller(c) {
+          const gr = c.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, "#5a4632"); gr.addColorStop(1, "#7a6248"); c.fillStyle = gr; c.fillRect(0, 0, W, H);
+          for (let x = 0; x < W; x += 70 * k) { c.fillStyle = "rgba(0,0,0,.12)"; c.fillRect(x, 0, 3 * k, H); }
+          c.fillStyle = "#e9e2cc"; c.fillRect(W * 0.62, H * 0.18, W * 0.2, H * 0.36); halo(c, W * 0.72, H * 0.36, 380 * k, 0xfff2d0, 0.35);
+          c.strokeStyle = "#4a3624"; c.lineWidth = 10 * k; c.strokeRect(W * 0.62, H * 0.18, W * 0.2, H * 0.36); c.beginPath(); c.moveTo(W * 0.72, H * 0.18); c.lineTo(W * 0.72, H * 0.54); c.moveTo(W * 0.62, H * 0.36); c.lineTo(W * 0.82, H * 0.36); c.stroke();
+          for (const y of [0.3, 0.5]) { c.fillStyle = "#3e2e1e"; c.fillRect(W * 0.08, H * y, W * 0.38, 12 * k); const az = prng(181 + y * 10); for (let i = 0; i < 9; i++) { c.fillStyle = mezcla(0x8a6a4a, 0xc9b28a, az()); c.fillRect(W * (0.1 + i * 0.038), H * y - (40 + az() * 50) * k, 26 * k, (40 + az() * 50) * k); } }
+          texturaRoca(c, 0, 0, W, H, 0, 0.18);
+          bruma(c, H * 0.9, 0x6a5440, 1);
+        },
+        // Ría del Nervión (1893): agua, laderas, chimeneas de fábricas
+        ria(c) {
+          cielo(c, [[0, "#7e9cb8"], [0.6, "#c4ced4"], [1, "#d9d6cc"]]);
+          nubes(c, 191, 9, H * 0.08, H * 0.4, 0xeef0f2, 0.8);
+          const lad = sierra(c, { base: H * 0.72, amp: 120 * k, col: "#6f8160", sem: 193, esc: 2.2, luz: 0xc8d0a8 });
+          ciudad(c, 0, W * 0.4, H * 0.78, 30 * k, 195, "#e2dcd0", "#b4ab9a", "#8f4a34");
+          ciudad(c, W * 0.6, W, H * 0.78, 30 * k, 197, "#e2dcd0", "#b4ab9a", "#8f4a34");
+          const az = prng(199);
+          for (let i = 0; i < 6; i++) { const x = W * (0.05 + az() * 0.9); c.fillStyle = "#6e5a4c"; c.fillRect(x, H * 0.78 - 140 * k, 16 * k, 140 * k); for (let j = 0; j < 5; j++) halo(c, x + 8 * k + j * 14 * k, H * 0.78 - 160 * k - j * 26 * k, (34 + j * 14) * k, 0xb8b8b4, 0.16); }
+          c.fillStyle = "#5f7d8c"; c.fillRect(0, H * 0.8, W, H * 0.2); banda(c, H * 0.8, H * 0.86, 0xc8d4da, 0.5, 0);
+          bruma(c, H * 0.9, 0xcfd2cc, 1);
+        },
+        // Maspalomas (Gran Canaria): dunas, palmeral, mar y cielo despejado
+        maspalomas(c) {
+          cielo(c, [[0, "#4f8fc8"], [0.6, "#a9cbe2"], [1, "#e8e2d0"]]);
+          nubes(c, 201, 5, H * 0.08, H * 0.3, 0xffffff, 0.6);
+          c.fillStyle = "#3a78a8"; c.fillRect(0, H * 0.7, W, H * 0.3); banda(c, H * 0.7, H * 0.76, 0xd2e2ea, 0.6, 0);
+          const az = prng(203);
+          for (let i = 0; i < 7; i++) { const x = W * (i / 6), w = (220 + az() * 160) * k, h = (60 + az() * 50) * k, y = H * (0.8 + az() * 0.06); const gr = c.createLinearGradient(x - w, y, x + w, y - h); gr.addColorStop(0, "#d9b47a"); gr.addColorStop(0.6, "#f0d9a4"); gr.addColorStop(1, "#c79a5e"); c.fillStyle = gr; c.beginPath(); c.moveTo(x - w, y + 20 * k); c.quadraticCurveTo(x - w * 0.2, y - h, x + w * 0.3, y - h * 0.8); c.quadraticCurveTo(x + w * 0.6, y - h * 0.5, x + w, y + 20 * k); c.fill(); }
+          for (let i = 0; i < 9; i++) palmera(c, W * (0.05 + az() * 0.3), H * (0.84 + az() * 0.04), (70 + az() * 40) * k, "#45542e");
+          bruma(c, H * 0.9, 0xe8dcc0, 1);
+        },
+        // Las Palmas de Gran Canaria hoy: el mar, el puerto y la ciudad sobre las laderas
+        ciudad_moderna(c) {
+          cielo(c, [[0, "#5d95c6"], [0.6, "#bcd4e2"], [1, "#e4e2d8"]]);
+          nubes(c, 211, 7, H * 0.08, H * 0.36, 0xffffff, 0.7);
+          const lad = sierra(c, { base: H * 0.72, amp: 140 * k, col: "#9a7d68", sem: 213, esc: 2, luz: 0xe6c4a2 });
+          const az = prng(217);
+          for (let i = 0; i < 70; i++) { const x = az() * W, w = (24 + az() * 40) * k, h = (30 + az() * 120) * k, y = Math.min(H * 0.8, lad(x) + 40 * k + az() * 60 * k); c.fillStyle = mezcla(0xf2efe8, 0xc8c2b6, az()); c.fillRect(x, y - h, w, h); c.fillStyle = "rgba(60,80,100,.35)"; for (let j = 8 * k; j < h - 6 * k; j += 14 * k) c.fillRect(x + 4 * k, y - h + j, w - 8 * k, 4 * k); }
+          c.fillStyle = "#3d7397"; c.fillRect(0, H * 0.8, W, H * 0.2); banda(c, H * 0.8, H * 0.85, 0xd4e2ea, 0.6, 0);
+          bruma(c, H * 0.9, 0xd8dcd8, 1);
+        },
+        // El Hierro: laderas volcánicas, el mar y los aerogeneradores en la loma
+        hierro(c) {
+          cielo(c, [[0, "#4f8cc6"], [0.6, "#b2cfe2"], [1, "#e2e2d8"]]);
+          nubes(c, 221, 8, H * 0.1, H * 0.38, 0xffffff, 0.75);
+          c.fillStyle = "#3a78a8"; c.fillRect(0, H * 0.74, W, H * 0.26); banda(c, H * 0.74, H * 0.8, 0xd2e2ea, 0.6, 0);
+          const lad = sierra(c, { base: H * 0.74, amp: 260 * k, col: "#6c5446", sem: 223, esc: 1.5, oct: 6, luz: 0xc69a7c, picudo: 0.9 });
+          const az = prng(227);
+          for (let i = 0; i < 26; i++) { const x = az() * W; conifera(c, x, lad(x) + (30 + az() * 80) * k, (20 + az() * 14) * k, "rgba(60,82,48,.9)"); }
+          for (let i = 0; i < 5; i++) { const x = W * (0.56 + i * 0.07), y = lad(x) + 6 * k, h = 110 * k; c.fillStyle = "#eef0f2"; c.fillRect(x - 3 * k, y - h, 6 * k, h); c.save(); c.translate(x, y - h); for (let b = 0; b < 3; b++) { c.rotate(Math.PI * 2 / 3); c.fillRect(-2 * k, 0, 4 * k, 52 * k); } c.restore(); }
+          bruma(c, H * 0.88, 0xdadcd6, 1);
         }
       };
       const CFG = {
@@ -713,6 +824,15 @@
         nave: { zb: 8, alto: 1.25, niebla: 0x4a4240, cielo: 0xd8d0e0, suelo: 0x4a4038, hi: 0.5, luz: 0xffe6c4, li: 2.3, tx: "caliza", tc: 0x9a8c7c },
         alhambra: { zb: 10, alto: 0.95, niebla: 0xe6d9c0, cielo: 0xeef0f2, suelo: 0x8a7458, hi: 0.62, luz: 0xfff0dc, li: 2.4, tx: "estuco", tc: 0xe2d2b6 },
         puerto: { niebla: 0xcfd6d6, cielo: 0xe6eef4, suelo: 0x6a6a5a, hi: 0.6, luz: 0xfff0dc, li: 2.4, tx: "madera", tc: 0xc8b090 },
+        gomera: { niebla: 0xd8dcd8, cielo: 0xe6eef4, suelo: 0x6a5a48, hi: 0.6, luz: 0xfff0dc, li: 2.4, tx: "madera", tc: 0xc8b090 },
+        florencia: { niebla: 0xe4dac4, cielo: 0xeef0f2, suelo: 0x8a7458, hi: 0.6, luz: 0xfff0dc, li: 2.4, tx: "estuco", tc: 0xe0d0b4 },
+        andes: { niebla: 0xd8d6c4, cielo: 0xe6eef4, suelo: 0x6f7048, hi: 0.6, luz: 0xfff2e0, li: 2.4, tx: "tierra", tc: 0xc4c098 },
+        canaveral: { niebla: 0xd9d4bc, cielo: 0xe6eef4, suelo: 0x6a6a40, hi: 0.6, luz: 0xfff0dc, li: 2.4, tx: "tierra", tc: 0xc8b890 },
+        taller: { zb: 8, alto: 1.2, niebla: 0x6a5440, cielo: 0xe0d4c0, suelo: 0x5a4632, hi: 0.55, luz: 0xffe8c8, li: 2.3, tx: "madera", tc: 0xc8a882 },
+        ria: { niebla: 0xcfd2cc, cielo: 0xe2e8ec, suelo: 0x6a6a5a, hi: 0.6, luz: 0xfff0dc, li: 2.3, tx: "tierra", tc: 0xb8b09a },
+        maspalomas: { niebla: 0xe8dcc0, cielo: 0xe8f0f4, suelo: 0xa08a60, hi: 0.62, luz: 0xfff2e0, li: 2.5, tx: "tierra", tc: 0xf0dcae },
+        ciudad_moderna: { niebla: 0xd8dcd8, cielo: 0xe6eef4, suelo: 0x6a6a5a, hi: 0.6, luz: 0xfff0dc, li: 2.4, tx: "estuco", tc: 0xd8d4cc },
+        hierro: { niebla: 0xdadcd6, cielo: 0xe6eef4, suelo: 0x5a4a3c, hi: 0.6, luz: 0xfff0dc, li: 2.4, tx: "tierra", tc: 0xa08870 },
         cenital: { cielo: 0xe8f0f6, suelo: 0x7a6448, hi: 0.55, luz: 0xfff0dc, li: 2.4 }
       };
       // Vista cenital (dolmen): pradera vista desde arriba, repetible sin costuras
@@ -1647,6 +1767,7 @@
     $("btn-volver-portada").addEventListener("click", () => irPortada());
     $("btn-linea").addEventListener("click", () => irPortada());
     $("btn-fin-linea").addEventListener("click", () => irPortada());
+    $("btn-ir-moderna").addEventListener("click", () => { salirDeActividad(); location.href = "edad-moderna.html" + location.search; });
     window.addEventListener("popstate", (e) => {
       const st = e.state || { p: "inicio" };
       if (st.p === "inicio") mostrarInicio(false);

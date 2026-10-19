@@ -51,6 +51,34 @@ Protocolo ARQ-3D-01, fase 1, adoptada de forma parcial. Para cada elemento recon
 | Lacería | Alicatados nazaríes; estrella de 8 puntas por giro de 45° | UNESCO (1984); Díez Jorge (2007), *Archivo Español de Arte*, 80(317), 25-43 | Documentado (patrón simplificado) |
 | Portulano | Cartas portulanas y Canarias; rumbo y distancia Mallorca-Lanzarote | Quartapelle (2017), *Revista de Historia Canaria*, 199, 11-37; Quartapelle (2023), *Revista de Historia Canaria*, 205, 323-336, https://doi.org/10.25145/j.histcan.2023.205.13 | Documentado (mapa esquemático) |
 
+## Edad Moderna · «Nuevos horizontes»
+
+| Elemento | Afirmación | Fuente | Certeza |
+|---|---|---|---|
+| Escala en Canarias (1492) | La flota se detuvo en Gran Canaria y La Gomera; se reparó la Pinta; una carabela pasó de velas latinas a redondas | Diario del primer viaje, resumen de Bartolomé de las Casas (texto de Early Modern Spain, King's College London) | Documentado; qué carabela cambió las velas varía según la edición (interpretado) |
+| Vela | 8 m × 7 m | — | Modelo didáctico |
+| Perspectiva | Método del punto de fuga y del pavimento | Alberti (1435), *De pictura*, libro I | Documentado (fuente primaria) |
+| Ciudadela de Jaca | Planta pentagonal con cinco baluartes; Felipe II; ingeniero Spannocchi; siglos XVI-XVII | Turespaña, «Castillo de San Pedro o Ciudadela de Jaca» | Documentado |
+| Expedición geodésica | 1735-1744; Jorge Juan y Antonio de Ulloa; cadena de unos 29 triángulos; Tierra achatada por los polos | Ruiz Morales (2011), *Revista de Historia Naval*, 113, supl. 15; Linda Hall Library; Juan y Ulloa (1748) | Documentado |
+| Triángulo de la actividad | Base de 10 km; ángulos de 62° y 70° | — | Modelo didáctico |
+| Ingenios canarios | Decenas de ingenios en cuatro islas; rueda hidráulica alimentada desde un depósito; molienda, prensado, calderas y formas cónicas; trabajo especializado y personas esclavizadas | Gambín García (2008), *Revista de Historia Canaria*, 190, 69-82; Viña Brito (2006), *En la España Medieval*, 29, 359-381 | Documentado |
+| Lista Indicativa | «Primeros ingenios azucareros del Atlántico», en la Lista Indicativa española desde 2025 | RTVC (9-2-2026) | Documentado (fuente periodística) |
+| Engranaje 40 : 10 | Mecanismo del molino | — | Modelo didáctico |
+
+## Edad Contemporánea · «Hierro, luz y viento»
+
+| Elemento | Afirmación | Fuente | Certeza |
+|---|---|---|---|
+| Sistema métrico | Ley de 19 de julio de 1849; obligatorio desde el 1-1-1860; vara de Burgos = 0,835905 m; otras varas, entre 0,768 y 0,912 m | Cadarso Montalvo (2021), Centro Español de Metrología | Documentado |
+| Puente de Vizcaya | 1887-1893; Alberto de Palacio; Patrimonio Mundial en 2006 | UNESCO, n.º 1217 | Documentado |
+| Rigidez del triángulo | Propiedad geométrica | — | Documentado (geometría) |
+| Faro de Maspalomas | Encendido en 1890; Juan León y Castillo | Turismo de Gran Canaria | Documentado (fuente institucional de divulgación) |
+| Destellos | Ritmo de 5 s | — | Modelo didáctico (no es el del faro real) |
+| Población de Canarias | 364.408 (1900), 807.773 (1950), 1.694.477 (2001) | ISTAC (2008), *Canarias en cifras 2007/08*, periodos censales (INE) | Documentado |
+| Emigración a Cuba y Venezuela; saldo migratorio positivo desde finales del siglo XX | Mención general | Conocimiento historiográfico general, sin fuente específica en el recurso | Pendiente de fuente |
+| Gorona del Viento | 2014; 5 aerogeneradores (11,5 MW); depósito superior en La Caldera; periodos con el 100 % renovable | Endesa, «El Hierro renovable»; Energías Renovables (2016) | Documentado |
+| Demanda de 5 MW y tres momentos del día | Simplificación | Energías Renovables (2016): demanda de unos 5 MW | Modelo didáctico |
+
 ## Elementos técnicos
 
 | Elemento | Afirmación | Fuente | Certeza |

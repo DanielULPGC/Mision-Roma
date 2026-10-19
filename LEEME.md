@@ -1,18 +1,20 @@
-# Las manos que construyeron la historia · v3.6.1 (edición para GitHub Pages)
+# Las manos que construyeron la historia · v3.7 (edición para GitHub Pages)
 
 Proyecto «Las manos que construyeron la historia». Geometría, patrimonio histórico y realidad aumentada en Educación Primaria (5.º y 6.º).
 
 ## Marco del proyecto
 
-La página se abre con la portada del proyecto «Las manos que construyeron la historia», que incluye una línea del tiempo. El recorrido va **desde la Prehistoria en adelante**: Prehistoria, Edad Antigua, Edad Media, Edad Moderna y Edad Contemporánea. Hay tres capítulos disponibles:
+La página se abre con la portada del proyecto «Las manos que construyeron la historia», que incluye una línea del tiempo. El recorrido va **desde la Prehistoria en adelante**: Prehistoria, Edad Antigua, Edad Media, Edad Moderna y Edad Contemporánea. Los cinco capítulos están disponibles:
 
 | Edad | Capítulo | Archivo |
 |---|---|---|
 | Prehistoria | **Las primeras manos** | `prehistoria.html` |
 | Edad Antigua | **Misión Roma · El acueducto** | `index.html` (abre la portada; `index.html#roma` abre el capítulo directamente) |
 | Edad Media | **El compás y la piedra** | `edad-media.html` |
+| Edad Moderna | **Nuevos horizontes** | `edad-moderna.html` |
+| Edad Contemporánea | **Hierro, luz y viento** | `edad-contemporanea.html` |
 
-La Edad Moderna y la Edad Contemporánea figuran como «en preparación». Al terminar cada capítulo, un botón lleva al siguiente: de la Prehistoria a Misión Roma y de Misión Roma a la Edad Media.
+Al terminar cada capítulo, un botón lleva al siguiente, en orden cronológico, hasta la Edad Contemporánea.
 
 **Navegación:**
 - «← Línea del tiempo» vuelve a la portada y apaga la cámara.
@@ -70,6 +72,26 @@ La Edad Moderna y la Edad Contemporánea figuran como «en preparación». Al te
 - La lacería es un patrón de dos cuadrados.
 - El portulano es un esquema de costas orientativo, no una reproducción; los rumbos se miden en el plano del mapa.
 
+## Capítulo «Nuevos horizontes» (Edad Moderna)
+
+| Etapa | Qué hace el alumnado con las manos | Contenidos |
+|---|---|---|
+| 1. Las velas de la carabela (Gran Canaria, 1492) | Arrastra la esquina de la vela latina (triangular) hasta convertirla en redonda (rectangular). | Área del triángulo y del rectángulo; escala de Colón en Canarias. |
+| 2. La perspectiva del Renacimiento | Mueve el punto de fuga hasta donde convergen los bordes de la plaza. | Horizonte, punto de fuga, rectas paralelas y semejanza (Alberti, 1435). |
+| 3. La ciudadela de Jaca (1592) | Coloca cinco baluartes girando la mano alrededor del centro. | Pentágono regular: 360° : 5 = 72°; ángulo interior de 108°. |
+| 4. La expedición al meridiano (1735-1744) | Orienta dos rayos con los ángulos medidos hasta que se cortan en la cumbre. | Triangulación, ángulos de un triángulo y escala (Jorge Juan y Antonio de Ulloa). |
+| 5. Canarias: el ingenio de azúcar (s. XVI) | Abre la compuerta de la acequia y cambia la rueda dentada del molino. | Proporcionalidad inversa: 40 : 10 = 4 vueltas. |
+
+## Capítulo «Hierro, luz y viento» (Edad Contemporánea)
+
+| Etapa | Qué hace el alumnado con las manos | Contenidos |
+|---|---|---|
+| 1. El metro (ley de 1849) | Mide una tela con varas de Burgos y después con metros. | Unidades antiguas y sistema métrico; 3 × 0,835905 m ≈ 2,51 m. |
+| 2. El Puente de Vizcaya (1893) | Carga la barquilla y pone diagonales en la viga. | Rigidez del triángulo frente al cuadrado. |
+| 3. El faro de Maspalomas (1890) | Ajusta el número de haces y el tiempo de cada vuelta. | 360° : n; un destello cada T : n segundos. |
+| 4. La población de Canarias (1900-2001) | Sube cada barra hasta el dato del censo. | Gráfico de barras, escala y comparación (casi ×5). |
+| 5. Canarias: Gorona del Viento (2014) | Reparte bombeo y turbinas para que a la isla lleguen 5 MW. | Igualdades, fracciones y porcentajes; isla sostenible. |
+
 ## Capítulo «Misión Roma» (Edad Antigua): el proceso evolutivo
 
 La actividad sigue el orden de una obra hidráulica real, en cinco etapas. Cada etapa se desbloquea al completar la anterior.
@@ -112,6 +134,7 @@ Todas las etapas se pueden hacer de tres formas:
 - Lewis, M. (1999). Vitruvius and Greek aqueducts. *Papers of the British School at Rome*, *67*, 145-172. https://doi.org/10.1017/S0068246200004530. Explica que los manuscritos de Vitruvio y de Plinio dan cifras de pendiente distintas.
 - UNESCO, «Old Town of Segovia and its Aqueduct», inscrito en 1985: https://whc.unesco.org/en/list/311
 - Real Academia Española, *Tesoro de los diccionarios históricos de la lengua española*, entrada «cantonera»: https://www.rae.es/tdhle/cantonera
+- Las fuentes de los capítulos de la Edad Moderna y de la Edad Contemporánea figuran en el panel «Saber más» de cada etapa y en [`docs/matriz-evidencias.md`](docs/matriz-evidencias.md).
 - Heredad de Aguas de Arucas y Firgas. Se cita sin fecha porque solo se ha consultado una fuente secundaria; conviene contrastarla con la bibliografía del Archivo Histórico Provincial o de la propia Heredad.
 
 ### Encaje curricular (Decreto 211/2022, Canarias)
@@ -207,6 +230,7 @@ Su uso con menores debe valorarse con el delegado o la delegada de protección d
 - Encuadre comprobado en móvil vertical, móvil horizontal y tableta.
 - Sin peticiones externas salvo el modelo, cuando falta y está permitido.
 - La cámara se apaga cuando el detector no arranca.
+- v3.7: capítulos de la Edad Moderna y de la Edad Contemporánea. Recorridos completos de sus diez etapas, accesibilidad sin violaciones (portada, etapas, «Saber más» y panel final), HTML válido y sin peticiones externas. Regresión de los tres capítulos anteriores sin errores.
 - v3.6.1: con el modelo de manos incluido, el diagnóstico confirma su huella. El detector arranca con una cámara simulada (GPU) sin peticiones externas; la detección de una mano real queda pendiente de probar en el aula.
 - v3.6: pared de la cueva integrada en la roca; pintadera con excisión y forma rómbica; comprobación de la huella del modelo en el diagnóstico; fecha del poblamiento de Canarias precisada (siglos II-III d. C., en debate). Regresión completa sin errores.
 - Decorados, bifaz y cerámica cardial (v3.5): recorridos de los tres capítulos sin errores, accesibilidad sin violaciones y capturas revisadas.
@@ -218,4 +242,3 @@ Su uso con menores debe valorarse con el delegado o la delegada de protección d
 - Comprobar en las tabletas del aula si salta el modo ligero automático; si va lenta, usar `?calidad=ligera`.
 - Cotejar la matriz curricular con el texto oficial del BOC y concretar la situación de aprendizaje.
 - Revisión humana de los contenidos.
-- Capítulos de la Edad Moderna y la Edad Contemporánea.
