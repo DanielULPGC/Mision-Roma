@@ -1138,7 +1138,6 @@
           c.fillStyle = gr; c.fillRect(x - r, y - r, 2 * r, 2 * r);
         }
         c.globalCompositeOperation = "source-over";
-        { const gr = c.createRadialGradient(CW / 2, CH / 2, Math.min(CW, CH) * 0.32, CW / 2, CH / 2, Math.max(CW, CH) * 0.62); gr.addColorStop(0, "rgba(120,88,58,0)"); gr.addColorStop(1, "rgba(120,88,58,.55)"); c.fillStyle = gr; c.fillRect(0, 0, CW, CH); }
         c.strokeStyle = "rgba(60,42,25,.35)"; c.lineWidth = 2 * KP;
         for (let i = 0; i < 9; i++) { c.beginPath(); let x = azar() * CW, y = azar() * CH; c.moveTo(x, y); for (let j = 0; j < 7; j++) { x += (azar() - 0.5) * 60 * KP; y += azar() * 40 * KP; c.lineTo(x, y); } c.stroke(); }
       })();
@@ -1170,42 +1169,8 @@
       const tex = new THREE.CanvasTexture(comp); tex.colorSpace = THREE.SRGBColorSpace;
       const relieveRoca = TX.textura("caliza").bump.clone(); relieveRoca.repeat.set(2, 2); relieveRoca.needsUpdate = true;
       nitida(tex);
-      // La pared forma parte de un macizo rocoso: superficie ondulada, borde irregular recortado y roca alrededor
-      const ondaRoca = (x, y, f) => 0.5 * Math.sin(x * 1.7 * f + 0.6) * Math.cos(y * 1.3 * f - 0.4) + 0.3 * Math.sin(x * 3.9 * f + y * 2.7 * f + 1.1) + 0.2 * Math.cos(x * 7.3 * f - y * 6.1 * f);
-      const gPared = new THREE.PlaneGeometry(W, H, 88, 64), pp = gPared.attributes.position;
-      for (let i = 0; i < pp.count; i++) pp.setZ(i, 0.045 * ondaRoca(pp.getX(i), pp.getY(i), 1));
-      gPared.computeVertexNormals();
-      const bordePared = (() => {                    // máscara alfa: contorno irregular, como un panel de roca natural
-        const c = document.createElement("canvas"); c.width = 512; c.height = Math.round(512 * H / W); const x = c.getContext("2d"), Wc = c.width, Hc = c.height;
-        x.fillStyle = "#000"; x.fillRect(0, 0, Wc, Hc); x.fillStyle = "#fff"; x.beginPath();
-        for (let i = 0; i <= 160; i++) {
-          const a = (i / 160) * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a), sup = Math.max(Math.abs(ca), Math.abs(sa) * Wc / Hc) || 1;
-          const m = 0.955 - 0.035 * (0.5 + 0.5 * Math.sin(a * 7 + 1.3)) - 0.025 * (0.5 + 0.5 * Math.sin(a * 17 + 0.2));
-          x.lineTo(Wc / 2 + (ca / sup) * (Wc / 2) * m, Hc / 2 + (sa / sup) * (Wc / 2) * m);
-        }
-        x.closePath(); x.fill(); return new THREE.CanvasTexture(c);
-      })();
-      const pared = new THREE.Mesh(gPared, new THREE.MeshStandardMaterial({ map: tex, bumpMap: relieveRoca, bumpScale: 3, roughness: 0.95, alphaMap: bordePared, alphaTest: 0.5 }));
+      const pared = new THREE.Mesh(new THREE.PlaneGeometry(W, H, 1, 1), new THREE.MeshStandardMaterial({ map: tex, bumpMap: relieveRoca, bumpScale: 3, roughness: 0.95 }));
       pared.position.set(0, CY, 0); g.add(pared);
-      const gMacizo = new THREE.PlaneGeometry(W * 2.1, H * 1.55, 96, 64), pm = gMacizo.attributes.position;
-      const colM = [];
-      for (let i = 0; i < pm.count; i++) {
-        const x = pm.getX(i), y = pm.getY(i), d = Math.hypot(x / (W * 1.05), y / (H * 0.78)), lejos = Math.max(0, d - 0.55);
-        pm.setZ(i, 0.07 * ondaRoca(x, y, 0.8) - 0.6 * lejos * lejos);
-        const f = Math.max(0.28, 1 - 1.1 * lejos); colM.push(f, f * 0.97, f * 0.93);   // la roca se oscurece hacia la penumbra
-      }
-      gMacizo.setAttribute("color", new THREE.Float32BufferAttribute(colM, 3)); gMacizo.computeVertexNormals();
-      const matMacizo = TX.mat("caliza", { color: 0xe2cfae, rugosidad: 0.97, relieve: 4, rep: 2.5 }); matMacizo.vertexColors = true;
-      matMacizo.alphaMap = (() => {                   // contorno del macizo: masa irregular que se pierde en la penumbra
-        const c = document.createElement("canvas"); c.width = 512; c.height = 378; const x = c.getContext("2d");
-        x.fillStyle = "#000"; x.fillRect(0, 0, 512, 378); x.fillStyle = "#fff"; x.beginPath();
-        for (let i = 0; i <= 200; i++) { const a = (i / 200) * Math.PI * 2, r = 0.9 - 0.09 * (0.5 + 0.5 * Math.sin(a * 3 + 2)) - 0.05 * (0.5 + 0.5 * Math.sin(a * 7 + 0.7)) - 0.015 * Math.sin(a * 17);
-          const yy = Math.sin(a) > 0.55 ? 1.2 : Math.sin(a) * r; x.lineTo(256 + Math.cos(a) * 256 * r, 189 + yy * 189); }
-        x.closePath(); x.fill(); return new THREE.CanvasTexture(c);
-      })();
-      matMacizo.alphaTest = 0.5;
-      const macizo = new THREE.Mesh(gMacizo, matMacizo);
-      macizo.position.set(0, CY + 0.25, -0.22); g.add(macizo);
       // Tablillas de respuesta (fase de medida)
       const OPC = [["10 cm", 10], ["20 cm", 20], ["40 cm", 40]];
       const tablillas = OPC.map((o, i) => { const t = caja(1.0, 0.5, 0.08, M.madera); t.position.set(2.95, CY + 0.8 - i * 0.8, 0.05); t.visible = false; t.userData.cm = o[1]; g.add(t); return t; });
@@ -1569,8 +1534,7 @@
         circular: { nombre: "circular", ejes: "infinitos", orden: null, punzon: "circular", real: "Ø 5 cm", area: "≈ 19,6 cm² (π · 2,5 · 2,5)" },
         cuadrada: { nombre: "cuadrada", ejes: "4", orden: 4, punzon: "cuadrado", real: "4,5 cm de lado", area: "20,25 cm² (4,5 · 4,5)" },
         triangular: { nombre: "triangular", ejes: "3", orden: 3, punzon: "triangular", real: "6 cm de lado", area: "≈ 15,6 cm² (6 · 5,2 : 2)" },
-        rectangular: { nombre: "rectangular", ejes: "2", orden: 2, punzon: "circular", real: "7 × 3 cm", area: "21 cm² (7 · 3)" },
-        rombica: { nombre: "rómbica", ejes: "2", orden: 2, punzon: "circular", real: "diagonales de 6 y 4 cm", area: "12 cm² (6 · 4 : 2)" }
+        rectangular: { nombre: "rectangular", ejes: "2", orden: 2, punzon: "circular", real: "7 × 3 cm", area: "21 cm² (7 · 3)" }
       };
       let forma = "circular", ordenCirc = 6, tecnica = "punzon", marcas = 0, impresiones = 0, hecho = false, trazo = null, ultimo = null;
       const orden = () => FORMAS[forma].orden || ordenCirc;
@@ -1580,7 +1544,6 @@
         if (forma === "circular") return null;
         if (forma === "cuadrada") { const s = 0.8 * C; return [[C - s, C - s], [C + s, C - s], [C + s, C + s], [C - s, C + s]]; }
         if (forma === "triangular") { const R = 0.97 * C; return [0, 1, 2].map((k) => { const a = -Math.PI / 2 + (k * 2 * Math.PI) / 3; return [C + R * Math.cos(a), C + R * Math.sin(a) + 0.12 * C]; }); }
-        if (forma === "rombica") return [[C, C - 0.62 * C], [C + 0.97 * C, C], [C, C + 0.62 * C], [C - 0.97 * C, C]];
         const w = 0.96 * C, h = 0.41 * C; return [[C - w, C - h], [C + w, C - h], [C + w, C + h], [C - w, C + h]];
       }
       // Centro de giro: el del campo (en el triángulo, su baricentro)
@@ -1647,19 +1610,7 @@
         }
         ctx.restore();
       }
-      const huellas = [], incisiones = [], excisiones = [];   // en coordenadas del lienzo
-      // Excisión: se vacía una figura geométrica; su forma acompaña a la del campo (relación forma-motivo del catálogo)
-      function figuraExcisa(ctx, x, y, giro, modo) {
-        const t = forma === "circular" || forma === "triangular" ? "tri" : forma === "cuadrada" ? "cuad" : forma === "rombica" ? "rombo" : "rect";
-        const r = PR * 2.4, v = t === "tri" ? [0, 1, 2].map((k) => [Math.cos(-Math.PI / 2 + k * 2.0944) * r, Math.sin(-Math.PI / 2 + k * 2.0944) * r + r * 0.25])
-          : t === "cuad" ? [[-r * 0.7, -r * 0.7], [r * 0.7, -r * 0.7], [r * 0.7, r * 0.7], [-r * 0.7, r * 0.7]]
-          : t === "rombo" ? [[0, -r * 0.65], [r * 1.0, 0], [0, r * 0.65], [-r * 1.0, 0]] : [[-r * 1.2, -r * 0.45], [r * 1.2, -r * 0.45], [r * 1.2, r * 0.45], [-r * 1.2, r * 0.45]];
-        ctx.save(); ctx.translate(x, y); ctx.rotate(giro);
-        const camino = (k) => { ctx.beginPath(); v.forEach(([a, b], i) => (i ? ctx.lineTo(a * k, b * k) : ctx.moveTo(a * k, b * k))); ctx.closePath(); };
-        if (modo === "plano") { camino(1); ctx.fill(); }
-        else { camino(1); ctx.fillStyle = "#4a3020"; ctx.fill(); camino(0.78); ctx.fillStyle = "#2c1b10"; ctx.fill(); camino(1); ctx.strokeStyle = "rgba(225,190,150,.35)"; ctx.lineWidth = 2 * K5; ctx.stroke(); }
-        ctx.restore();
-      }
+      const huellas = [], incisiones = [];             // en coordenadas del lienzo
       function componer() {
         // Cara: barro bruñido, con el campo recortado y las huellas sombreadas
         TX.pintarFondo(cF, "barro", T, T);
@@ -1671,13 +1622,11 @@
         cF.setLineDash([]);
         for (const l of incisiones) { cF.lineCap = "round"; cF.strokeStyle = "rgba(220,180,140,.35)"; cF.lineWidth = PR * 1.1; cF.beginPath(); cF.moveTo(l[0] - 2, l[1] - 2); cF.lineTo(l[2] - 2, l[3] - 2); cF.stroke(); cF.strokeStyle = "#2a1a10"; cF.lineWidth = PR * 0.8; cF.beginPath(); cF.moveTo(l[0], l[1]); cF.lineTo(l[2], l[3]); cF.stroke(); }
         for (const h of huellas) punzonar(cF, h[0], h[1], h[2], "cara");
-        for (const e of excisiones) figuraExcisa(cF, e[0], e[1], e[2], "cara");
         cF.restore(); texF.needsUpdate = true;
         // Relieve: gris medio y lo hundido en negro
         cR.fillStyle = "#9a9a9a"; cR.fillRect(0, 0, T, T); cR.fillStyle = "#000"; cR.strokeStyle = "#000";
         for (const l of incisiones) { cR.lineCap = "round"; cR.lineWidth = PR * 0.8; cR.beginPath(); cR.moveTo(l[0], l[1]); cR.lineTo(l[2], l[3]); cR.stroke(); }
         for (const h of huellas) punzonar(cR, h[0], h[1], h[2], "plano");
-        for (const e of excisiones) figuraExcisa(cR, e[0], e[1], e[2], "plano");
         texR.needsUpdate = true;
       }
       // Cada marca se repite girando alrededor del centro (simetría de rotación de orden n)
@@ -1695,13 +1644,7 @@
         marcas += n * Math.max(1, Math.round(Math.hypot(x1 - x0, y1 - y0) / (PR * 3)));
         return true;
       }
-      function marcaExcision(x, y) {
-        trazarCampo(cP, PR * 3.2); if (!cP.isPointInPath(x, y)) return false;
-        const n = orden(), [cx, cy] = centro(), radial = Math.atan2(y - cy, x - cx) + Math.PI / 2;
-        for (let k = 0; k < n; k++) { const [a, b, ang] = rotar(x, y, k, n); excisiones.push([a, b, forma === "circular" ? radial + ang : forma === "triangular" || forma === "cuadrada" ? 0 : ang]); marcas += 3; }
-        return true;
-      }
-      function borrar() { huellas.length = 0; incisiones.length = 0; excisiones.length = 0; marcas = 0; componer(); refrescar(); }
+      function borrar() { huellas.length = 0; incisiones.length = 0; marcas = 0; componer(); refrescar(); }
       function cambiarForma(f) {
         forma = f; construirPieza(); borrar();
         const F = FORMAS[f];
@@ -1720,7 +1663,7 @@
       function lineaIncisa() { const [cx, cy] = centro(), a = -Math.PI / 2 + Math.PI / orden(), r0 = 0.18 * C, r1 = (forma === "rectangular" ? 0.32 : 0.62) * C; marcaLinea(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0, cx + Math.cos(a) * r1, cy + Math.sin(a) * r1); componer(); refrescar(); }
       // Esquemas pautados, inspirados en piezas del catálogo (fig. 5.1): las hileras de impresiones siguen el contorno del campo
       function esquema() {
-        huellas.length = 0; incisiones.length = 0; excisiones.length = 0; marcas = 0;
+        huellas.length = 0; incisiones.length = 0; marcas = 0;
         const [cx, cy] = centro(), paso = PR * 2.6;
         const hilera = (pts) => { for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length], L = Math.hypot(b[0] - a[0], b[1] - a[1]), m = Math.max(1, Math.round(L / paso)); for (let j = 0; j < m; j++) marcaPunzon(a[0] + ((b[0] - a[0]) * j) / m, a[1] + ((b[1] - a[1]) * j) / m, false); } };
         if (forma === "circular") {
@@ -1731,8 +1674,8 @@
           for (let fila = 0; fila < 40; fila++) for (let i = -20; i <= 20; i++) { const y = cy - 0.95 * C + fila * h, x = cx + (i + (fila % 2 ? 0.5 : 0)) * d; marcaPunzon(x, y, false); }
         } else {
           const pts = contorno();
-          for (const f of forma === "cuadrada" ? [0.88, 0.64, 0.4] : forma === "rombica" ? [0.84, 0.56, 0.3] : [0.86, 0.5]) hilera(pts.map(([x, y]) => [cx + (x - cx) * f, cy + (y - cy) * f]));
-          if (forma === "cuadrada" || forma === "rombica") marcaPunzon(cx, cy, false);
+          for (const f of forma === "cuadrada" ? [0.88, 0.64, 0.4] : [0.86, 0.5]) hilera(pts.map(([x, y]) => [cx + (x - cx) * f, cy + (y - cy) * f]));
+          if (forma === "cuadrada") marcaPunzon(cx, cy, false);
           else for (let x = cx - 0.6 * C; x <= cx + 0.6 * C; x += paso) marcaPunzon(x, cy, false);
         }
         componer(); refrescar();
@@ -1746,7 +1689,6 @@
         cT.globalCompositeOperation = "destination-out"; cT.fillStyle = "#000"; cT.strokeStyle = "#000";
         for (const l of incisiones) { cT.lineCap = "round"; cT.lineWidth = PR * 0.8; cT.beginPath(); cT.moveTo(l[0], l[1]); cT.lineTo(l[2], l[3]); cT.stroke(); }
         for (const h of huellas) punzonar(cT, h[0], h[1], h[2], "plano");
-        for (const e of excisiones) figuraExcisa(cT, e[0], e[1], e[2], "plano");
         cT.restore(); cT.globalCompositeOperation = "source-over";
         const L = Math.round((T * 2 * RS) / 2.1), x = clamp(u * T, L / 2, T - L / 2), y = clamp((1 - v) * T, L / 2, T - L / 2);
         cI.globalAlpha = 0.85; cI.drawImage(tinta, x - L / 2, y - L / 2, L, L); cI.globalAlpha = 1; texI.needsUpdate = true;
@@ -1757,7 +1699,7 @@
       function refrescar() {
         if (actual !== 4) return;
         const F = FORMAS[forma], n = orden();
-        metricas(["Forma: " + F.nombre + " · ejes de simetría: " + F.ejes, "Simetría de rotación: orden " + n + " (360° : " + n + " = " + fmt(360 / n, 0) + "°)", "Campo real: " + F.real + " · área " + F.area, "Técnica: " + (tecnica === "punzon" ? "impresión con punzón" : tecnica === "excision" ? "excisión" : "incisión") + " · marcas: " + marcas + " · estampaciones: " + impresiones]);
+        metricas(["Forma: " + F.nombre + " · ejes de simetría: " + F.ejes, "Simetría de rotación: orden " + n + " (360° : " + n + " = " + fmt(360 / n, 0) + "°)", "Campo real: " + F.real + " · área " + F.area, "Técnica: " + (tecnica === "punzon" ? "impresión con punzón" : "incisión") + " · marcas: " + marcas + " · estampaciones: " + impresiones]);
       }
       construirPieza(); componer();
       return {
@@ -1773,16 +1715,15 @@
           refrescar();
         },
         alternativos() {
-          filaBotones([["Circular", () => cambiarForma("circular")], ["Cuadrada", () => cambiarForma("cuadrada")], ["Triangular", () => cambiarForma("triangular")], ["Rectangular", () => cambiarForma("rectangular")], ["Rómbica", () => cambiarForma("rombica")], ["Orden 4", () => cambiarOrden(4)], ["Orden 6", () => cambiarOrden(6)], ["Orden 8", () => cambiarOrden(8)]]);
-          filaBotones([["Técnica: punzón", () => { tecnica = "punzon"; refrescar(); }], ["Técnica: incisión", () => { tecnica = "incision"; refrescar(); }], ["Técnica: excisión", () => { tecnica = "excision"; refrescar(); estado("Excisión: se vacía una figura con una punta en lengua de carpa. La figura acompaña a la forma del campo.", "status-warn", "p5-excision"); }], ["Ver el dorso y el apéndice", () => { giroObjetivo = GIRO_DORSO; estado("El dorso lleva el apéndice, un mango que facilita sujetar la pintadera; en el catálogo, 98 de los 124 apéndices completos están perforados.", "status-warn", "p5-dorso"); }], ["Ver el campo", () => { giroObjetivo = GIRO_CAMPO; }]]);
-          filaBotones([["Un anillo de impresiones", anillo], ["Una línea incisa", lineaIncisa], ["Una figura excisa", () => { const [cx, cy] = centro(), a = -Math.PI / 2 + Math.PI / orden(), r = (forma === "rectangular" || forma === "rombica" ? 0.3 : 0.55) * C; marcaExcision(cx + Math.cos(a) * r, cy + Math.sin(a) * r); componer(); refrescar(); }], ["Esquema del museo", esquema], ["Borrar", borrar], ["Estampar", () => estampar(0.5, 0.5)]]);
+          filaBotones([["Circular", () => cambiarForma("circular")], ["Cuadrada", () => cambiarForma("cuadrada")], ["Triangular", () => cambiarForma("triangular")], ["Rectangular", () => cambiarForma("rectangular")], ["Orden 4", () => cambiarOrden(4)], ["Orden 6", () => cambiarOrden(6)], ["Orden 8", () => cambiarOrden(8)]]);
+          filaBotones([["Técnica: punzón", () => { tecnica = "punzon"; refrescar(); }], ["Técnica: incisión", () => { tecnica = "incision"; refrescar(); }], ["Ver el dorso y el apéndice", () => { giroObjetivo = GIRO_DORSO; estado("El dorso lleva el apéndice, un mango que facilita sujetar la pintadera; en el catálogo, 98 de los 124 apéndices completos están perforados.", "status-warn", "p5-dorso"); }], ["Ver el campo", () => { giroObjetivo = GIRO_CAMPO; }]]);
+          filaBotones([["Un anillo de impresiones", anillo], ["Una línea incisa", lineaIncisa], ["Esquema del museo", esquema], ["Borrar", borrar], ["Estampar", () => estampar(0.5, 0.5)]]);
         },
         down(x, y) {
           const s = uv(campo, x, y);
           if (s) {
             const p = [s.uv.x * T, (1 - s.uv.y) * T]; trazo = p; ultimo = p;
             if (tecnica === "punzon" && marcaPunzon(p[0], p[1])) { componer(); refrescar(); }
-            if (tecnica === "excision" && marcaExcision(p[0], p[1])) { componer(); refrescar(); }
             return true;
           }
           const l = uv(lamina, x, y);
@@ -1794,7 +1735,6 @@
           const s = uv(campo, x, y); if (!s) return;
           const p = [s.uv.x * T, (1 - s.uv.y) * T], d = Math.hypot(p[0] - ultimo[0], p[1] - ultimo[1]);
           if (tecnica === "punzon" && d > PR * 2.6) { if (marcaPunzon(p[0], p[1])) { componer(); refrescar(); } ultimo = p; }
-          else if (tecnica === "excision" && d > PR * 5.5) { if (marcaExcision(p[0], p[1])) { componer(); refrescar(); } ultimo = p; }
           else if (tecnica === "incision" && d > PR * 1.5) { if (marcaLinea(ultimo[0], ultimo[1], p[0], p[1])) { componer(); refrescar(); } ultimo = p; }
         },
         up() { trazo = null; },
@@ -1875,8 +1815,6 @@
     const PERMITIR_MODELO_REMOTO = false;   // con false, si falta modelo/hand_landmarker.task no se recurre a Google
     const URL_TASKS = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
     const URL_MODELO = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
-    // Huella SHA-256 del modelo oficial float16, versión 1 (7 819 105 bytes), coincidente en tres copias independientes
-    const SHA256_MODELO = "fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1";
     const CONEX = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
     const PINZA_CIERRA = 0.33, PINZA_ABRE = 0.5;
     let detector = null, modo = null, lastVideoTime = -1, lastTimestampMs = 0, agarre = null;
@@ -2050,8 +1988,8 @@
        <h3>Al estampar</h3><p>El sello deja la imagen al revés, como en un espejo. Además, si se usa tinte, lo hundido no toca la superficie y queda sin color; sobre barro tierno, lo hundido sale en relieve.</p>
        <h3>¿Para qué servían?</h3><p>No lo sabemos con seguridad. Se ha propuesto que servían para pintar la piel, como marcas de propiedad (por ejemplo, en graneros), como amuletos o como señales de identidad. La mayoría se ha encontrado en casas y cuevas de habitación, por toda la isla. Cuando nadie lo dejó escrito, los arqueólogos proponen hipótesis y las ponen a prueba.</p>
        <h3>Geometría en las paredes</h3><p>En la Cueva Pintada de Gáldar, la población indígena de Gran Canaria decoró una cámara con motivos exclusivamente geométricos, en rojo y blanco sobre fondo negro.</p>
-       <h3>¿Prehistoria en Canarias?</h3><p>Las primeras personas llegaron a las islas desde el norte de África. Las dataciones más fiables sitúan el poblamiento estable en los primeros siglos de nuestra era (hacia los siglos II-III), hace unos 1800 años; la fecha exacta todavía se discute. Sus descendientes vivieron sin metales hasta la conquista castellana del siglo XV. Por eso algunos libros hablan de «Prehistoria de Canarias», aunque muchos especialistas prefieren decir «época prehispánica» o «indígena». Las edades de la historia son una manera de ordenar el tiempo y no encajan igual en todos los lugares.</p>
-       <p class="fuente">Cruz de Mercadal, M.ª C., Delgado Darias, T. y Velasco Vázquez, J. (2013). <em>Pintaderas de El Museo Canario</em>. El Museo Canario. ISBN 978-84-695-6874-3 · Turespaña, ficha «Cueva Pintada» · Velasco-Vázquez et al. (2021), <em>Complutum</em>, 32(1), 167-189, doi:10.5209/cmpl.76453 · Velasco Vázquez et al. (2020), <em>Anuario de Estudios Atlánticos</em>, 66, 1-24, doi:10.36980/10530.9904. Las medidas de la actividad son ejemplos dentro del tamaño mediano del catálogo; los esquemas están inspirados en piezas reales, no las copian.</p>`
+       <h3>¿Prehistoria en Canarias?</h3><p>Las primeras personas llegaron a las islas desde el norte de África hace unos dos mil años; la fecha exacta todavía se discute. Sus descendientes vivieron sin metales hasta la conquista castellana del siglo XV. Por eso algunos libros hablan de «Prehistoria de Canarias», aunque muchos especialistas prefieren decir «época prehispánica» o «indígena». Las edades de la historia son una manera de ordenar el tiempo y no encajan igual en todos los lugares.</p>
+       <p class="fuente">Cruz de Mercadal, M.ª C., Delgado Darias, T. y Velasco Vázquez, J. (2013). <em>Pintaderas de El Museo Canario</em>. El Museo Canario. ISBN 978-84-695-6874-3 · Turespaña, ficha «Cueva Pintada» · Velasco-Vázquez et al. (2021), <em>Complutum</em>, 32(1), 167-189, doi:10.5209/cmpl.76453. Las medidas de la actividad son ejemplos dentro del tamaño mediano del catálogo; los esquemas están inspirados en piezas reales, no las copian.</p>`
     ];
     let focoPrevio = null;
     function abrirPanel(id) { focoPrevio = document.activeElement; const p = $(id); p.hidden = false; p.querySelector("button").focus(); }
@@ -2163,17 +2101,7 @@
       const wasm = await tamanoLocal("./wasm/vision_wasm_internal.wasm");
       filaDiag(wasm ? "ok" : "error", wasm ? "Motor de detección (WASM) presente." : "Falta la carpeta wasm/ junto a la página.", wasm ? "" : "Sube también la carpeta wasm/ completa.");
       const mod = await tamanoLocal("./modelo/hand_landmarker.task");
-      if (mod > 1000000 || mod === -1) {
-        filaDiag("ok", "Modelo de manos presente" + (mod > 0 ? " (" + (mod / 1048576).toFixed(1).replace(".", ",") + " MB)." : "."));
-        // Integridad: se compara la huella del archivo con la del modelo oficial (solo en contexto seguro: https o localhost)
-        try {
-          if (!crypto.subtle) throw new Error("sin crypto.subtle");
-          const buf = await (await fetch("./modelo/hand_landmarker.task", { cache: "no-store" })).arrayBuffer();
-          const h = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", buf))).map((b) => b.toString(16).padStart(2, "0")).join("");
-          if (h === SHA256_MODELO) filaDiag("ok", "El modelo coincide con el oficial de MediaPipe (huella SHA-256 comprobada).");
-          else filaDiag("aviso", "El modelo no coincide con la versión esperada (float16, versión 1).", "Puede ser otra versión válida, pero conviene descargarlo de nuevo desde el enlace de modelo/LEEME.txt.");
-        } catch (e) { filaDiag("aviso", "No se ha podido comprobar la huella del modelo en este navegador.", "Abre la página con https o desde localhost."); }
-      }
+      if (mod > 1000000 || mod === -1) filaDiag("ok", "Modelo de manos presente" + (mod > 0 ? " (" + (mod / 1048576).toFixed(1).replace(".", ",") + " MB)." : "."));
       else if (mod > 0) filaDiag("error", "El archivo del modelo es demasiado pequeño (" + mod + " bytes): probablemente está dañado o es un enlace.", "Vuelve a descargarlo y súbelo de nuevo a modelo/.");
       else if (PERMITIR_MODELO_REMOTO) filaDiag("aviso", "No hay modelo local: se descargará de Google al empezar.");
       else filaDiag("error", "Falta el modelo de manos (modelo/hand_landmarker.task).", "Es la causa más frecuente. Descárgalo con el enlace de modelo/LEEME.txt, guárdalo con ese nombre exacto en la carpeta modelo/ y súbelo.");

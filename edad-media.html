@@ -1432,8 +1432,6 @@
     const PERMITIR_MODELO_REMOTO = false;   // con false, si falta modelo/hand_landmarker.task no se recurre a Google
     const URL_TASKS = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
     const URL_MODELO = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
-    // Huella SHA-256 del modelo oficial float16, versión 1 (7 819 105 bytes), coincidente en tres copias independientes
-    const SHA256_MODELO = "fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1";
     const CONEX = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
     const PINZA_CIERRA = 0.33, PINZA_ABRE = 0.5;
     let detector = null, modo = null, lastVideoTime = -1, lastTimestampMs = 0, agarre = null;
@@ -1716,17 +1714,7 @@
       const wasm = await tamanoLocal("./wasm/vision_wasm_internal.wasm");
       filaDiag(wasm ? "ok" : "error", wasm ? "Motor de detección (WASM) presente." : "Falta la carpeta wasm/ junto a la página.", wasm ? "" : "Sube también la carpeta wasm/ completa.");
       const mod = await tamanoLocal("./modelo/hand_landmarker.task");
-      if (mod > 1000000 || mod === -1) {
-        filaDiag("ok", "Modelo de manos presente" + (mod > 0 ? " (" + (mod / 1048576).toFixed(1).replace(".", ",") + " MB)." : "."));
-        // Integridad: se compara la huella del archivo con la del modelo oficial (solo en contexto seguro: https o localhost)
-        try {
-          if (!crypto.subtle) throw new Error("sin crypto.subtle");
-          const buf = await (await fetch("./modelo/hand_landmarker.task", { cache: "no-store" })).arrayBuffer();
-          const h = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", buf))).map((b) => b.toString(16).padStart(2, "0")).join("");
-          if (h === SHA256_MODELO) filaDiag("ok", "El modelo coincide con el oficial de MediaPipe (huella SHA-256 comprobada).");
-          else filaDiag("aviso", "El modelo no coincide con la versión esperada (float16, versión 1).", "Puede ser otra versión válida, pero conviene descargarlo de nuevo desde el enlace de modelo/LEEME.txt.");
-        } catch (e) { filaDiag("aviso", "No se ha podido comprobar la huella del modelo en este navegador.", "Abre la página con https o desde localhost."); }
-      }
+      if (mod > 1000000 || mod === -1) filaDiag("ok", "Modelo de manos presente" + (mod > 0 ? " (" + (mod / 1048576).toFixed(1).replace(".", ",") + " MB)." : "."));
       else if (mod > 0) filaDiag("error", "El archivo del modelo es demasiado pequeño (" + mod + " bytes): probablemente está dañado o es un enlace.", "Vuelve a descargarlo y súbelo de nuevo a modelo/.");
       else if (PERMITIR_MODELO_REMOTO) filaDiag("aviso", "No hay modelo local: se descargará de Google al empezar.");
       else filaDiag("error", "Falta el modelo de manos (modelo/hand_landmarker.task).", "Es la causa más frecuente. Descárgalo con el enlace de modelo/LEEME.txt, guárdalo con ese nombre exacto en la carpeta modelo/ y súbelo.");

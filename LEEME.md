@@ -1,4 +1,4 @@
-# Las manos que construyeron la historia · v3.6 (edición para GitHub Pages)
+# Las manos que construyeron la historia · v3.5.1 (edición para GitHub Pages)
 
 Proyecto «Las manos que construyeron la historia». Geometría, patrimonio histórico y realidad aumentada en Educación Primaria (5.º y 6.º).
 
@@ -95,7 +95,6 @@ Todas las etapas se pueden hacer de tres formas:
 - **Decorados (v3.5).** Cada etapa tiene un telón pintado en el navegador acorde con su época y lugar (sabana del lago Turkana, cueva, aldea neolítica, cumbres de Gran Canaria, valle de Segovia, barranco con bancales, Toledo, obra de una catedral, nave gótica, patio nazarí, puerto de Mallorca), con suelo, niebla y luz propios. Al mostrar la imagen de la cámara, el decorado se retira.
 - **Bifaz (v3.5).** El nódulo empieza cubierto de córtex; cada golpe saca una lasca invasora de una cara distinta (talla bifacial), con negativos en abanico, ondas de percusión y retoque final del filo. Puede conservar córtex en la base, como muchos bifaces.
 - **Cerámica cardial (v3.5).** Pasta parda bruñida con manchas de cocción. Las impresiones se graban en la superficie de la vasija (siguen su curvatura) y reproducen el borde dentado de la valva de berberecho; se ordenan en una franja del hombro, como en la decoración cardial.
-- **Pintadera (v3.6).** Se añaden la excisión (vaciar una figura que acompaña a la forma del campo; 60 piezas del catálogo) y la forma rómbica (3 piezas).
 - **Pintadera (v3.5.1).** Rehecha a partir de Cruz de Mercadal, Delgado Darias y Velasco Vázquez (2013), *Pintaderas de El Museo Canario* (ISBN 978-84-695-6874-3). Tiene cuerpo (campo, laterales y dorso) y apéndice perforado, que se ve al girar la pieza. Se elige entre las cuatro formas más frecuentes del catálogo: rectangular (77 de 183 matrices simples), cuadrada (34), circular (29) y triangular (29). Cada forma tiene su simetría: orden 2, 4, 3 o libre en la circular. Se decora con punzón (impresión, la técnica más frecuente) o con incisión. El botón «Esquema del museo» muestra hileras que siguen la forma del campo, como en los esquemas pautados del catálogo. La medida real y el área del campo se muestran en pantalla. Al estampar, la imagen sale al revés (reflejo) y en negativo.
 - **Calidad gráfica.** Por defecto se usa la calidad alta: materiales con textura (granito, caliza, barro, sílex, latón, estuco, vidriado, pergamino y madera), sombras suaves, reflejos, aristas biseladas, trazos con grosor real y lienzos de 1024 a 1536 píxeles. Las texturas se generan en el propio navegador, sin descargar imágenes. Si el equipo no llega a 24 imágenes por segundo durante unos 4 segundos, la actividad quita las sombras y baja la resolución por sí sola.
   - `?calidad=ligera` arranca directamente en modo ligero (útil en tabletas antiguas).
@@ -114,19 +113,7 @@ Todas las etapas se pueden hacer de tres formas:
 - Real Academia Española, *Tesoro de los diccionarios históricos de la lengua española*, entrada «cantonera»: https://www.rae.es/tdhle/cantonera
 - Heredad de Aguas de Arucas y Firgas. Se cita sin fecha porque solo se ha consultado una fuente secundaria; conviene contrastarla con la bibliografía del Archivo Histórico Provincial o de la propia Heredad.
 
-### Encaje curricular (Decreto 211/2022, Canarias)
-
-La matriz completa está en [`docs/alineacion-curricular.md`](docs/alineacion-curricular.md). En resumen:
-- **Matemáticas:** todas las etapas trabajan saberes del tercer ciclo, como simetrías y giros, ángulos, áreas, volumen, escalas, porcentajes, fracciones y el uso del compás. El saber III.1.4 cita expresamente la realidad aumentada.
-- **Conocimiento del Medio:** el currículo canario sitúa la Prehistoria y la Edad Antigua en el **segundo ciclo** (saberes III.2.3-2.5). En el tercer ciclo están la Edad Media, la Moderna y la Contemporánea, y la sociedad indígena canaria (III.2.1; criterio 7.2).
-  - En 5.º y 6.º, la pintadera y el capítulo de la Edad Media encajan de lleno.
-  - Las demás etapas de la Prehistoria y de Roma sirven para activar conocimientos previos y dar contexto a la geometría. También pueden usarse en 3.º y 4.º.
-- Los códigos proceden del Anexo 2 que publica la Consejería; conviene cotejarlos con el texto del BOC.
-
-### Documentación del protocolo ARQ-3D-01 (adopción parcial)
-- [`docs/matriz-evidencias.md`](docs/matriz-evidencias.md): qué está documentado, qué es interpretación y qué es modelo didáctico.
-- [`docs/registro-decisiones.md`](docs/registro-decisiones.md): decisiones de diseño por versión.
-- [`docs/alineacion-curricular.md`](docs/alineacion-curricular.md): matriz curricular e instrumentos de evaluación.
+Los saberes deben contrastarse con el Decreto 211/2022 (currículo de Primaria en Canarias) antes de redactar la situación de aprendizaje.
 
 ## Puesta en marcha
 
@@ -136,13 +123,7 @@ No se incluye. Descárgalo desde:
 
 `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`
 
-Guárdalo como `modelo/hand_landmarker.task` y súbelo a la carpeta `modelo/` del repositorio («Add file → Upload files» en GitHub).
-
-**Comprobación:** el archivo correcto ocupa 7 819 105 bytes y su huella SHA-256 es `fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1`. El panel `?diagnostico` la comprueba solo; también puede hacerse a mano:
-- Windows: `certutil -hashfile hand_landmarker.task SHA256`
-- macOS o Linux: `shasum -a 256 hand_landmarker.task`
-
-Antes de redistribuirlo fuera del centro, revisa sus condiciones de uso en la documentación de MediaPipe.
+Guárdalo como `modelo/hand_landmarker.task`. Antes de redistribuirlo fuera del centro, revisa sus condiciones de uso en la documentación de MediaPipe.
 
 ### 2. Modelo remoto (desactivado en esta edición)
 
@@ -207,7 +188,6 @@ Su uso con menores debe valorarse con el delegado o la delegada de protección d
 - Encuadre comprobado en móvil vertical, móvil horizontal y tableta.
 - Sin peticiones externas salvo el modelo, cuando falta y está permitido.
 - La cámara se apaga cuando el detector no arranca.
-- v3.6: pared de la cueva integrada en la roca; pintadera con excisión y forma rómbica; comprobación de la huella del modelo en el diagnóstico; fecha del poblamiento de Canarias precisada (siglos II-III d. C., en debate). Regresión completa sin errores.
 - Decorados, bifaz y cerámica cardial (v3.5): recorridos de los tres capítulos sin errores, accesibilidad sin violaciones y capturas revisadas.
 - Calidad gráfica alta (v3.4): recorridos de los tres capítulos repetidos sin errores, capturas de las quince etapas revisadas y modo ligero comprobado.
 
@@ -215,7 +195,4 @@ Su uso con menores debe valorarse con el delegado o la delegada de protección d
 - Prueba de la pinza real con alumnado y en las tabletas del aula.
 - Revisión de Safari para iPad.
 - Comprobar en las tabletas del aula si salta el modo ligero automático; si va lenta, usar `?calidad=ligera`.
-- Subir el modelo de manos (`modelo/hand_landmarker.task`) al repositorio: sin él, la cámara no funciona.
-- Cotejar la matriz curricular con el texto oficial del BOC y concretar la situación de aprendizaje.
-- Revisión humana de los contenidos.
-- Capítulos de la Edad Moderna y la Edad Contemporánea.
+- Revisión humana de los contenidos y de la adecuación curricular.
