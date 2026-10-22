@@ -1,4 +1,4 @@
-# Las manos que construyeron la historia · v3.9 (edición para GitHub Pages)
+# Las manos que construyeron la historia · v3.9.1 (edición para GitHub Pages)
 
 Proyecto «Las manos que construyeron la historia». Geometría, patrimonio histórico y realidad aumentada en Educación Primaria (5.º y 6.º).
 
@@ -23,7 +23,16 @@ Al terminar cada capítulo, un botón lleva al siguiente, en orden cronológico,
 
 ## Bienvenida y pasaporte del aprendiz (`bienvenida.html`, v3.9)
 
-Es la puerta de entrada pensada para el alumnado. Conviene compartir este enlace: `https://danielulpgc.github.io/Mision-Roma/bienvenida.html`. La portada de la línea del tiempo (`index.html`) también enlaza con ella.
+Es la **pantalla de inicio del sitio**: quien abre `https://danielulpgc.github.io/Mision-Roma/` llega a la bienvenida.
+
+| Para abrir… | Dirección |
+|---|---|
+| La bienvenida (inicio) | `…/Mision-Roma/` o `…/bienvenida.html` |
+| La línea del tiempo | `…/index.html#linea` (botón «Ver la línea del tiempo» de la bienvenida) |
+| Misión Roma directamente | `…/index.html#roma` |
+| Modo docente, sin pasar por la bienvenida | `…/?docente` |
+
+Los botones «← Línea del tiempo» de los capítulos llevan a la línea del tiempo, no a la bienvenida. Al recargar la línea del tiempo se sigue en ella.
 
 - **La mano en la pared.** La página abre con la pared de una cueva. El alumnado mantiene pulsado (o usa el botón del teclado) y sopla pigmento alrededor de una mano dibujada; al retirarla queda la mano en negativo. Un texto breve la relaciona con la mano de El Castillo (Cantabria), de al menos 37 300 años (Pike et al., 2012, https://doi.org/10.1126/science.1219957). La mano es un dibujo, no la de quien juega: no se usa la cámara.
 - **El pasaporte.** Tiene una tapa con la mano que se ha dejado en la cueva y una página por capítulo, en orden cronológico. Cada página muestra qué se hará con las manos, cuántas etapas están hechas (lee el progreso que guarda cada capítulo) y un enlace para entrar o seguir.
@@ -247,6 +256,7 @@ Su uso con menores debe valorarse con el delegado o la delegada de protección d
 - Encuadre comprobado en móvil vertical, móvil horizontal y tableta.
 - Sin peticiones externas salvo el modelo, cuando falta y está permitido.
 - La cámara se apaga cuando el detector no arranca.
+- v3.9.1: la bienvenida pasa a ser la pantalla de inicio. Comprobada la navegación: raíz, línea del tiempo, recarga, «atrás», vuelta desde los capítulos, Misión Roma directa y modo docente.
 - v3.9: bienvenida y pasaporte del aprendiz. Probados en escritorio y en móvil vertical: soplo con puntero y con teclado, miniatura guardada, lectura del progreso, sello estampado e ideas previas. Sin violaciones de accesibilidad (axe, WCAG 2.2 AA), HTML válido, sin desbordamiento horizontal y sin errores.
 - v3.8: ayudas de juego comunes. Probadas pistas, aviso tras dos errores, celebración, anillos, ayuda tras tres pinzas fallidas, sonido desactivable y nuevo control del faro. Regresión de los cinco capítulos sin errores, axe sin violaciones y HTML válido.
 - v3.7: capítulos de la Edad Moderna y de la Edad Contemporánea. Recorridos completos de sus diez etapas, accesibilidad sin violaciones (portada, etapas, «Saber más» y panel final), HTML válido y sin peticiones externas. Regresión de los tres capítulos anteriores sin errores.

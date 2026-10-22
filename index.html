@@ -28,6 +28,14 @@
     v3.3: capítulo de la Edad Media (edad-media.html); el panel final de Misión Roma enlaza con él.
     v3.8: ayudas de juego comunes (pistas graduadas, anillos de agarre, respuesta a la pinza, celebración y sonido opcional).
   -->
+  <script>
+    // La pantalla de inicio del sitio es la bienvenida. La línea del tiempo se abre con index.html#linea
+    // (también con #roma, ?docente o ?diagnostico, que van directos a la actividad).
+    (function () {
+      var q = new URLSearchParams(location.search);
+      if (!location.hash && !q.has("docente") && !q.has("diagnostico")) location.replace("bienvenida.html" + location.search);
+    })();
+  </script>
   <script type="importmap">
   {
     "imports": {
@@ -182,7 +190,7 @@
       <h2 id="t-portada">Las manos que construyeron la historia</h2>
       <p>Desde la Prehistoria, los seres humanos han cambiado el mundo con sus manos: tallaron piedras, cultivaron la tierra, levantaron muros y llevaron el agua de un lugar a otro. De casi todas ellas no conocemos el nombre, pero sí lo que construyeron.</p>
       <p>En este proyecto recorrerás la historia en orden, desde la Prehistoria hasta hoy. En cada época construirás algo con tus propias manos y descubrirás la geometría y el patrimonio que hay detrás.</p>
-      <p><a class="enlace-pasaporte" href="bienvenida.html">¿Es tu primera vez? Deja tu mano en la cueva y abre tu pasaporte del aprendiz →</a></p>
+      <p><a class="enlace-pasaporte" href="bienvenida.html#pasaporte">← Volver a mi pasaporte del aprendiz</a></p>
       <h3>La línea del tiempo</h3>
       <ol class="linea" aria-label="Edades de la historia">
         <li class="era activa"><span class="era-nombre">Prehistoria</span><span class="era-fecha">Hasta la aparición de la escritura, hacia el 3000 a. C.</span><span class="era-estado">Capítulo disponible: Las primeras manos</span>
@@ -1998,7 +2006,7 @@
       }
     });
     const abrirRoma = location.hash === "#roma";
-    history.replaceState({ p: "portada" }, "", location.pathname + location.search);
+    history.replaceState({ p: "portada" }, "", location.pathname + location.search + "#linea");   // al recargar se vuelve aquí, no a la bienvenida
 
     function primeraEtapa() { let i = hechas.findIndex((h) => !h); return i < 0 ? 4 : i; }
     function empezarTactil(mensaje) {

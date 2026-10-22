@@ -1950,7 +1950,7 @@
     });
     // ---------- Portada, capítulo y botón «atrás» ----------
     const inicioDlg = $("inicio");
-    const irPortada = (hash = "") => { salirDeActividad(); location.href = "index.html" + location.search + hash; };
+    const irPortada = (hash = "#linea") => { salirDeActividad(); location.href = "index.html" + location.search + hash; };
     function salirDeActividad() {
       document.querySelectorAll(".panel:not([hidden])").forEach((p) => (p.hidden = true));
       if (modo === "manos") cerrarCamara();
