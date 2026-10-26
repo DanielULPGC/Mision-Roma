@@ -211,6 +211,7 @@
           <button type="button" class="principal" id="btn-entrar-contemporanea">Entrar en Hierro, luz y viento</button></li>
       </ol>
       <p class="fuente">Las fechas son los límites convencionales que se usan en la escuela para ordenar el tiempo. Los cambios entre una edad y otra fueron lentos y no ocurrieron a la vez en todos los lugares.</p>
+      <p class="fuente"><a href="maquina-del-tiempo.html">Máquina del tiempo · área del profesorado</a> (guía didáctica y solucionario, con contraseña)</p>
     </div>
   </section>
 
@@ -266,11 +267,11 @@
       <h2 id="t-final">¡Misión cumplida!</h2>
       <p>Tus manos han recorrido el camino de una obra hidráulica:</p>
       <ol>
-        <li><strong>Terreno:</strong> leíste el perfil y encontraste el valle donde el canal queda en el aire.</li>
-        <li><strong>Nivelar:</strong> ajustaste el pilar para que el agua bajara siempre, con la misma pendiente.</li>
-        <li><strong>Construir:</strong> levantaste el pilar con sillares y calculaste su volumen.</li>
+        <li><strong>Terreno:</strong> leíste el perfil, encontraste el valle donde el canal queda en el aire y calculaste la altura de la arcada.</li>
+        <li><strong>Nivelar:</strong> ajustaste el pilar para que el agua bajara con la misma pendiente y calculaste cuánto baja en un tramo.</li>
+        <li><strong>Construir:</strong> calculaste cuántos sillares hacían falta, levantaste el pilar y comprobaste su volumen.</li>
         <li><strong>Romanos:</strong> nivelaste un corobate y viste lo poco que bajaba un canal de verdad.</li>
-        <li><strong>Canarias:</strong> repartiste el agua de una cantonera en partes proporcionales.</li>
+        <li><strong>Canarias:</strong> repartiste el agua de una cantonera en partes proporcionales y calculaste las aberturas sin tantear.</li>
       </ol>
       <p>La misma idea une las cinco etapas: el agua solo se mueve sola cuesta abajo, y quien la conduce tiene que medir con mucho cuidado.</p>
       <div class="botones"><button type="button" class="principal" id="btn-ir-media">Continuar en la Edad Media: El compás y la piedra →</button><button type="button" data-cerrar>Volver a la obra</button></div>
@@ -366,7 +367,9 @@
     function verPista(texto) { const c = $("pista"); c.hidden = false; c.textContent = texto; }
     function mostrarPista() {
       if (!etapa) return;
-      const lista = etapa.pistas && etapa.pistas.length ? etapa.pistas : [etapa.nota];
+      // Las pistas pueden ser una lista fija o una función que devuelve las de la fase actual del reto
+      const ps = typeof etapa.pistas === "function" ? etapa.pistas() : etapa.pistas;
+      const lista = ps && ps.length ? ps : [etapa.nota];
       const n = nivelPista[actual] || 0, k = n % lista.length;
       nivelPista[actual] = n + 1;
       if (registro && !hechas[actual]) { registro[actual].pistas++; guardarRegistro(); }
@@ -1218,6 +1221,21 @@
       }
     }
 
+    // Desordena las opciones para que la respuesta correcta no esté siempre en el mismo sitio
+    function barajar(l) { const a = l.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+    // Tablillas de respuesta con texto variable (preguntas encadenadas dentro de una etapa)
+    function tablillasP(g, n, x, y0, paso, w = 1.15, z = 0.08) {
+      const t = Array.from({ length: n }, (_, i) => { const m = caja(w, 0.42, 0.06, M.madera); m.position.set(x, y0 - i * paso, z); m.visible = false; m.userData.i = i; g.add(m); return m; });
+      let ops = [];
+      return {
+        poner(o) { ops = o; t.forEach((m, i) => (m.visible = i < o.length)); },
+        ocultar() { ops = []; t.forEach((m) => (m.visible = false)); },
+        tocar(px, py) { const h = rayo(px, py).intersectObjects(t.filter((m) => m.visible), false)[0]; return h ? h.object.userData.i : null; },
+        etiquetas() { t.forEach((m, i) => { const e = etiqueta("", "geo", () => { if (!m.visible || !ops[i]) return null; e.texto = ops[i][0]; return [x, y0 - i * paso + 0.02, z + 0.08]; }); }); },
+        get ops() { return ops; }
+      };
+    }
+
     // Controles alternativos (DUA)
     function filaRango(etq, min, max, paso, valor, alCambiar, texto) {
       const id = "alt-" + Math.random().toString(36).slice(2, 8);
@@ -1248,7 +1266,11 @@
       const zC = (x) => 429.5 - 6 * (x / L);                // canal inventado: baja 6 m en 1200 m (0,5 %)
       const wx = (x) => -ANCHO / 2 + x * k;
       const xm = (w) => (w + ANCHO / 2) / k;
-      let E = 1, paso = "a", ancla = null, cotaMano = null;
+      let E = 1, paso = "a", ancla = null, cotaMano = null, respE1 = [];
+      // Fondo del valle (punto más bajo del terreno) y cota del canal en ese punto
+      const XV = (() => { let xb = 0, zb = 1e9; for (let x = 400; x <= 900; x++) if (zT(x) < zb) { zb = zT(x); xb = x; } return xb; })();
+      const ZV = Math.round(zT(XV)), ZC = Math.round(zC(XV)), ALTO = ZC - ZV;
+      const tabsE1 = tablillasP(g, 3, 3.1, 4.6, 0.62, 1.25, 0.7);
 
       const relieve = new THREE.Group(); g.add(relieve);
       const forma = new THREE.Shape();
@@ -1272,16 +1294,39 @@
         const hueco = zC(x) - zT(x);
         if (hueco > 12) {
           canal.visible = pilaresGuia.visible = true;
-          paso = "hecho";
-          completar(0, "¡Bien visto! En el valle el canal pasa a unos " + Math.round(hueco) + " m del suelo: ahí hace falta una arcada.");
+          paso = "altura"; cotaMano = ZV;
+          respE1 = barajar([[ALTO + " m", null], [(430 - ZV) + " m", "Esa es la diferencia entre el manantial y el valle. Pregunta por el canal: compara la cota del canal con la del fondo del valle."], [(ZC + ZV) + " m", "No hay que sumar las cotas: la altura de la arcada es lo que hay entre el suelo y el canal. Resta."]]);
+          tabsE1.poner(respE1); reAltE1();
+          estado("¡Bien visto! En el valle el canal queda en el aire: ahí hace falta un acueducto. El canal pasa a " + ZC + " m de altitud y el fondo del valle está a " + ZV + " m. ¿Qué altura deberá tener la arcada más alta? Haz pinza sobre una tablilla.", "status-ok", "e1-altura");
         } else {
           estado("Aquí el terreno está a " + Math.round(zT(x)) + " m: el canal puede ir por el suelo o bajo tierra. Busca donde el terreno baja más.", "status-warn", "e1-no-" + Math.round(x / 50));
         }
         refrescar();
       }
       let ctrlE = null;
+      function responderE1(i) {
+        if (paso !== "altura" || !respE1[i]) return;
+        const mal = respE1[i][1];
+        if (mal) { estado(mal, "status-error", "e1-mal-" + i); return; }
+        paso = "hecho"; tabsE1.ocultar(); reAltE1();
+        completar(0, "¡Correcto! " + ZC + " − " + ZV + " = " + ALTO + " m: la arcada más alta tendrá unos " + ALTO + " m. En el resto del recorrido el canal puede ir por el suelo o bajo tierra.");
+      }
+      function reAltE1() { if (actual !== 0) return; alternativos.replaceChildren(); construirAltE1(); }
+      function construirAltE1() {
+        ctrlE = filaRango("Exageración", 1, 25, 0.5, E, (v) => { ponerE(v); if (E >= 10 && paso === "a") pasarB(); }, (v) => "por " + fmt(v, 1));
+        let xSel = 300;
+        filaRango("Punto del recorrido", 0, 1200, 10, xSel, (v) => { xSel = v; cotaMano = zT(v); refrescar(); }, (v) => Math.round(v) + " metros desde el manantial, cota " + Math.round(zT(v)) + " metros");
+        filaBotones([["Comprobar este punto", () => { if (paso === "b") comprobar(xSel); }]]);
+        if (paso === "altura") filaBotones(respE1.map((o, i) => ["La arcada mide " + o[0], () => responderE1(i)]));
+      }
       function refrescar() {
-        metricas([
+        if (actual !== 0) return;
+        metricas(paso === "altura" || paso === "hecho" ? [
+          "Canal en el valle: " + ZC + " m de altitud",
+          "Fondo del valle: " + ZV + " m de altitud",
+          "Manantial: 430 m",
+          "Ciudad: " + Math.round(zT(L)) + " m"
+        ] : [
           "Exageración vertical: ×" + fmt(E, 1),
           "Cota bajo tu mano: " + (cotaMano == null ? "—" : Math.round(cotaMano) + " m"),
           "Manantial: 430 m",
@@ -1290,24 +1335,24 @@
       }
       return {
         nombre: "Leer el terreno", grupo: g, marco: { ancho: 8.2, alto: 5.6, cy: 2.3 }, fondo: "valle",
-        pistas: ["Primero estira las alturas: haz pinza en cualquier sitio del perfil y sube la mano hasta una exageración de ×10 o más.", "Después busca dónde el terreno baja mucho más que el canal, que siempre va bajando poco a poco. Haz pinza en el punto más hondo del valle."],
+        pistas: ["Primero estira las alturas: haz pinza en cualquier sitio del perfil y sube la mano hasta una exageración de ×10 o más. Después haz pinza en el punto más hondo del valle.", "La altura de la arcada es la distancia entre el canal y el suelo: cota del canal menos cota del fondo del valle."],
+        contexto: { epoca: "Imperio romano · siglos I y II d. C.", titulo: "Llevar el agua a la ciudad",
+          texto: "<p>Las ciudades romanas necesitaban mucha agua para sus fuentes, termas y casas. Los ingenieros la traían desde manantiales lejanos por <strong>canales que bajaban siempre un poco</strong>, para que el agua corriera sola, sin bombas.</p><p>Antes de construir había que estudiar el terreno. Donde el suelo se hundía, como en un valle, el canal quedaba en el aire y había que levantar un <strong>acueducto</strong> con arcos que lo sostuviera, como el de Segovia.</p><p>Para estudiar el terreno se dibuja un <strong>perfil</strong>: el terreno cortado y visto de lado. Como los valles son poco profundos comparados con la distancia, en el perfil se estiran las alturas para verlos (exageración vertical).</p><p class=\"reto\"><strong>Tu reto:</strong> estira las alturas del perfil para ver el relieve, encuentra el valle donde el canal quedaría en el aire y calcula qué altura deberá tener la arcada más alta.</p>" },
         nota: "Perfil topográfico inventado para la actividad. Las alturas están exageradas para poder verlas.",
         entrar() {
           etiqueta("Manantial · 430 m", "", () => [wx(0) + 0.95, (zT(0) - 400) * k * E + 0.15]);
           etiqueta("Ciudad", "", () => [wx(L) - 0.45, (zT(L) - 400) * k * E + 0.15]);
           etiqueta("Valle", "geo", () => (paso === "hecho" ? [wx(650), (zT(650) - 400) * k * E - 0.05] : null)).el.classList.add("abajo");
           etiqueta("canal", "agua", () => (paso === "hecho" ? [wx(330), (zC(330) - 400) * k * E + 0.12] : null));
-          if (paso === "a") estado("Desde lejos el terreno parece plano. Haz pinza en cualquier sitio y sube la mano para estirar las alturas.", "status-warn", "e1-a");
+          tabsE1.etiquetas();
+          if (paso === "a") estado("El agua irá del manantial (izquierda) a la ciudad (derecha) por un canal que baja muy poco a poco. Desde lejos el terreno parece plano: haz pinza en cualquier sitio y sube la mano para estirar las alturas.", "status-warn", "e1-a");
+          else if (paso === "altura") estado("El canal pasa a " + ZC + " m de altitud y el fondo del valle está a " + ZV + " m. ¿Qué altura deberá tener la arcada más alta?", "status-warn", "e1-altura-ini");
           else if (paso === "b") estado("¿Dónde quedará el canal en el aire? Haz pinza sobre el punto más bajo del valle.", "status-warn", "e1-b");
           refrescar();
         },
-        alternativos() {
-          ctrlE = filaRango("Exageración", 1, 25, 0.5, E, (v) => { ponerE(v); if (E >= 10 && paso === "a") pasarB(); }, (v) => "por " + fmt(v, 1));
-          let xSel = 300;
-          filaRango("Punto del recorrido", 0, 1200, 10, xSel, (v) => { xSel = v; cotaMano = zT(v); refrescar(); }, (v) => Math.round(v) + " metros desde el manantial, cota " + Math.round(zT(v)) + " metros");
-          filaBotones([["Comprobar este punto", () => { if (paso === "b") comprobar(xSel); }]]);
-        },
+        alternativos() { construirAltE1(); },
         down(x, y) {
+          if (paso === "altura") { const i = tabsE1.tocar(x, y); if (i !== null) responderE1(i); return false; }
           if (paso === "a") { ancla = { y, E }; return true; }
           if (paso === "b") {
             const hit = rayo(x, y).intersectObject(terreno, false)[0];
@@ -1319,10 +1364,10 @@
         },
         move(x, y) { if (ancla) ponerE(ancla.E * Math.exp((ancla.y - y) / 110)); },
         up() { if (!ancla) return; ancla = null; if (paso === "a" && E >= 10) pasarB(); else if (paso === "a") estado("Sigue estirando: con más exageración se ve mejor el valle (al menos ×10).", "status-warn", "e1-a2"); },
-        hover(x, y) { const p = enPlano(x, y); if (p && Math.abs(p.x) <= ANCHO / 2) { cotaMano = zT(clamp(xm(p.x), 0, L)); refrescar(); } },
+        hover(x, y) { if (paso === "altura" || paso === "hecho") return; const p = enPlano(x, y); if (p && Math.abs(p.x) <= ANCHO / 2) { cotaMano = zT(clamp(xm(p.x), 0, L)); refrescar(); } },
         tick() {}
       };
-      function pasarB() { paso = "b"; estado("¿Dónde quedará el canal en el aire? Haz pinza sobre el punto más bajo del valle.", "status-warn", "e1-b"); }
+      function pasarB() { paso = "b"; estado("¡Ahora se ve el relieve! El canal (que irá casi recto, bajando muy poco) quedará en el aire donde el terreno se hunde. Haz pinza sobre el punto más bajo del valle.", "status-warn", "e1-b"); }
     })();
 
     // =====================================================================
@@ -1367,7 +1412,20 @@
       const agua = crearAgua(36);
       const pos = Array.from({ length: 36 }, (_, i) => (i / 36) * 2);
       g.add(pIzq, pDer, pilar, a1, a2, c1, c2, agua);
-      let h = 2.0, arrastre = null, ctrl = null;
+      let h = 2.0, arrastre = null, ctrl = null, faseE2 = "nivelar", respE2 = [];
+      const tabsE2 = tablillasP(g, 3, -3.2, 4.4, 0.62, 1.2, 0.6);
+      function responderE2(i) {
+        if (faseE2 !== "pregunta" || !respE2[i]) return;
+        const mal = respE2[i][1];
+        if (mal) { estado(mal, "status-error", "e2-mal-" + i); return; }
+        faseE2 = "hecho"; tabsE2.ocultar(); reAltE2();
+        completar(1, "¡Correcto! El 8 % de 2,5 m: 2,5 × 8 : 100 = 0,2 m, es decir, 20 cm. Recuerda que esta pendiente está muy exagerada para que se vea; en la etapa 4 verás la real.");
+      }
+      function reAltE2() { if (actual !== 1) return; alternativos.replaceChildren(); construirAltE2(); }
+      function construirAltE2() {
+        ctrl = filaRango("Altura del pilar", 1.2, 4, 0.01, h, (v) => { if (faseE2 === "nivelar") actualizarGeometria(v); }, (v) => fmt(v) + " metros");
+        if (faseE2 === "pregunta") filaBotones(respE2.map((o, i) => ["Baja " + o[0], () => responderE2(i)]));
+      }
 
       function actualizarGeometria(nueva) {
         h = clamp(nueva, 1.2, 4.0);
@@ -1380,27 +1438,40 @@
         pilar.material = h === 3.2 ? M.correcto : M.seleccion;
         if (actual !== 1) return;
         const p1 = ((h - ALTURA_IZQ) / DISTANCIA_TRAMO) * 100, p2 = ((ALTURA_DER - h) / DISTANCIA_TRAMO) * 100;
-        metricas(["Altura pilar: " + fmt(h) + " m", "Tramo 1: " + fmtSigno(p1) + " %", "Tramo 2: " + fmtSigno(p2) + " %", "Volumen prisma: " + fmt(LADO_PILAR * LADO_PILAR * h) + " m³"]);
+        metricas(["Altura del pilar: " + fmt(h) + " m", "Tramo 1: " + fmtSigno(p1) + " %", "Tramo 2: " + fmtSigno(p2) + " %", "Cada tramo mide 2,5 m en horizontal"]);
         ctrl && ctrl.poner(h);
+        if (faseE2 !== "nivelar") return;
         if (h >= ALTURA_IZQ) estado("El tramo 1 no baja: el agua no sale del manantial. Baja el pilar.", "status-error", "e2-t1");
         else if (h <= ALTURA_DER) estado("El tramo 2 no baja: el agua se queda atascada en el pilar. El agua no sube sola.", "status-error", "e2-t2");
-        else if (h === 3.2) { completar(1, "¡Nivelación conseguida! Los dos tramos bajan igual (−8 %) hasta la ciudad."); }
+        else if (h === 3.2) {
+          faseE2 = "pregunta";
+          respE2 = barajar([["0,2 m (20 cm)", null], ["8 m", "8 m es lo que baja en 100 m. El tramo mide solo 2,5 m: calcula el 8 % de 2,5."], ["2 m", "Demasiado: 2 m sería casi todo el tramo. El 8 % de 2,5 m es mucho menos."]]);
+          tabsE2.poner(respE2); reAltE2();
+          estado("¡Nivelación conseguida! Los dos tramos bajan igual. La pendiente es del −8 %: el canal baja 8 m por cada 100 m que avanza. Si revisamos un tramo de 2,5 m, ¿cuántos metros bajará el agua en ese recorrido? Haz pinza sobre una tablilla.", "status-ok", "e2-pregunta");
+        }
         else estado("El agua llega, pero los dos tramos no bajan igual. ¿Puedes igualar las pendientes?", "status-warn", "e2-llega");
       }
       actualizarGeometria(2.0);
       return {
-        nombre: "Nivelar el canal", grupo: g, marco: { ancho: 7.6, alto: 5.0, cy: 1.8 }, fondo: "valle",
-        pistas: ["Haz pinza sobre el pilar amarillo y sube o baja la mano. El agua solo corre si los dos tramos del canal bajan.", "Los dos tramos miden lo mismo en horizontal (2,5 m). Para que bajen igual, la cima del pilar debe quedar justo a medio camino entre el manantial (3,40 m) y la ciudad (3,00 m)."],
-        agarres() { return [[0, h - 0.25, 0.5]]; },
+        nombre: "Nivelar el canal", grupo: g, marco: { ancho: 8.2, alto: 5.0, cy: 1.9 }, fondo: "valle",
+        contexto: { epoca: "Imperio romano · siglos I y II d. C.", titulo: "Que el agua no se pare",
+          texto: "<p>En un acueducto, el canal va por encima de los arcos. Cada tramo tiene que <strong>bajar un poco</strong>: si un tramo sube, el agua se para, porque no puede subir sola.</p><p>Por eso los ingenieros calculaban con cuidado la altura de cada pilar. La inclinación de un canal se expresa como <strong>pendiente</strong>, en porcentaje: una pendiente del −8 % significa que baja 8 m por cada 100 m que avanza en horizontal.</p><p>En esta etapa la pendiente está muy exagerada para que se vea bien; los canales romanos bajaban mucho menos.</p><p class=\"reto\"><strong>Tu reto:</strong> ajusta la altura del pilar central para que el agua baje igual en los dos tramos, desde el manantial hasta la ciudad. Después calcula cuánto baja el agua en un tramo.</p>" },
+        pistas: ["Haz pinza sobre el pilar amarillo y sube o baja la mano. El agua solo corre si los dos tramos del canal bajan; la cima del pilar debe quedar a medio camino entre el manantial (3,40 m) y la ciudad (3,00 m).", "Para la pregunta: −8 % quiere decir 8 m de bajada por cada 100 m. En 2,5 m baja el 8 % de 2,5, es decir, 2,5 × 8 : 100."],
+        agarres() { return faseE2 === "nivelar" ? [[0, h - 0.25, 0.5]] : []; },
         nota: "Modelo con exageración vertical: la inclinación real era mucho menor (lo verás en la etapa 4).",
         entrar() {
           etiqueta("Manantial", "", () => [-DISTANCIA_TRAMO, ALTURA_IZQ + 0.55]);
           etiqueta("Ciudad", "", () => [DISTANCIA_TRAMO, ALTURA_DER + 0.55]);
+          tabsE2.etiquetas();
           categoriaPrevia = ""; actualizarGeometria(h);
-          if (h < ALTURA_DER) estado("Haz pinza sobre el pilar amarillo y súbelo con la mano.", "status-warn", "e2-ini");
+          if (faseE2 === "nivelar" && h < ALTURA_DER) estado("El agua tiene que bajar del manantial (3,40 m) a la ciudad (3,00 m) pasando por el pilar del centro. Si un tramo sube, el agua se para. Haz pinza sobre el pilar amarillo y súbelo o bájalo hasta que los dos tramos bajen lo mismo.", "status-warn", "e2-ini");
+          else if (faseE2 === "pregunta") estado("Pendiente del −8 %: el canal baja 8 m por cada 100 m. En un tramo de 2,5 m, ¿cuánto bajará el agua?", "status-warn", "e2-pregunta-ini");
         },
-        alternativos() { ctrl = filaRango("Altura del pilar", 1.2, 4, 0.01, h, actualizarGeometria, (v) => fmt(v) + " metros"); },
-        down(x, y) { if (!toca(x, y, zona)) return false; arrastre = { y0: y, h0: h, ppm: pixelesPorMetro() }; return true; },
+        alternativos() { construirAltE2(); },
+        down(x, y) {
+          if (faseE2 === "pregunta") { const i = tabsE2.tocar(x, y); if (i !== null) responderE2(i); return false; }
+          if (faseE2 !== "nivelar" || !toca(x, y, zona)) return false; arrastre = { y0: y, h0: h, ppm: pixelesPorMetro() }; return true;
+        },
         // Ganancia 0,5: el pilar sube a media velocidad que la mano, para poder afinar con la pinza
         move(x, y) { if (arrastre) actualizarGeometria(arrastre.h0 + 0.5 * (arrastre.y0 - y) / arrastre.ppm); },
         up() { arrastre = null; },
@@ -1443,14 +1514,42 @@
       for (let i = 0; i < 3; i++) { const s = nuevoSillar(i + 20); s.position.set(X_MONTON, 0.2 + i * ALTO_SILLAR, 0); monton.add(s); }
       g.add(monton);
       const colocados = [];
-      let enMano = null, terminado = false;
+      let enMano = null, terminado = false, faseE3 = "calcular", qE3 = 0, respE3 = [];
+      const tabsE3 = tablillasP(g, 3, -3.95, 4.3, 0.62, 1.3, 0.6);
+      const PREG_E3 = [
+        { txt: "El pilar tiene una base de 0,90 × 0,90 m y tiene que llegar hasta 3,20 m de altura. Cada sillar mide 0,90 × 0,90 × 0,40 m. ¿Cuántos sillares tienes que apilar? Haz pinza sobre una tablilla.",
+          ops: [["8 sillares", null], ["6 sillares", "Con 6 sillares solo llegas a 6 × 0,40 = 2,40 m. Te faltan."], ["10 sillares", "Con 10 sillares llegarías a 10 × 0,40 = 4,00 m: te pasas. Divide 3,20 entre 0,40."]],
+          bien: "¡Exacto! 3,20 : 0,40 = 8. Ahora compruébalo: coge un sillar del montón con la pinza y suéltalo sobre la marca del pilar, hasta llegar al canal." },
+        { txt: "¡Pilar terminado! Calcula el volumen total del pilar, que es un prisma: 0,90 × 0,90 × 3,20. Haz pinza sobre una tablilla.",
+          ops: [["2,592 m³", null], ["2,88 m³", "0,90 × 3,20 = 2,88: te falta multiplicar por el otro lado de la base (0,90)."], ["0,324 m³", "Ese es el volumen de un solo sillar (0,90 × 0,90 × 0,40)."]],
+          bien: "¡Correcto! 0,90 × 0,90 × 3,20 = 2,592 m³." },
+        { txt: "Cada sillar tiene un volumen de 0,90 × 0,90 × 0,40 = 0,324 m³. ¿Coincide el volumen del pilar con el de los 8 sillares juntos (8 × 0,324)?",
+          ops: [["Sí: los dos dan 2,592 m³", null], ["No: los sillares suman más", "Calcula 8 × 0,324 y compáralo con 2,592."], ["No: el pilar es mayor", "Calcula 8 × 0,324 y compáralo con 2,592."]],
+          bien: "" }
+      ];
+      PREG_E3.forEach((q) => (q.ops = barajar(q.ops)));
+      function preguntarE3() { respE3 = PREG_E3[qE3].ops; tabsE3.poner(respE3); reAltE3(); }
+      function responderE3(i) {
+        if ((faseE3 !== "calcular" && faseE3 !== "volumen") || !respE3[i]) return;
+        const mal = respE3[i][1];
+        if (mal) { estado(mal, "status-error", "e3-mal-" + qE3 + "-" + i); return; }
+        if (qE3 === 0) { faseE3 = "construir"; tabsE3.ocultar(); reAltE3(); estado(PREG_E3[0].bien, "status-ok", "e3-construir"); return; }
+        if (qE3 === 1) { qE3 = 2; preguntarE3(); estado(PREG_E3[1].bien + " " + PREG_E3[2].txt, "status-ok", "e3-q2"); return; }
+        faseE3 = "hecho"; tabsE3.ocultar(); reAltE3();
+        completar(2, "¡Sí! 8 × 0,324 = 2,592 m³: el volumen del pilar es la suma de los volúmenes de sus sillares. Su altura es 8 × 0,40 = 3,20 m.");
+      }
+      function reAltE3() { if (actual !== 2) return; alternativos.replaceChildren(); construirAltE3(); }
+      function construirAltE3() {
+        filaBotones([["Colocar un sillar", () => { if (faseE3 === "construir") colocar(); }], ["Quitar el último", () => { if (faseE3 === "construir") quitar(); }]]);
+        if (faseE3 === "calcular" || faseE3 === "volumen") filaBotones(respE3.map((o, i) => [o[0], () => responderE3(i)]));
+      }
 
       function colocar() {
         if (colocados.length >= N_OBJ) { estado("El pilar ya llega al canal: no caben más sillares.", "status-warn", "e3-lleno"); return false; }
         const s = nuevoSillar(colocados.length);
         s.position.set(0, ALTO_SILLAR / 2 + colocados.length * ALTO_SILLAR, 0);
         g.add(s); colocados.push(s);
-        if (colocados.length === N_OBJ) terminar(); else estado("Sillar colocado. ¿Cuántos harán falta para llegar al canal (3,20 m)?", "status-warn", "e3-c" + colocados.length);
+        if (colocados.length === N_OBJ) terminar(); else estado("Sillar colocado: " + colocados.length + " × 0,40 = " + fmt(colocados.length * ALTO_SILLAR) + " m. Sigue hasta llegar al canal (3,20 m).", "status-warn", "e3-c" + colocados.length);
         refrescar();
         return true;
       }
@@ -1461,19 +1560,20 @@
       }
       function terminar() {
         terminado = true; c1.visible = c2.visible = agua.visible = cotaR.visible = cotaL.visible = true;
-        completar(2, "¡Pilar terminado! " + N_OBJ + " sillares × 0,40 m = 3,20 m. Volumen: " + N_OBJ + " × 0,324 = 2,592 m³.");
+        faseE3 = "volumen"; qE3 = 1; preguntarE3();
+        estado(PREG_E3[1].txt, "status-ok", "e3-q1");
       }
       function refrescar() {
         const n = colocados.length;
-        metricas([
-          "Sillares: " + n, "Altura: " + n + " × 0,40 = " + fmt(n * ALTO_SILLAR) + " m",
-          "Volumen: " + fmt(n * V_SILLAR, 3) + " m³", "Objetivo: 3,20 m (" + fmt(LADO_PILAR * LADO_PILAR * H_OBJ, 3) + " m³)"
-        ]);
+        if (actual !== 2) return;
+        metricas(["Sillares colocados: " + n, "Altura: " + fmt(n * ALTO_SILLAR) + " m de 3,20 m", "Base del pilar: 0,90 × 0,90 m", "Sillar: 0,90 × 0,90 × 0,40 m"]);
       }
       return {
         nombre: "Construir el pilar", grupo: g, marco: { ancho: 9.6, alto: 5.0, cy: 1.8 }, fondo: "valle",
-        pistas: ["Haz pinza sobre el montón de sillares, lleva la mano encima de la marca del pilar y abre los dedos para soltar el sillar.", "El pilar debe medir 3,20 m y cada sillar mide 0,40 m. ¿Cuántas veces cabe 0,40 en 3,20?"],
-        agarres() { return terminado ? [] : [[X_MONTON, 0.8, 0.5]]; },
+        pistas: ["Para saber cuántos sillares: ¿cuántas veces cabe 0,40 m en 3,20 m? Después coge un sillar del montón con la pinza y suéltalo sobre la marca del pilar.", "El volumen de un prisma es el área de la base por la altura: 0,90 × 0,90 × 3,20. El de un sillar, 0,90 × 0,90 × 0,40; multiplícalo por el número de sillares y compara."],
+        agarres() { return faseE3 === "construir" ? [[X_MONTON, 0.8, 0.5]] : []; },
+        contexto: { epoca: "Imperio romano · siglos I y II d. C.", titulo: "Piedra sobre piedra",
+          texto: "<p>Los pilares de los acueductos se levantaban con <strong>sillares</strong>: bloques de piedra tallados con medidas regulares que se colocaban unos sobre otros. En el acueducto de Segovia, los bloques de granito se sostienen sin argamasa, solo por su peso y su buen encaje.</p><p>Para preparar la obra había que calcular cuántos bloques hacían falta y cuánta piedra se iba a mover: el <strong>volumen</strong>. Un pilar con forma de caja es un <strong>prisma</strong>, y su volumen es el área de la base por la altura.</p><p class=\"reto\"><strong>Tu reto:</strong> calcula cuántos sillares necesita el pilar, apílalos hasta el canal y comprueba que el volumen del pilar es el de todos sus sillares juntos.</p>" },
         nota: "Cada sillar mide 0,90 × 0,90 × 0,40 m. Es un prisma: 6 caras, 12 aristas y 8 vértices.",
         entrar() {
           etiqueta("sillares", "", () => [X_MONTON, 1.45]);
@@ -1481,12 +1581,16 @@
           etiqueta("luz = 1,60 m", "geo", () => (terminado ? [a1.position.x, a1.position.y - 0.3, 0.3] : null));
           etiqueta("aquí va el pilar", "", () => (terminado ? null : [0, H_OBJ + 0.45]));
           etiqueta("prisma: 6 caras · 12 aristas · 8 vértices", "geo abajo", () => (terminado ? [0, -0.25] : null));
+          tabsE3.etiquetas();
           refrescar();
-          if (!terminado) estado("Coge un sillar del montón con la pinza y suéltalo sobre la marca del pilar.", "status-warn", "e3-ini");
+          if (faseE3 === "calcular") { if (!respE3.length) preguntarE3(); estado(PREG_E3[0].txt, "status-warn", "e3-ini"); }
+          else if (faseE3 === "construir") estado("Coge un sillar del montón con la pinza y suéltalo sobre la marca del pilar, hasta llegar al canal.", "status-warn", "e3-construir-ini");
+          else if (faseE3 === "volumen") estado(PREG_E3[qE3].txt, "status-warn", "e3-q-ini");
         },
-        alternativos() { filaBotones([["Colocar un sillar", () => colocar()], ["Quitar el último", quitar]]); },
+        alternativos() { construirAltE3(); },
         down(x, y) {
-          if (!toca(x, y, monton)) return false;
+          if (faseE3 === "calcular" || faseE3 === "volumen") { const i = tabsE3.tocar(x, y); if (i !== null) responderE3(i); return false; }
+          if (faseE3 !== "construir" || !toca(x, y, monton)) return false;
           enMano = nuevoSillar(colocados.length); g.add(enMano);
           const p = enPlano(x, y); if (p) enMano.position.set(p.x, p.y, 0.3);
           return true;
@@ -1578,7 +1682,7 @@
           paso = "b"; canalEj.visible = true; ponerE(16);
           estado("¡Corobate nivelado! El agua queda pareja en los dos extremos. Ahora quita la exageración: haz pinza y baja la mano.", "status-ok", "e4-b");
         } else if (cunaAlt > DESNIVEL) estado("Te has pasado: ahora el lado derecho queda más alto. Baja la cuña.", "status-error", "e4-alto");
-        else estado("El corobate está inclinado: el agua se va a un lado y las plomadas no tocan la marca. Sube la cuña de la derecha.", "status-warn", "e4-bajo");
+        else estado("Queremos saber si el suelo está nivelado, como hacían los romanos. Ahora el corobate está inclinado: el agua del canalito se va a un lado y las plomadas no caen sobre las marcas. Haz pinza sobre la cuña de la derecha y súbela poco a poco.", "status-warn", "e4-bajo");
       }
       function ponerE(v) {
         Ex = clamp(v, 1, 16);
@@ -1591,6 +1695,8 @@
       }
       geom();
       return {
+        contexto: { epoca: "Roma · siglo I a. C.", titulo: "Medir sin láser",
+          texto: "<p>En las etapas anteriores la pendiente estaba muy exagerada para que se viera. En realidad, los canales romanos bajaban <strong>muy poco</strong>: a veces menos de un metro por cada cien. Para conseguirlo había que medir con mucha precisión, sin láseres ni aparatos modernos.</p><p>El arquitecto romano <strong>Vitruvio</strong>, en su libro <em>De architectura</em> (siglo I a. C.), describe el <strong>corobate</strong>: una regla larga de unos veinte pies con patas, unas plomadas que deben caer justo sobre unas marcas y, para los días de viento, un canalito con agua que debe quedar igual de lleno en los dos extremos.</p><p class=\"reto\"><strong>Tu reto:</strong> el suelo de la derecha está más bajo. Pon una cuña bajo la pata derecha hasta que el corobate quede horizontal (agua pareja y plomadas sobre las marcas). Después quita la exageración y mira cuánto bajaba de verdad un canal.</p>" },
         nombre: "Cómo lo hacían los romanos", grupo: g, marco: { ancho: 7.8, alto: 4.2, cy: 1.2 }, fondo: "valle",
         pistas: ["Mira el agua del canalito y las plomadas: si el agua se va a un lado, el corobate está inclinado. Haz pinza sobre la cuña de la derecha y súbela poco a poco.", "Si te pasas, baja la cuña. Cuando esté nivelado, haz pinza en cualquier sitio y baja la mano hasta quitar toda la exageración (×1)."],
         agarres() { return paso === "a" ? [[XP, -DESNIVEL + 0.45, 0.4]] : []; },
@@ -1645,8 +1751,29 @@
       XS.forEach((x) => { const c = caja(0.5, 0.12, 1.2, M.canal); c.position.set(x, 0.06, 0.95); g.add(c); });
       const N_GOTAS = 60, agua = crearAgua(N_GOTAS, 0.06); g.add(agua);
       const gotas = Array.from({ length: N_GOTAS }, (_, i) => ({ s: (i * 0.137) % 1, canal: i % 3 }));
-      let ab = [0.4, 0.4, 0.4], arrastre = null, hecho = false;
+      let ab = [0.4, 0.4, 0.4], arrastre = null, hecho = false, faseE5 = "repartir", respE5 = [], abFinal = null;
       const ctrls = [];
+      const tabsE5 = tablillasP(g, 3, 3.45, 3.9, 0.62, 1.2, 0.6);
+      // Regla graduada junto a cada boca, desde el suelo: 0 a 80 cm, con marca cada 10 cm (la abertura es el hueco bajo la tabla)
+      const matRegla = new THREE.MeshBasicMaterial({ color: 0xf8f1e0 }), matMarca = new THREE.MeshBasicMaterial({ color: 0x1c1917 });
+      XS.forEach((x) => {
+        const r = caja(0.06, ABRIR_MAX + 0.04, 0.02, matRegla); r.position.set(x + ANCHO_BOCA / 2 + 0.12, ABRIR_MAX / 2, 0.56); g.add(r);
+        for (let k = 0; k <= 8; k++) { const m = caja(k % 2 ? 0.05 : 0.09, 0.012, 0.03, matMarca); m.position.set(x + ANCHO_BOCA / 2 + 0.12, k * 0.1, 0.57); g.add(m); }
+      });
+      function responderE5(i) {
+        if (faseE5 !== "pregunta" || !respE5[i]) return;
+        const mal = respE5[i][1];
+        if (mal) { estado(mal, "status-error", "e5-mal-" + i); return; }
+        faseE5 = "hecho"; hecho = true; tabsE5.ocultar(); reAltE5();
+        completar(4, "¡Correcto! Las bocas de B y C se abren la mitad que la de A: así A recibe 2 de cada 4 partes (1/2 = 50 %) y B y C, 1 parte cada una (1/4 = 25 %). Es una proporción: lo que importa es la relación entre las aberturas.");
+        abrirPanel("panel-final");
+      }
+      function reAltE5() { if (actual !== 4) return; alternativos.replaceChildren(); construirAltE5(); }
+      function construirAltE5() {
+        ctrls.length = 0;
+        NOMBRES.forEach((n, i) => ctrls.push(filaRango(n + " (cm)", 0, 80, 5, ab[i] * 100, (v) => { if (faseE5 !== "repartir") return; ab[i] = Math.round(v / 5) * 5 / 100; geom(); }, (v) => "abertura " + Math.round(v) + " centímetros de 80")));
+        if (faseE5 === "pregunta") filaBotones(respE5.map((o, i) => [o[0], () => responderE5(i)]));
+      }
 
       function repartos() { const t = ab.reduce((a, b) => a + b, 0); return t > 0 ? ab.map((a) => a / t) : [0, 0, 0]; }
       function geom() {
@@ -1655,30 +1782,40 @@
         if (actual !== 4) return;
         metricas(r.map((p, i) => NOMBRES[i] + ": " + Math.round(p * 100) + " % · meta " + FRAC[i]).concat(["Aberturas: " + ab.map((a) => fmt(a * 100, 0)).join(" · ") + " cm"]));
         ctrls.forEach((c, i) => c.poner(ab[i] * 100));
-        if (hecho) return;
+        if (hecho || faseE5 !== "repartir") return;
         const ok = r.every((p, i) => Math.abs(p - OBJ[i]) < 0.005) && ab.some((a) => a > 0.02);
         if (ok) {
-          hecho = true;
-          geom();
-          completar(4, "¡Reparto justo! La finca A recibe la mitad (50 %) y las fincas B y C, un cuarto cada una (25 %).");
-          abrirPanel("panel-final");
+          faseE5 = "pregunta"; abFinal = ab.map((a) => Math.round(a * 100));
+          // Se pregunta con otra abertura de A, para comprobar que se ha entendido la proporción y no se ha acertado por tanteo
+          const A2 = abFinal[0] === 60 ? 40 : 60, B2 = A2 / 2;
+          respE5 = barajar([["B y C: " + B2 + " cm cada una", null], ["B y C: " + A2 / 4 + " cm cada una", "Así B y C recibirían menos de un cuarto. La boca de cada una debe ser la mitad que la de A."], ["B y C: " + A2 + " cm cada una", "Si las tres bocas se abren igual, cada finca recibe un tercio, no la mitad y dos cuartos."]]);
+          tabsE5.poner(respE5); reAltE5();
+          estado("¡Reparto justo con " + abFinal.join(", ") + " cm! Ahora sin tantear: si la boca de A estuviera abierta " + A2 + " cm, ¿cuánto habría que abrir las de B y C para repartir igual (1/2, 1/4 y 1/4)? Haz pinza sobre una tablilla.", "status-ok", "e5-pregunta");
         } else if (ab.every((a) => a < 0.02)) estado("Todas las bocas están cerradas: el agua no sale. Sube alguna tabla.", "status-error", "e5-cerrado");
-        else estado("Mueve las tablas: la finca A debe recibir la mitad del agua y las fincas B y C, un cuarto cada una.", "status-warn", "e5-ajuste");
+        else estado("Sube o baja las tablas (cada boca se abre de 0 a 80 cm): la finca A debe recibir la mitad del agua y las fincas B y C, un cuarto cada una. Fíjate en los centímetros de cada boca.", "status-warn", "e5-ajuste");
       }
       geom();
       return {
         nombre: "El agua en Canarias", grupo: g, marco: { ancho: 7.6, alto: 4.8, cy: 1.5 }, fondo: "barranco",
-        pistas: ["Haz pinza sobre la tabla de una boca y sube o baja la mano: cuanto más abierta, más agua sale por ella.", "La boca de la finca A debe abrirse el doble que las de B y C. Por ejemplo, 40, 20 y 20 cm: A recibe 2 de 4 partes, la mitad."],
-        agarres() { return hecho ? [] : XS.map((x, i) => [x, 0.5 + ab[i], 0.6]); },
+        pistas: ["Haz pinza sobre la tabla de una boca y sube o baja la mano: la regla blanca y el cartel azul indican cuántos centímetros está abierta (de 0 a 80 cm).", "Para repartir 1/2, 1/4 y 1/4, la boca de A debe abrirse el doble que las de B y C. Por ejemplo, 40, 20 y 20 cm."],
+        agarres() { return faseE5 === "repartir" ? XS.map((x, i) => [x, 0.5 + ab[i], 0.6]) : []; },
+        contexto: { epoca: "Canarias · de la época moderna a hoy", titulo: "Repartir el agua con justicia",
+          texto: "<p>En Canarias el agua es escasa y muy valiosa. Durante siglos se ha llevado por <strong>acequias</strong>, canales que también tienen que bajar siempre, como los romanos.</p><p>Comunidades de regantes llamadas <strong>heredades</strong>, como la de Arucas y Firgas, en el norte de Gran Canaria, reparten el agua entre quienes tienen derecho a ella. Para dividirla usan depósitos como la <strong>cantonera</strong>: el agua entra y sale por varias bocas, y el tamaño de cada boca decide qué parte recibe cada finca.</p><p class=\"reto\"><strong>Tu reto:</strong> abre las bocas para que la finca A reciba la mitad del agua y las fincas B y C, un cuarto cada una. Cada boca se abre de 0 a 80 cm. Al final tendrás que demostrar que sabes calcular las aberturas sin tantear.</p>" },
         nota: "Cantonera simplificada: el caudal de cada boca se toma proporcional a su abertura; las tablas encajan cada 5 cm. Fincas y cifras inventadas.",
         entrar() {
           etiqueta("cantonera", "", () => [0, 2.95]);
           etiqueta("agua de la galería", "agua", () => [-2.7, 3.4]);
           NOMBRES.forEach((n, i) => etiqueta(n + " · " + FRAC[i], "geo abajo", () => [XS[i], -0.1, 1.5]));
+          // Marcador de la abertura de cada boca, en centímetros, sobre la cantonera
+          XS.forEach((x, i) => { const e = etiqueta("", "agua", () => { e.texto = "abierta " + Math.round(ab[i] * 100) + " cm"; return [x, 2.75, 0.6]; }); });
+          etiqueta("regla: 0 a 80 cm", "", () => [XS[2] + ANCHO_BOCA / 2 + 0.2, ABRIR_MAX + 0.22, 0.6]);
+          tabsE5.etiquetas();
           geom(); if (hecho) estado("Reparto conseguido: 1/2, 1/4 y 1/4.", "status-ok", "e5-ok");
+          else if (faseE5 === "pregunta") estado("Si la boca de A estuviera abierta otra medida, ¿cuánto habría que abrir las de B y C? Haz pinza sobre una tablilla.", "status-warn", "e5-pregunta-ini");
         },
-        alternativos() { NOMBRES.forEach((n, i) => ctrls.push(filaRango(n + " (cm)", 0, 80, 5, ab[i] * 100, (v) => { ab[i] = Math.round(v / 5) * 5 / 100; geom(); }, (v) => "abertura " + Math.round(v) + " centímetros"))); },
+        alternativos() { construirAltE5(); },
         down(x, y) {
+          if (faseE5 === "pregunta") { const t = tabsE5.tocar(x, y); if (t !== null) responderE5(t); return false; }
           const i = zonas.findIndex((z) => toca(x, y, z));
           if (i < 0 || hecho) return false;
           arrastre = { i, y0: y, v0: ab[i], ppm: pixelesPorMetro() }; return true;
@@ -2004,7 +2141,7 @@
        <h3>Números negativos</h3><p>Usamos el signo menos para bajar y el signo más para subir. El agua solo corre sola si los dos tramos tienen pendiente negativa.</p>
        <p class="fuente">Este modelo exagera la inclinación para que se vea.</p>`,
       `<h3>El arco de medio punto</h3><p>Cada arco es media circunferencia. Su radio mide 0,80 m y su diámetro es la <strong>luz</strong>, el hueco libre entre pilares: 2,50 m entre centros menos 0,90 m de pilar = 1,60 m.</p>
-       <h3>El pilar es un prisma</h3><p>Volumen = 0,90 × 0,90 × altura. Cada sillar mide 0,90 × 0,90 × 0,40 = 0,324 m³. ¿Cuántos sillares caben en 3,20 m? ¿Coincide el volumen de los sillares con el del prisma?</p>
+       <h3>El pilar es un prisma</h3><p>El volumen de un prisma de base rectangular se calcula multiplicando sus tres medidas: largo × ancho × alto. Un pilar hecho con sillares iguales, apilados sin huecos, ocupa lo mismo que todos sus sillares juntos.</p>
        <h3>Las manos que los construyeron</h3><p>De casi todas las personas que levantaron los acueductos no conocemos el nombre. En las obras romanas trabajaban canteros, peones, transportistas y técnicos que medían el terreno; en muchas de ellas también trabajaron personas esclavizadas.</p>`,
       `<h3>El corobate</h3><p>El arquitecto romano Vitruvio describe un instrumento para nivelar llamado <strong>corobate</strong>: una regla de unos veinte pies con patas, plomadas que deben caer justo sobre unas marcas y, para los días de viento, un canalito con agua que debe quedar igual de lleno en los dos extremos.</p>
        <h3>¿Cuánto bajaba un canal?</h3><p>Muy poco: normalmente menos de 1 metro por cada 100 metros de avance. Vitruvio dejó escrita una cifra, pero los especialistas todavía discuten cuál era exactamente. Aquí usamos 0,3 % como ejemplo.</p>

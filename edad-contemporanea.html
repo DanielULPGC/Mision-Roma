@@ -324,7 +324,9 @@
     function verPista(texto) { const c = $("pista"); c.hidden = false; c.textContent = texto; }
     function mostrarPista() {
       if (!etapa) return;
-      const lista = etapa.pistas && etapa.pistas.length ? etapa.pistas : [etapa.nota];
+      // Las pistas pueden ser una lista fija o una función que devuelve las de la fase actual del reto
+      const ps = typeof etapa.pistas === "function" ? etapa.pistas() : etapa.pistas;
+      const lista = ps && ps.length ? ps : [etapa.nota];
       const n = nivelPista[actual] || 0, k = n % lista.length;
       nivelPista[actual] = n + 1;
       if (registro && !hechas[actual]) { registro[actual].pistas++; guardarRegistro(); }
@@ -1176,6 +1178,21 @@
       }
     }
 
+    // Desordena las opciones para que la respuesta correcta no esté siempre en el mismo sitio
+    function barajar(l) { const a = l.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+    // Tablillas de respuesta con texto variable (preguntas encadenadas dentro de una etapa)
+    function tablillasP(g, n, x, y0, paso, w = 1.15, z = 0.08) {
+      const t = Array.from({ length: n }, (_, i) => { const m = caja(w, 0.42, 0.06, M.madera); m.position.set(x, y0 - i * paso, z); m.visible = false; m.userData.i = i; g.add(m); return m; });
+      let ops = [];
+      return {
+        poner(o) { ops = o; t.forEach((m, i) => (m.visible = i < o.length)); },
+        ocultar() { ops = []; t.forEach((m) => (m.visible = false)); },
+        tocar(px, py) { const h = rayo(px, py).intersectObjects(t.filter((m) => m.visible), false)[0]; return h ? h.object.userData.i : null; },
+        etiquetas() { t.forEach((m, i) => { const e = etiqueta("", "geo", () => { if (!m.visible || !ops[i]) return null; e.texto = ops[i][0]; return [x, y0 - i * paso + 0.02, z + 0.08]; }); }); },
+        get ops() { return ops; }
+      };
+    }
+
     // Controles alternativos (DUA)
     function filaRango(etq, min, max, paso, valor, alCambiar, texto) {
       const id = "alt-" + Math.random().toString(36).slice(2, 8);
@@ -1237,14 +1254,14 @@
             const cm = Math.round((LT * U - n * MT) * 100);
             regla(X0 + n * MT / U, (LT * U - n * MT) / U, matMetro, 0.25);
             fase = "pregunta"; preg.mostrar(true);
-            estado("Caben " + n + " metros y sobran " + cm + " centímetros. Una vara de Burgos mide 0,835905 m. ¿Cuánto miden 3 varas? Haz pinza sobre una tablilla.", "status-ok", "c1-preg");
+            estado("Caben " + n + " metros enteros y sobra un trozo más corto que un metro. ¿Cuánto mide la tela exactamente? Calcúlalo con las varas: una vara de Burgos mide 0,835905 m. ¿Cuánto miden 3 varas? Haz pinza sobre una tablilla.", "status-ok", "c1-preg");
           }
         }
         refrescar();
       }
       function responder(v) {
         if (fase !== "pregunta" || hecho) return;
-        if (v === 2.51) { hecho = true; fase = "hecho"; completar(0, "¡Correcto! 3 × 0,835905 m = 2,507715 m, unos 2,51 m: 2 metros y 51 centímetros. Desde 1849, la ley implantó en España el metro, igual en todas partes."); }
+        if (v === 2.51) { hecho = true; fase = "hecho"; completar(0, "¡Correcto! 3 × 0,835905 m = 2,507715 m, unos 2,51 m: los 2 metros enteros y 51 centímetros más. Desde 1849, la ley implantó en España el metro, igual en todas partes."); }
         else estado(v === 3 ? "Una vara mide menos que un metro, así que 3 varas miden menos de 3 m." : "0,84 m es una sola vara. Multiplica por 3.", "status-warn", "c1-mal-" + v);
       }
       function refrescar() {
@@ -1252,6 +1269,8 @@
         metricas(["Vara de Burgos: 0,835905 m", "Varas colocadas: " + (fase === "vara" ? n : 3), "Metros colocados: " + (fase === "vara" ? 0 : n), "1 m = 100 cm · 1 cm = 10 mm"]);
       }
       return {
+        contexto: { epoca: "Siglo XIX · ley de 1849", titulo: "Una medida igual para todos",
+          texto: "<p>Antes del siglo XIX, cada región tenía sus propias medidas: varas, palmos, pies, leguas… La <strong>vara de Burgos</strong> medía 0,835905 m, pero en otras provincias la vara era distinta, y eso causaba confusiones en el comercio.</p><p>A finales del siglo XVIII, en Francia, nació el <strong>sistema métrico decimal</strong>, basado en el <strong>metro</strong> y en múltiplos de 10. En España, una ley de 1849 lo implantó y fue obligatorio desde 1860, aunque costó muchos años que se usara en todas partes.</p><p class=\"reto\"><strong>Tu reto:</strong> eres comerciante y tienes que medir una pieza de tela. Mídela con varas y después con metros, y calcula cuánto miden en metros las varas de Burgos.</p>" },
         nombre: "El metro", grupo: g, marco: { ancho: LT + 4.4, alto: 3.2, cy: 1.4 }, fondo: "taller",
         pistas: ["Haz pinza sobre la tela, una vez por cada vara o cada metro que quieras poner.", "Una vara de Burgos mide 0,835905 m. Para 3 varas, multiplica por 3 y redondea a centímetros."],
         agarres() { return fase === "vara" || fase === "metro" ? [[0, YM + 0.05, 0.3]] : []; },
@@ -1377,8 +1396,19 @@
       const lente = new THREE.Group(); lente.position.set(XT, HT + 0.25, 0); g.add(lente);
       const matHaz = new THREE.MeshBasicMaterial({ color: 0xfff1a8, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
       // Barco que observa los destellos
-      const barco = caja(0.7, 0.18, 0.25, TX.mat("madera", { color: 0x5a3c26 })); barco.position.set(2.6, 0.35, 0.6);
-      const luzBarco = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 8), new THREE.MeshBasicMaterial({ color: 0x555555 })); luzBarco.position.set(2.6, 0.75, 0.6);
+      // Barco de vapor de finales del siglo XIX, de perfil: casco, cubierta, chimenea y mástil con farol
+      const barco = new THREE.Group(); barco.position.set(2.6, 0.18, 0.6);
+      const casco = (() => {
+        const sh = new THREE.Shape(); sh.moveTo(-0.5, 0.16); sh.lineTo(0.55, 0.16); sh.quadraticCurveTo(0.5, -0.02, 0.32, -0.08); sh.lineTo(-0.38, -0.08); sh.quadraticCurveTo(-0.5, -0.02, -0.5, 0.16);
+        const geo = new THREE.ExtrudeGeometry(sh, { depth: 0.24, bevelEnabled: true, bevelThickness: 0.02, bevelSize: 0.015, bevelSegments: 2, curveSegments: 16 }); geo.translate(0, 0, -0.12);
+        return new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.6 }));
+      })();
+      const franja = caja(1.0, 0.03, 0.27, new THREE.MeshStandardMaterial({ color: 0x9b2d20 })); franja.position.set(0.02, 0.13, 0);
+      const cubierta = caja(0.5, 0.14, 0.2, new THREE.MeshStandardMaterial({ color: 0xf2efe6, roughness: 0.7 })); cubierta.position.set(-0.08, 0.24, 0);
+      const chimenea = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, 0.22, 16), new THREE.MeshStandardMaterial({ color: 0xc2843a })); chimenea.position.set(0.06, 0.41, 0);
+      const mastil = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.014, 0.6, 8), M.madera); mastil.position.set(0.32, 0.46, 0);
+      barco.add(casco, franja, cubierta, chimenea, mastil);
+      const luzBarco = new THREE.Mesh(new THREE.SphereGeometry(0.07, 12, 8), new THREE.MeshBasicMaterial({ color: 0x555555 })); luzBarco.position.set(2.92, 0.95, 0.6);
       g.add(barco, luzBarco);
       // Mecanismo de relojería que hace girar la lente: su esfera marca los segundos de cada vuelta (control separado de los haces)
       const XD = XT + 1.15, YD = 1.25;
@@ -1390,7 +1420,7 @@
       const aguja = new THREE.Group(); aguja.position.set(XD, YD, 0.37);
       const pAguja = caja(0.03, 0.22, 0.01, new THREE.MeshBasicMaterial({ color: 0x9b2d20 })); pAguja.position.y = 0.1; aguja.add(pAguja);
       g.add(poste, esfera, caraDial, aguja);
-      let n = 2, T = 20, ang = 0, fase = "ajustar", hecho = false, ctrlN = null, ctrlT = null, ultimo = 0, arrastre = null;
+      let n = 1, T = 20, ang = 0, fase = "ajustar", hecho = false, ctrlN = null, ctrlT = null, ultimo = 0, arrastre = null;
       const OPC = [["60°", 60], ["90°", 90], ["120°", 120]];
       const preg = crearPreguntas(g, OPC, 2.2, 3.4, 0.62, 0.9);
       function haces() {
@@ -1403,8 +1433,9 @@
         ctrlN && ctrlN.poner(n); ctrlT && ctrlT.poner(T);
         if (actual !== 2) return;
         if (fase === "ajustar") {
-          if (T / n === 5) { fase = "pregunta"; preg.mostrar(true); estado("¡El barco ve un destello cada 5 segundos! " + T + " s : " + n + " haces = 5 s. Si el faro tuviera 3 haces repartidos por igual, ¿qué ángulo habría entre dos haces? Haz pinza sobre una tablilla.", "status-ok", "c3-preg"); }
-          else estado("Ahora el barco ve un destello cada " + T + " : " + n + " = " + fmt(T / n, 1) + " s. Los marinos reconocen cada faro por sus destellos: este debe dar uno cada 5 s.", "status-warn", "c3-" + n + "-" + T);
+          if (n === 3 && T / n === 5) { fase = "pregunta"; preg.mostrar(true); estado("¡El barco ve un destello cada 5 segundos! " + T + " s : 3 haces = 5 s. Puedes seguir moviendo la linterna y la relojería para comprobarlo. Los 3 haces están repartidos por igual alrededor de la lente: ¿qué ángulo hay entre dos haces? Haz pinza sobre una tablilla.", "status-ok", "c3-preg"); }
+          else if (T / n === 5) estado("Un destello cada 5 s, ¡bien calculado! Pero este faro tiene 3 haces: pon 3 haces en la linterna y vuelve a ajustar los segundos por vuelta.", "status-warn", "c3-5s-" + n);
+          else estado("Ahora el barco ve un destello cada " + T + " : " + n + " = " + fmt(T / n, 1) + " s. Este faro tiene que tener 3 haces y dar un destello cada 5 s.", "status-warn", "c3-" + n + "-" + T);
         }
         refrescar();
       }
@@ -1415,30 +1446,31 @@
       }
       function refrescar() {
         if (actual !== 2) return;
-        metricas(["Haces de luz: " + n + " (" + Math.round(360 / n) + "° entre ellos)", "Una vuelta: " + T + " s", "Destello cada: " + T + " : " + n + " = " + fmt(T / n, 1) + " s", "Objetivo: un destello cada 5 s"]);
+        metricas(["Haces de luz: " + n + " (objetivo: 3)", "Una vuelta: " + T + " s", "Destello cada: " + T + " : " + n + " = " + fmt(T / n, 1) + " s", "Objetivo: un destello cada 5 s"]);
       }
       haces();
       return {
         nombre: "El faro de Maspalomas", grupo: g, marco: { ancho: 6.4, alto: 4.6, cy: 2.1 }, fondo: "maspalomas",
-        pistas: ["La linterna cambia el número de haces (sube o baja la mano). La esfera de la relojería cambia los segundos de cada vuelta (mueve la mano a los lados).", "Destello cada = segundos por vuelta : número de haces. Busca dos números que, al dividirlos, den 5."],
-        agarres() { return fase === "ajustar" ? [[XT, HT + 0.25, 0.4], [XD, YD, 0.4]] : []; },
+        pistas: ["La linterna cambia el número de haces (sube o baja la mano). La esfera de la relojería cambia los segundos de cada vuelta (mueve la mano a los lados). Pon 3 haces.", "Destello cada = segundos por vuelta : número de haces. Con 3 haces, ¿qué número de segundos dividido entre 3 da 5? Para el ángulo: una vuelta completa son 360°."],
+        agarres() { return fase !== "hecho" ? [[XT, HT + 0.25, 0.4], [XD, YD, 0.4]] : []; },
+        contexto: { epoca: "Siglo XIX · 1890", titulo: "Luces para guiar a los barcos",
+          texto: "<p>En el siglo XIX se construyeron muchos <strong>faros</strong> en las costas para que los barcos no chocaran de noche. Cada faro tiene su propia señal: un número de destellos cada cierto tiempo, para que los marinos sepan cuál es y dónde están.</p><p>Los destellos se consiguen con una <strong>lente que gira</strong> y lanza varios haces de luz, movida por un mecanismo de relojería. El <strong>faro de Maspalomas</strong>, en el sur de Gran Canaria, se encendió en 1890; lo proyectó el ingeniero grancanario Juan León y Castillo.</p><p class=\"reto\"><strong>Tu reto:</strong> este faro de la actividad (un modelo, no el real) tiene 3 haces y debe dar un destello cada 5 s. Ajusta los haces y el tiempo de cada vuelta, y calcula el ángulo que hay entre dos haces.</p>" },
         nota: "El faro de Maspalomas (Gran Canaria) se encendió en 1890; lo proyectó el ingeniero grancanario Juan León y Castillo. Los destellos de la actividad son un modelo.",
         entrar() {
           etiqueta("lente giratoria", "geo", () => [XT, HT + 0.85, 0]);
           etiqueta("barco", "", () => [2.6, 1.05, 0.6]);
           etiqueta("relojería: segundos por vuelta", "geo", () => [XD, YD - 0.45, 0.4]).el.classList.add("abajo");
           preg.etiquetas(() => fase !== "ajustar");
-          if (fase === "ajustar") estado("Haz pinza sobre la linterna del faro y sube o baja la mano para cambiar el número de haces. Para cambiar el tiempo de cada vuelta, haz pinza sobre la esfera de la relojería y mueve la mano a los lados.", "status-warn", "c3-ini");
+          if (fase === "ajustar") estado("Este faro (un modelo) tiene que tener 3 haces y dar un destello cada 5 s. Haz pinza sobre la linterna y sube o baja la mano para cambiar los haces; haz pinza sobre la esfera de la relojería y mueve la mano a los lados para cambiar los segundos de cada vuelta.", "status-warn", "c3-ini");
           poner(n, T);
         },
         alternativos() {
-          ctrlN = filaRango("Haces de luz", 1, 6, 1, n, (v) => { if (fase === "ajustar") poner(v, T); }, (v) => v + " haces");
-          ctrlT = filaRango("Segundos por vuelta", 5, 30, 5, T, (v) => { if (fase === "ajustar") poner(n, v); }, (v) => v + " segundos");
+          ctrlN = filaRango("Haces de luz", 1, 6, 1, n, (v) => poner(v, T), (v) => v + " haces");
+          ctrlT = filaRango("Segundos por vuelta", 5, 30, 5, T, (v) => poner(n, v), (v) => v + " segundos");
           filaBotones(OPC.map((o) => ["Hay " + o[0], () => responder(o[1])]));
         },
         down(x, y) {
-          if (fase === "pregunta") { const v = preg.tocar(x, y); if (v !== null) responder(v); return false; }
-          if (fase !== "ajustar") return false;
+          if (fase === "pregunta") { const v = preg.tocar(x, y); if (v !== null) { responder(v); return false; } }
           const p = enPlano(x, y); if (!p) return false;
           if (Math.hypot(p.x - XD, p.y - YD) < 0.5) { arrastre = { tipo: "t", px: p.x, t0: T }; return true; }
           if (Math.hypot(p.x - XT, p.y - (HT + 0.25)) < 0.9) { arrastre = { tipo: "n", py: p.y, n0: n }; return true; }
@@ -1470,19 +1502,30 @@
       const EH = 3.0 / 2000000, YB = 0.55, CWc = 1024, CHc = 820, PW = 5.2, PH = 4.1, PCY = 2.3;
       const cv = document.createElement("canvas"); cv.width = CWc; cv.height = CHc; const c = cv.getContext("2d");
       const tex = nitida(new THREE.CanvasTexture(cv));
-      const pizarra = new THREE.Mesh(new THREE.PlaneGeometry(PW, PH), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8 })); pizarra.position.set(0, PCY, -0.02);
+      // Material sin iluminación para que los datos se lean con nitidez, sin sombras ni brillos
+      const pizarra = new THREE.Mesh(new THREE.PlaneGeometry(PW, PH), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false })); pizarra.position.set(0, PCY, -0.02);
       const marco = caja(PW + 0.2, PH + 0.2, 0.08, M.madera); marco.position.set(0, PCY, -0.08);
       g.add(marco, pizarra);
       const aY = (yw) => (PCY + PH / 2 - yw) / PH * CHc, aX = (xw) => (xw + PW / 2) / PW * CWc;
       function pintar() {
         c.fillStyle = "#fbf8f0"; c.fillRect(0, 0, CWc, CHc);
         c.strokeStyle = "#1c1917"; c.lineWidth = 3; c.beginPath(); c.moveTo(aX(-2.0), aY(YB + 3.15)); c.lineTo(aX(-2.0), aY(YB)); c.lineTo(aX(1.4), aY(YB)); c.stroke();
-        c.font = "22px system-ui"; c.fillStyle = "#1c1917"; c.textAlign = "right";
+        c.font = "bold 24px system-ui"; c.fillStyle = "#1c1917"; c.textAlign = "right";
         for (let v = 0; v <= 2000000; v += 250000) { const y = aY(YB + v * EH); c.strokeStyle = "rgba(0,0,0,.15)"; c.lineWidth = 1; c.beginPath(); c.moveTo(aX(-2.0), y); c.lineTo(aX(1.4), y); c.stroke(); c.fillText(v === 0 ? "0" : (v / 1000000).toLocaleString("es-ES") + " M", aX(-2.05), y + 7); }
-        c.textAlign = "left"; c.font = "bold 24px system-ui"; c.fillText("Habitantes de Canarias", aX(-2.0), aY(YB + 3.3));
-        c.font = "22px system-ui"; c.fillText("Datos (censos):", aX(1.55), aY(YB + 3.0));
-        DATOS.forEach(([a, v], i) => c.fillText(a + ": " + v.toLocaleString("es-ES"), aX(1.55), aY(YB + 2.6 - i * 0.35)));
-        c.fillText("M = millón", aX(1.55), aY(YB + 1.3)); tex.needsUpdate = true;
+        c.textAlign = "left"; c.font = "bold 30px system-ui"; c.fillStyle = "#1c1917"; c.fillText("Habitantes de Canarias", aX(-2.0), aY(YB + 3.3));
+        // Cuadro de datos: fondo blanco, borde y letra grande y oscura
+        const bx = aX(1.48), by = aY(YB + 3.22), bw = aX(2.55) - bx, bh = aY(YB + 1.05) - by;
+        c.fillStyle = "#ffffff"; c.fillRect(bx, by, bw, bh); c.strokeStyle = "#1e3a8a"; c.lineWidth = 4; c.strokeRect(bx, by, bw, bh);
+        c.fillStyle = "#1e3a8a"; c.font = "bold 28px system-ui"; c.fillText("Censos", bx + 16, aY(YB + 2.98));
+        // Año en una línea y cifra debajo, con la letra más grande que quepa en el cuadro
+        c.font = "bold 30px system-ui";
+        const anchoMax = Math.max(...DATOS.map(([, v]) => c.measureText(v.toLocaleString("es-ES")).width));
+        const fsD = Math.max(18, Math.min(30, Math.floor(30 * (bw - 30) / anchoMax)));
+        DATOS.forEach(([a, v], i) => {
+          c.fillStyle = "#1e3a8a"; c.font = "bold " + Math.min(26, fsD) + "px system-ui"; c.fillText(a + ":", bx + 16, aY(YB + 2.66 - i * 0.5));
+          c.fillStyle = "#111111"; c.font = "bold " + fsD + "px system-ui"; c.fillText(v.toLocaleString("es-ES"), bx + 16, aY(YB + 2.42 - i * 0.5));
+        });
+        c.fillStyle = "#111111"; c.font = Math.min(24, fsD) + "px system-ui"; c.fillText("M = millón", bx + 16, aY(YB + 1.14)); tex.needsUpdate = true;
       }
       pintar();
       const matBarra = TX.mat("vidriado", { color: 0x1e5aa8, rugosidad: 0.3, fisico: true }), matOk = TX.mat("vidriado", { color: 0x1d7a46, rugosidad: 0.3, fisico: true });
@@ -1514,6 +1557,8 @@
       }
       barras.forEach((b, i) => poner(i, 0.3));
       return {
+        contexto: { epoca: "Siglo XX · de 1900 a 2001", titulo: "Contar a la población",
+          texto: "<p>Para saber cuántas personas viven en un lugar se hacen <strong>censos</strong>, más o menos cada diez años. Con sus datos se puede ver cómo cambia la población a lo largo del tiempo.</p><p>En el siglo XX la población de Canarias creció mucho. También hubo épocas en que mucha gente canaria emigró, sobre todo a Cuba y Venezuela; desde finales del siglo XX, en cambio, Canarias recibe más población de la que sale.</p><p>Un <strong>gráfico de barras</strong> ayuda a comparar cantidades de un vistazo: cada barra es tan alta como el dato que representa, según una escala.</p><p class=\"reto\"><strong>Tu reto:</strong> dibuja el gráfico de barras con los datos de tres censos y compara cuántas veces creció la población entre 1900 y 2001.</p>" },
         nombre: "La población de Canarias", grupo: g, marco: { ancho: 7.6, alto: 4.4, cy: PCY }, fondo: "ciudad_moderna",
         pistas: ["Haz pinza sobre la parte de arriba de una barra y sube la mano. La barra se pone verde cuando acierta.", "Cada línea de la pizarra vale 250.000 habitantes: 1900 queda algo por encima de la primera línea; 1950, algo por encima de la tercera; 2001, cerca de la séptima."],
         agarres() { return fase === "barras" ? XB.filter((x, i) => !ok[i]).map((x) => [x, YB + alturas[XB.indexOf(x)], 0.32]) : []; },
@@ -1567,79 +1612,86 @@
       const pueblo = new THREE.Group();
       for (let i = 0; i < 5; i++) { const cs = caja(0.35, 0.3 + (i % 2) * 0.15, 0.35, TX.mat("estuco", { color: 0xf4efe6 })); cs.position.set(2.0 + (i % 3) * 0.42, 0.2 + (i % 2) * 0.07, -0.3 + Math.floor(i / 3) * 0.4); pueblo.add(cs); }
       g.add(pueblo);
-      let esc = 0, bomba = 0, turb = 0, nivel = 0.55, fase = "equilibrar", hecho = false, ctrlB = null, ctrlT = null, arrastre = null, angM = 0;
-      const OPC = [["20 %", 20], ["50 %", 50], ["80 %", 80]];
-      const preg = crearPreguntas(g, OPC, 3.4, 3.6, 0.62, 0.9);
+      let esc = 0, bomba = 0, turb = 0, nivel = 0.55, fase = "calcular", hecho = false, angM = 0, temp = null;
+      // Razonamiento guiado: en cada momento del día, primero calcular (¿sobra o falta?) y después decidir qué hace la central
+      const tabs = tablillasP(g, 3, 3.3, 3.75, 0.6, 1.95, 0.3);
+      const MOM = ESC.map((m) => {
+        const d = m.v - DEM, n = Math.abs(d);
+        const calc = d > 0 ? [["Sobran " + n + " MW", null], ["Faltan " + n + " MW", "El viento da " + m.v + " MW y la isla necesita " + DEM + " MW: hay más de lo que hace falta."], ["Sobran " + m.v + " MW", "La isla también consume. Resta: " + m.v + " − " + DEM + "."]]
+          : d < 0 ? [["Faltan " + n + " MW", null], ["Sobran " + n + " MW", "El viento da " + m.v + " MW y la isla necesita " + DEM + " MW: hay menos de lo que hace falta."], ["Faltan " + DEM + " MW", "El viento sí da algo de energía. Resta: " + DEM + " − " + m.v + "."]]
+          : [["Ni sobra ni falta", null], ["Sobran " + DEM + " MW", "Compara: el viento da " + m.v + " MW y la isla necesita " + DEM + " MW."], ["Faltan " + DEM + " MW", "Compara: el viento da " + m.v + " MW y la isla necesita " + DEM + " MW."]];
+        const acc = d > 0 ? [["Bombear " + n + " MW: subir agua", null], ["Turbinar " + n + " MW: bajar agua", "Si bajamos agua, producimos aún más energía, y ya sobra."], ["Nada: todo parado", "La energía que sobra se perdería. ¿Cómo podemos guardarla?"]]
+          : d < 0 ? [["Turbinar " + n + " MW: bajar agua", null], ["Bombear " + n + " MW: subir agua", "Para bombear hace falta energía, y ahora falta."], ["Nada: todo parado", "Entonces la isla se quedaría sin " + n + " MW. ¿De dónde podemos sacarlos?"]]
+          : [["Nada: todo parado", null], ["Bombear " + DEM + " MW: subir agua", "Si bombeamos, a la isla le faltaría energía."], ["Turbinar " + DEM + " MW: bajar agua", "Si turbinamos, sobraría energía."]];
+        return { calc: barajar(calc), acc: barajar(acc), d };
+      });
+      const PCT = barajar([["20 %", null], ["50 %", "50 % sería la mitad: 2,5 de 5 MW."], ["80 %", "80 % es lo que FALTABA (4 de 5). Pregunta por lo que daba el viento: 1 de 5."]]);
       const llega = () => ESC[esc].v - bomba + turb;
+      const ops = () => fase === "calcular" ? MOM[esc].calc : fase === "decidir" ? MOM[esc].acc : fase === "pregunta" ? PCT : [];
+      const txtCalc = () => ESC[esc].txt + ": el viento da " + ESC[esc].v + " MW y la isla necesita " + DEM + " MW. ¿Sobra o falta energía, y cuánta? Haz pinza sobre una tablilla.";
+      const txtDec = (bien) => bien + " Entonces, ¿qué tiene que hacer la central? Arriba hay un depósito de agua y abajo otro: subir agua (bombear) gasta energía y la guarda; dejarla caer por las turbinas (turbinar) la produce.";
       function niveles() {
         aguaS.scale.y = Math.max(0.02, nivel * 0.55); aguaS.position.set(0.2, 2.9 + aguaS.scale.y / 2, -0.25);
         const ni = 1 - nivel; aguaI.scale.y = Math.max(0.02, ni * 0.55); aguaI.position.set(0.2, 0.15 + aguaI.scale.y / 2, -0.25);
       }
-      function poner(b, t2) {
-        bomba = clamp(Math.round(b), 0, 6); turb = clamp(Math.round(t2), 0, 6);
-        ctrlB && ctrlB.poner(bomba); ctrlT && ctrlT.poner(turb);
-        if (actual !== 4) return;
-        if (fase === "equilibrar") {
-          const sobra = llega() - DEM;
-          if (sobra === 0 && !(bomba > 0 && turb > 0)) {
-            if (esc < 2) {
-              esc++; bomba = 0; turb = 0; ctrlB && ctrlB.poner(0); ctrlT && ctrlT.poner(0);
-              estado("¡Equilibrado! La isla recibe justo 5 MW. Siguiente momento: " + ESC[esc].txt.toLowerCase() + " (" + ESC[esc].v + " MW de viento).", "status-ok", "c5-esc" + esc);
-              // Si el viento ya iguala la demanda, no hay que guardar ni sacar agua
-              if (ESC[esc].v === DEM) { const e0 = esc; setTimeout(() => { if (esc === e0 && fase === "equilibrar" && bomba === 0 && turb === 0) { estado("Con 5 MW de viento y 5 MW de demanda no hace falta guardar ni sacar agua: bombas y turbinas paradas.", "status-ok", "c5-justo"); setTimeout(() => { if (esc === e0 && fase === "equilibrar") poner(0, 0); }, 2200); } }, 2200); }
-            }
-            else { fase = "pregunta"; preg.mostrar(true); estado("¡Los tres momentos equilibrados! Recuerda la tarde casi sin viento: el viento daba 1 MW de los 5 MW que necesita la isla. ¿Qué porcentaje es? Haz pinza sobre una tablilla.", "status-ok", "c5-preg"); }
-          } else if (bomba > 0 && turb > 0) estado("No tiene sentido subir agua y bajarla a la vez: usa solo las bombas o solo las turbinas.", "status-warn", "c5-ambas");
-          else estado(ESC[esc].txt + ": el viento da " + ESC[esc].v + " MW. A la isla le llegan " + llega() + " MW y necesita " + DEM + " MW. " + (sobra > 0 ? "Sobran " + sobra + " MW: úsalos para bombear agua hacia arriba." : "Faltan " + -sobra + " MW: deja bajar agua por las turbinas."), "status-warn", "c5-" + esc + "-" + bomba + "-" + turb);
+      function reAlt() { if (actual !== 4) return; alternativos.replaceChildren(); construirAlt(); }
+      function construirAlt() { const o = ops(); if (o.length) filaBotones(o.map((op, i) => [op[0], () => responder(i)])); }
+      function mostrar() { tabs.poner(ops()); reAlt(); refrescar(); }
+      function responder(i) {
+        if (hecho || temp) return; const op = ops()[i]; if (!op) return;
+        if (op[1]) { estado(op[1], "status-warn", "c5-mal-" + fase + esc + "-" + i); return; }
+        if (fase === "calcular") { fase = "decidir"; mostrar(); estado(txtDec("¡Bien calculado! " + op[0] + "."), "status-ok", "c5-dec" + esc); return; }
+        if (fase === "decidir") {
+          const d = MOM[esc].d; bomba = d > 0 ? d : 0; turb = d < 0 ? -d : 0;
+          fase = "ver"; tabs.ocultar(); reAlt(); refrescar();
+          const txt = d > 0 ? "¡Eso es! Las bombas gastan los " + d + " MW que sobran en subir agua al depósito de arriba: la energía queda guardada." : d < 0 ? "¡Eso es! El agua baja por las turbinas y produce los " + -d + " MW que faltan." : "¡Eso es! El viento da justo lo que necesita la isla: bombas y turbinas paradas.";
+          estado(txt + " A la isla le llegan " + ESC[esc].v + " − " + bomba + " + " + turb + " = " + llega() + " MW.", "status-ok", "c5-ok" + esc);
+          const e0 = esc;
+          temp = setTimeout(() => {
+            temp = null; if (actual !== 4 || esc !== e0) return;
+            if (esc < 2) { esc++; bomba = 0; turb = 0; fase = "calcular"; mostrar(); estado("Siguiente momento del día. " + txtCalc(), "status-ok", "c5-esc" + esc); }
+            else { fase = "pregunta"; mostrar(); estado("¡Los tres momentos del día equilibrados! Recuerda la tarde casi sin viento: el viento daba 1 MW de los 5 MW que necesita la isla. ¿Qué porcentaje de la energía daba el viento? Haz pinza sobre una tablilla.", "status-ok", "c5-preg"); }
+          }, MOV_REDUCIDO ? 1200 : 3200);
+          return;
         }
-        refrescar();
-      }
-      function responder(v) {
-        if (fase !== "pregunta" || hecho) return;
-        if (v === 20) { hecho = true; fase = "hecho"; completar(4, "¡Correcto! 1 de 5 = 1/5 = 20 %. Gorona del Viento guarda la energía del viento subiendo agua y la recupera dejándola caer: El Hierro avanza hacia un modelo de isla sostenible."); abrirPanel("panel-final"); }
-        else estado("1 de cada 5 partes. ¿Qué porcentaje es la quinta parte de 100?", "status-warn", "c5-mal-" + v);
+        if (fase === "pregunta") { hecho = true; fase = "hecho"; tabs.ocultar(); reAlt(); completar(4, "¡Correcto! 1 de 5 = 1/5 = 20 %. Gorona del Viento guarda la energía del viento subiendo agua y la recupera dejándola caer: El Hierro avanza hacia un modelo de isla sostenible."); abrirPanel("panel-final"); }
       }
       function refrescar() {
         if (actual !== 4) return;
-        metricas([ESC[esc].txt + " · viento: " + ESC[esc].v + " MW", "Bombeo (sube agua): " + bomba + " MW · turbinas (baja agua): " + turb + " MW", "Llega a la isla: " + ESC[esc].v + " − " + bomba + " + " + turb + " = " + llega() + " MW", "La isla necesita: " + DEM + " MW"]);
+        const decidido = fase === "ver" || fase === "pregunta" || fase === "hecho";
+        metricas(["Momento " + (esc + 1) + " de 3 · " + ESC[esc].txt, "Viento: " + ESC[esc].v + " MW · la isla necesita: " + DEM + " MW",
+          decidido ? "Bombeo: " + bomba + " MW · turbinas: " + turb + " MW" : "Bombeo y turbinas: ¡decide tú!",
+          decidido ? "Llega a la isla: " + ESC[esc].v + " − " + bomba + " + " + turb + " = " + llega() + " MW" : "Llega a la isla = viento − bombeo + turbinas"]);
       }
       niveles();
       return {
-        nombre: "Gorona del Viento", grupo: g, marco: { ancho: 8.0, alto: 4.4, cy: 1.95 }, fondo: "hierro",
-        pistas: ["Si sobra viento, haz pinza en el depósito de abajo y sube la mano para bombear agua. Si falta, haz pinza en el depósito de arriba y baja la mano para abrir las turbinas.", "A la isla llega: viento − bombeo + turbinas. Tiene que dar 5 MW en cada momento del día."],
-        agarres() { return fase === "equilibrar" ? [[0.2, 3.2, 0.2], [0.2, 0.45, 0.2]] : []; },
+        nombre: "Gorona del Viento", grupo: g, marco: { ancho: 8.6, alto: 4.4, cy: 1.95 }, fondo: "hierro",
+        pistas: ["Primero compara: ¿el viento da más o menos de los 5 MW que necesita la isla? Resta para saber cuánto sobra o falta.", "Si sobra energía, se guarda subiendo agua (bombear). Si falta, se saca dejando caer agua por las turbinas (turbinar). Si es justo, todo parado.", "Para el porcentaje: 1 de 5 partes. Si 5 partes son el 100 %, ¿cuánto es una parte?"],
+        agarres() { return []; },
+        contexto: { epoca: "Siglo XXI · 2014", titulo: "Una isla que se mueve con el viento",
+          texto: "<p>Durante el siglo XX, casi toda la electricidad de Canarias se producía quemando petróleo. Hoy buscamos <strong>energías renovables</strong>, como la del viento y la del sol, que no se agotan y contaminan mucho menos.</p><p>El problema del viento es que no siempre sopla igual. En <strong>El Hierro</strong>, la central de <strong>Gorona del Viento</strong> (2014) lo resuelve con agua: cuando sobra viento, usa esa energía para <strong>subir agua</strong> a un depósito alto; cuando falta, deja <strong>caer el agua</strong> por unas turbinas que producen electricidad. Es como una gran batería de agua.</p><p class=\"reto\"><strong>Tu reto:</strong> eres quien controla la central. En tres momentos del día, calcula si sobra o falta energía y decide qué hacer para que a la isla le lleguen siempre 5 MW.</p>" },
         nota: "Desde 2014, la central de Gorona del Viento (El Hierro) combina 5 aerogeneradores con dos depósitos de agua a distinta altura. Cifras de la actividad simplificadas.",
         entrar() {
           etiqueta("aerogeneradores", "", () => [-1.9, 3.15, -0.3]);
           etiqueta("depósito de arriba", "geo", () => [0.2, 3.8, -0.3]);
           etiqueta("depósito de abajo", "geo", () => [0.2, 1.0, -0.3]);
           etiqueta("la isla: 5 MW", "", () => [2.4, 0.85, -0.3]);
-          preg.etiquetas(() => fase !== "equilibrar");
-          if (fase === "equilibrar") poner(bomba, turb); else refrescar();
+          const eAgua = etiqueta("", "", () => { if (!(bomba || turb)) return null; eAgua.texto = bomba ? "↑ bombeando " + bomba + " MW" : "↓ turbinando " + turb + " MW"; return [1.35, 1.85, -0.3]; });
+          tabs.etiquetas();
+          if (fase === "ver") { clearTimeout(temp); temp = null; fase = "decidir"; bomba = 0; turb = 0; }
+          mostrar();
+          if (fase === "calcular") estado(txtCalc(), "status-warn", "c5-ini");
+          else if (fase === "decidir") estado(txtDec(""), "status-warn", "c5-ini-d");
         },
-        alternativos() {
-          ctrlB = filaRango("Bombeo: subir agua (MW)", 0, 6, 1, bomba, (v) => { if (fase === "equilibrar") poner(v, turb); }, (v) => v + " megavatios");
-          ctrlT = filaRango("Turbinas: bajar agua (MW)", 0, 6, 1, turb, (v) => { if (fase === "equilibrar") poner(bomba, v); }, (v) => v + " megavatios");
-          filaBotones(OPC.map((o) => ["Es el " + o[0], () => responder(o[1])]));
-        },
+        alternativos() { construirAlt(); },
         down(x, y) {
-          if (fase === "pregunta") { const v = preg.tocar(x, y); if (v !== null) responder(v); return false; }
-          if (fase !== "equilibrar") return false;
-          const p = enPlano(x, y); if (!p || Math.abs(p.x - 0.2) > 0.9) return false;
-          if (p.y > 2.6) { arrastre = { tipo: "t", py: p.y, v0: turb }; return true; }
-          if (p.y < 1.2) { arrastre = { tipo: "b", py: p.y, v0: bomba }; return true; }
+          if (fase === "calcular" || fase === "decidir" || fase === "pregunta") { const i = tabs.tocar(x, y); if (i !== null) responder(i); }
           return false;
         },
-        // Arrastrar hacia abajo desde arriba abre las turbinas; hacia arriba desde abajo, las bombas
-        move(x, y) {
-          if (!arrastre) return; const p = enPlano(x, y); if (!p) return;
-          if (arrastre.tipo === "t") { const v = arrastre.v0 + Math.round((arrastre.py - p.y) / 0.25); if (v !== turb) poner(bomba, v); }
-          else { const v = arrastre.v0 + Math.round((p.y - arrastre.py) / 0.25); if (v !== bomba) poner(v, turb); }
-        },
-        up() { arrastre = null; },
+        move() {}, up() {},
         tick(dt) {
           angM += dt * (0.4 + ESC[esc].v * 0.35); molinos.forEach((m, i) => (m.rotation.z = -angM - i));
-          nivel = clamp(nivel + (bomba - turb) * dt * 0.02, 0.05, 0.95); niveles();
+          nivel = clamp(nivel + (bomba - turb) * dt * 0.03, 0.05, 0.95); niveles();
         }
       };
     })();
@@ -1937,22 +1989,21 @@
     const INFO = [
       `<h3>Una medida para todos</h3><p>Antes, cada reino y cada provincia tenía sus medidas: varas, palmos, leguas... La vara castellana de Burgos medía 0,835905 m, pero en otros lugares las varas medían entre 0,768 m y 0,912 m. Comprar y vender era complicado.</p>
        <h3>El sistema métrico decimal</h3><p>A finales del siglo XVIII, en Francia, se definió el <strong>metro</strong> a partir del tamaño de la Tierra, y las demás unidades se relacionaron con él de 10 en 10. En España, la Ley de 19 de julio de 1849 implantó el sistema métrico, obligatorio desde el 1 de enero de 1860.</p>
-       <h3>Las cuentas</h3><p>3 varas = 3 × 0,835905 m = 2,507715 m, unos 2 m y 51 cm.</p>
        <p class="fuente">Cadarso Montalvo, M. (2021). <em>Un análisis de la evolución de la metrología en España</em>. Centro Español de Metrología (texto de la ley de 1849 y valor de la vara de Burgos). La tela de la actividad es inventada.</p>`,
       `<h3>La era del hierro</h3><p>En el siglo XIX, la Revolución Industrial permitió fabricar mucho hierro y acero. Con ellos se levantaron puentes, estaciones y torres enormes, hechos de barras unidas.</p>
        <h3>¿Por qué triángulos?</h3><p>Un cuadrado hecho con barras articuladas puede torcerse y convertirse en un paralelogramo sin que cambie la longitud de sus lados. Un triángulo, no: si sus lados no cambian, su forma tampoco. Por eso las vigas de hierro se llenan de diagonales que forman triángulos.</p>
        <h3>El Puente de Vizcaya</h3><p>Une Getxo y Portugalete sobre la ría. Lo proyectó Alberto de Palacio y se inauguró en 1893. Es un puente transbordador: una barquilla colgada de una gran viga cruza la ría con personas y vehículos. Es Patrimonio Mundial desde 2006.</p>
        <p class="fuente">UNESCO, «Vizcaya Bridge», Patrimonio Mundial n.º 1217 (2006). La viga de la actividad es un modelo simplificado.</p>`,
       `<h3>Faros en Canarias</h3><p>En el siglo XIX se construyeron faros en las costas canarias para que los barcos navegaran con seguridad de noche. El faro de Maspalomas, en el sur de Gran Canaria, se encendió en 1890; lo proyectó el ingeniero grancanario Juan León y Castillo. Está protegido como Bien de Interés Cultural.</p>
-       <h3>Destellos que se reconocen</h3><p>Muchos faros tienen una lente que gira. Cada haz de luz que pasa frente a un barco se ve como un destello. Si la lente tiene n haces y da una vuelta en T segundos, se ve un destello cada T : n segundos, y entre dos haces hay 360° : n. Cada faro tiene su ritmo, para que los marinos sepan cuál ven.</p>
+       <h3>Destellos que se reconocen</h3><p>Muchos faros tienen una lente que gira. Cada haz de luz que pasa frente a un barco se ve como un destello. Si la lente tiene n haces y da una vuelta en T segundos, se ve un destello cada T : n segundos. Los haces están repartidos por igual alrededor de la lente. Cada faro tiene su ritmo, para que los marinos sepan cuál ven.</p>
        <p class="fuente">Turismo de Gran Canaria, «The inner light of Maspalomas Lighthouse». El ritmo de destellos de la actividad es un modelo, no el del faro real.</p>`,
       `<h3>Contar a la población</h3><p>Los <strong>censos</strong> cuentan cada cierto tiempo a todas las personas que viven en un lugar. Con sus datos se hacen tablas y gráficos.</p>
-       <h3>Canarias en el siglo XX</h3><p>Según los censos, Canarias tenía 364.408 habitantes en 1900, 807.773 en 1950 y 1.694.477 en 2001: se multiplicó casi por 5. En la primera mitad del siglo XX muchas personas canarias emigraron a Cuba y, hacia mediados de siglo, a Venezuela. Desde finales del siglo XX, en cambio, llega más población de la que se va.</p>
+       <h3>Canarias en el siglo XX</h3><p>Según los censos, Canarias tenía 364.408 habitantes en 1900, 807.773 en 1950 y 1.694.477 en 2001. En la primera mitad del siglo XX muchas personas canarias emigraron a Cuba y, hacia mediados de siglo, a Venezuela. Desde finales del siglo XX, en cambio, llega más población de la que se va.</p>
        <h3>Leer un gráfico</h3><p>En un gráfico de barras, la altura de cada barra representa una cantidad. La <strong>escala</strong> del eje indica cuánto vale cada línea: aquí, 250.000 habitantes.</p>
        <p class="fuente">Instituto Canario de Estadística (ISTAC) (2008). <em>Canarias en cifras 2007/08</em>: población de Canarias por periodos censales (INE).</p>`,
       `<h3>Una isla con energía renovable</h3><p>El Hierro produce gran parte de su electricidad con la central hidroeólica de <strong>Gorona del Viento</strong>, inaugurada en 2014. Tiene 5 aerogeneradores (11,5 MW en total) y dos depósitos de agua a distinta altura: el de arriba, en un cráter llamado La Caldera, y otro abajo.</p>
        <h3>Guardar el viento</h3><p>Cuando sobra viento, las bombas suben agua al depósito de arriba. Cuando falta, el agua baja por una tubería y mueve las turbinas. Así la energía del viento se guarda para cuando hace falta. En algunos periodos, la isla funciona con el 100 % de electricidad renovable.</p>
-       <h3>Porcentajes</h3><p>Si el viento da 1 MW de los 5 MW que necesita la isla, cubre 1/5 de la demanda, es decir, el 20 %.</p>
+       <h3>Porcentajes</h3><p>Un porcentaje dice cuántas partes de cada 100 son: la mitad es el 50 % y la cuarta parte, el 25 %.</p>
        <p class="fuente">Endesa, «El Hierro renovable» (datos técnicos de Gorona del Viento) · Energías Renovables (1-2-2016), «El Hierro, primer sistema totalmente aislado capaz de...». La demanda de unos 5 MW y los momentos del día de la actividad están simplificados.</p>`
     ];
     let focoPrevio = null;

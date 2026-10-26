@@ -16,6 +16,7 @@ Protocolo ARQ-3D-01, fase 1, adoptada de forma parcial. Para cada elemento recon
 | Mano en negativo | El Castillo, ≥ 37 300 años | Pike et al. (2012), *Science*, 336, 1409-1413, https://doi.org/10.1126/science.1219957 | Documentado |
 | Mano en negativo | Posible autoría neandertal (Maltravieso), en debate | Hoffmann et al. (2018), https://doi.org/10.1126/science.aap7778; White et al. (2020), https://doi.org/10.1016/j.jhevol.2019.102640 | Interpretado |
 | Mano en negativo | Mano de 20 cm; cuadrícula de 5 cm | — | Modelo didáctico |
+| Mano en negativo | Superficie estimada con cuadros enteros y medios trozos; panel de 44 × 32 cm | — | Modelo didáctico |
 | Cerámica cardial | Decoración con el borde de *Cerastoderma*; Cova de l'Or, hacia 5300 a. C. | Zilhão (2001), *PNAS*, 98(24), 14180-14185, https://doi.org/10.1073/pnas.241522898 | Documentado |
 | Cerámica cardial | Una sola franja en el hombro; medidas de la vasija | — | Modelo didáctico |
 | Dolmen | Viera orientado al sol del equinoccio; Menga a la Peña de los Enamorados | UNESCO (2016), «Antequera Dolmens Site»; Lozano Rodríguez et al. (2024), *Science Advances*, https://doi.org/10.1126/sciadv.adp1295 | Documentado |
@@ -92,3 +93,22 @@ Protocolo ARQ-3D-01, fase 1, adoptada de forma parcial. Para cada elemento recon
 | Elemento | Afirmación | Fuente | Certeza |
 |---|---|---|---|
 | Modelo de manos | `hand_landmarker.task`, float16, versión 1; SHA-256 `fbc2a300…cde1` y 7 819 105 bytes | Coincidencia de tres copias independientes (un paquete de npm y dos repositorios de Hugging Face); la descarga directa de Google no fue posible desde el entorno de trabajo | Documentado: la descarga oficial de la usuaria (19-10-2026) tiene la misma huella |
+
+## Contextos históricos añadidos en la v3.11
+
+| Elemento | Afirmación en el recurso | Fuente | Certeza |
+|---|---|---|---|
+| Acueducto de Segovia | Sillares de granito colocados sin argamasa | UNESCO, «Old Town of Segovia and its Aqueduct» (1985) | Documentado (cotejar la redacción con la ficha UNESCO) |
+| Acueductos romanos | Canales con pendiente constante; arcadas donde el terreno se hunde | Vitruvio, *De architectura*, VIII | Documentado |
+| Arco apuntado | Transición del románico al gótico; arco equilátero | Construcción geométrica clásica | Documentado (geometría) |
+| Portulanos | Dulcert (1339) dibuja islas de Canarias; Lanzarote y Lanzarotto Malocello | Quartapelle (2017, 2023), *Revista de Historia Canaria*, https://doi.org/10.25145/j.histcan.2023.205.13 | Documentado |
+| Vela «redonda» | En la época se llamaba así a la vela cuadrada o rectangular | Diario del primer viaje (resumen de Las Casas) | Documentado (terminología náutica de la época) |
+| Perspectiva | Brunelleschi y Alberti; *De pictura* (1435) | Alberti (1435) | Documentado |
+| Ciudadela de Jaca | Felipe II; Tiburcio Spannocchi; planta pentagonal | Turespaña | Documentado (fuente institucional) |
+| Meridiano | Jorge Juan y Antonio de Ulloa; 1735-1744; Tierra achatada por los polos | Ruiz Morales (2011); Juan y Ulloa (1748) | Documentado |
+| Ingenios | Producción de azúcar en Canarias, siglos XV-XVI | Gambín García (2008); Viña Brito (2006) | Documentado |
+| Sistema métrico | Ley de 1849, obligatorio desde 1860; vara de Burgos 0,835905 m | Cadarso Montalvo (2021), Centro Español de Metrología | Documentado |
+| Faro de Maspalomas | 1890; Juan León y Castillo | Turismo de Gran Canaria | Documentado (fuente institucional de divulgación) |
+| Censos | Población de Canarias en 1900, 1950 y 2001 | ISTAC (2008) | Documentado |
+| Gorona del Viento | 2014; bombeo y turbinado entre dos depósitos | Endesa; Energías Renovables (2016) | Documentado |
+

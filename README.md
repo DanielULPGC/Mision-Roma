@@ -1,4 +1,4 @@
-# Las manos que construyeron la historia · v3.10 (edición para GitHub Pages)
+# Las manos que construyeron la historia · v3.11 (edición para GitHub Pages)
 
 Proyecto «Las manos que construyeron la historia». Geometría, patrimonio histórico y realidad aumentada en Educación Primaria (5.º y 6.º).
 
@@ -60,6 +60,42 @@ Los botones «← Línea del tiempo» de los capítulos llevan a la línea del t
 - **Modelar.** Tras decorar la vasija, se mide su capacidad con jarras de 2 L, 1 L y 0,5 L: se vierte (o se saca, con el cartel «verter/sacar») hasta llenarla justo hasta el borde. La vasija se ve transparente para seguir el nivel del agua. Después se elige su capacidad aproximada.
 - **Orientar.** El corredor empieza cada vez en una posición distinta (marcada con una línea discontinua). Tras orientarlo al este, el alumnado indica cuántos grados lo ha girado, por el camino más corto, y qué tipo de ángulo forma (agudo, recto, obtuso o llano). Un sector azul muestra el giro.
 - **Canarias.** El menú de forma, técnica, orden y esquemas se muestra siempre, también con la cámara. «Borrar» deja la pintadera y el papel como al principio, y hay además «Limpiar solo el papel».
+
+## Novedades de la v3.11 (propuestas de mejora del 26-10-2026)
+
+**Máquina del tiempo · área del profesorado** (`maquina-del-tiempo.html`). Se enlaza desde la bienvenida y desde la línea del tiempo. Contiene la guía didáctica, la fundamentación curricular, las instrucciones de uso y evaluación (con rúbrica), material de apoyo y ampliación por capítulo y el solucionario de las 25 etapas. El contenido se publica **cifrado** (AES-256-GCM con clave derivada por PBKDF2-SHA-256, 600 000 iteraciones) y solo se descifra en el navegador con la contraseña. En un sitio estático no se puede «ocultar» una página: sin cifrado, cualquiera podría leer el solucionario en el código fuente. El texto en claro y la herramienta de cifrado no están en el repositorio. Para cambiar la contraseña o el contenido, se vuelve a cifrar con `cifrar.mjs` (se entrega aparte).
+
+**Contexto histórico en las 25 etapas.** El panel «Contexto» que ya tenía la Prehistoria se extiende a la Edad Antigua, la Media, la Moderna y la Contemporánea.
+
+**Sin respuestas a la vista.** Se ha revisado «Saber más», las métricas y los enunciados de los cinco capítulos para que no adelanten la solución: por ejemplo, la medida de la tela en metros, «casi 5 veces», el 20 %, el ángulo interior del pentágono, los 40° de Toledo o los 20 cm de la mano. Donde hacía falta un ejemplo, se usan otros números.
+
+**Prehistoria.** La mano de la cueva encaja con la cuadrícula: la palma y los dedos se recortan sobre cuadros de 5 cm, y la superficie se cuenta con cuadros enteros (verdes) y trozos (amarillos), que valen medio cuadro. La respuesta sale del dibujo real, no de una cifra fija.
+
+**Edad Antigua (Misión Roma).**
+- *Terreno:* el alumnado calcula la altura de la arcada restando cotas (canal − valle).
+- *Nivelar:* se añade el problema de la pendiente del −8 % en un tramo de 2,5 m y se quita el volumen del prisma.
+- *Construir:* primero se calcula cuántos sillares hacen falta para el pilar de 3,20 m; después se apilan; por último, se calculan el volumen del pilar y el de los sillares y se comparan.
+- *Medir:* el enunciado de la etapa 4 es más claro.
+- *Cantonera:* cada boca tiene una regla de 0 a 80 cm con la abertura rotulada; al final, el reparto se aplica sin tantear a una abertura nueva.
+
+**Edad Media.**
+- *Arcos:* se añaden una regla de 0 a 2 m y una mira con la distancia a A para localizar el punto medio.
+- *Rosetón:* primero hay que abrir el compás hasta el radio.
+- *Alhambra:* las piezas empiezan en posiciones al azar y, para cada una, se pregunta cuántos grados se ha girado y qué tipo de ángulo es.
+- *Portulano:* la distancia se mide con un compás de puntas abierto como la barra de escala (500 km), paso a paso.
+
+**Edad Moderna.**
+- *Velas:* se explica que en la época «vela redonda» designaba la vela cuadrada o rectangular, y el alumnado calcula las dos áreas y cuántas veces es mayor la rectangular.
+- *Perspectiva:* se corrige el aviso que pedía mover el cuadro y se añade una pregunta sobre posiciones de rectas (secantes, paralelas, perpendiculares, tangentes).
+- *Ciudadela:* al colocar cada baluarte se ven el sector y los grados; desaparece la suma de 540° y se usa el enunciado propuesto (180° − 72°), con una pregunta sobre el tipo de los ángulos central e interior.
+- *Meridiano:* primero se calcula el ángulo de la cumbre y después se mide la distancia con un compás de puntas y una escala visible (tramos de 2 km).
+- *Ingenio:* antes de probar, el alumnado calcula los dientes (40 : 4) y luego lo comprueba.
+
+**Edad Contemporánea.**
+- *Metro:* el enunciado ya no da la medida en metros y centímetros.
+- *Faro:* nuevo modelo de barco de vapor. Se exigen 3 haces y 15 s, y no basta cualquier combinación que dé 5 s. Los controles siguen activos durante la pregunta.
+- *Población:* los datos del censo aparecen en un cuadro blanco con letra grande y oscura, sin sombras.
+- *Gorona del Viento:* razonamiento guiado. En cada momento del día se calcula primero si sobra o falta energía y cuánta, y después se decide si bombear, turbinar o no hacer nada. Se sustituyen los arrastres de agua, que funcionaban mal.
 
 ## Capítulo «Las primeras manos» (Prehistoria)
 
@@ -158,6 +194,7 @@ Todas las etapas se pueden hacer de tres formas:
   - **Celebración.** Al completar una etapa por primera vez aparece un rótulo, confeti (no se muestra si el sistema pide reducir el movimiento) y el botón «Siguiente etapa» se ilumina.
   - **Sonido.** Sonidos breves y suaves, sintetizados en el navegador sin archivos: acierto, error, agarre y fanfarria final. El botón «Sonido» del panel superior los activa o desactiva, y la elección se recuerda en el navegador. Ningún mensaje depende solo del sonido.
   - **Faro de Maspalomas.** Los haces y los segundos por vuelta se controlan ahora por separado: la linterna cambia los haces y la esfera de la relojería, el tiempo. Antes, un mismo gesto cambiaba las dos cosas.
+- **Máquina del tiempo (v3.11).** Área del profesorado cifrada con contraseña: `maquina-del-tiempo.html`. Guía, currículo, evaluación, material de apoyo y solucionario.
 - **Modo docente.** Añade `?docente` a la dirección (por ejemplo, `http://localhost:8000/?docente`) para abrir cualquier etapa sin completar las anteriores.
 - **Progreso.** Las etapas completadas se recuerdan solo en ese navegador. Para reiniciar, borra los datos del sitio en el navegador.
 - **«Saber más».** Cada etapa tiene un panel con la explicación, preguntas y la fuente.

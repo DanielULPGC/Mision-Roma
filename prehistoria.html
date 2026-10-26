@@ -325,7 +325,9 @@
     function verPista(texto) { const c = $("pista"); c.hidden = false; c.textContent = texto; }
     function mostrarPista() {
       if (!etapa) return;
-      const lista = etapa.pistas && etapa.pistas.length ? etapa.pistas : [etapa.nota];
+      // Las pistas pueden ser una lista fija o una función que devuelve las de la fase actual del reto
+      const ps = typeof etapa.pistas === "function" ? etapa.pistas() : etapa.pistas;
+      const lista = ps && ps.length ? ps : [etapa.nota];
       const n = nivelPista[actual] || 0, k = n % lista.length;
       nivelPista[actual] = n + 1;
       if (registro && !hechas[actual]) { registro[actual].pistas++; guardarRegistro(); }
@@ -1177,6 +1179,21 @@
       }
     }
 
+    // Desordena las opciones para que la respuesta correcta no esté siempre en el mismo sitio
+    function barajar(l) { const a = l.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+    // Tablillas de respuesta con texto variable (preguntas encadenadas dentro de una etapa)
+    function tablillasP(g, n, x, y0, paso, w = 1.15, z = 0.08) {
+      const t = Array.from({ length: n }, (_, i) => { const m = caja(w, 0.42, 0.06, M.madera); m.position.set(x, y0 - i * paso, z); m.visible = false; m.userData.i = i; g.add(m); return m; });
+      let ops = [];
+      return {
+        poner(o) { ops = o; t.forEach((m, i) => (m.visible = i < o.length)); },
+        ocultar() { ops = []; t.forEach((m) => (m.visible = false)); },
+        tocar(px, py) { const h = rayo(px, py).intersectObjects(t.filter((m) => m.visible), false)[0]; return h ? h.object.userData.i : null; },
+        etiquetas() { t.forEach((m, i) => { const e = etiqueta("", "geo", () => { if (!m.visible || !ops[i]) return null; e.texto = ops[i][0]; return [x, y0 - i * paso + 0.02, z + 0.08]; }); }); },
+        get ops() { return ops; }
+      };
+    }
+
     // Controles alternativos (DUA)
     function filaRango(etq, min, max, paso, valor, alCambiar, texto) {
       const id = "alt-" + Math.random().toString(36).slice(2, 8);
@@ -1195,21 +1212,6 @@
         const b = document.createElement("button"); b.type = "button"; b.textContent = txt; b.addEventListener("click", fn); fila.appendChild(b);
       }
       alternativos.appendChild(fila);
-    }
-
-    // Desordena las opciones para que la respuesta correcta no esté siempre en el mismo sitio
-    function barajar(l) { const a = l.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
-    // Tablillas de respuesta con texto variable (preguntas encadenadas dentro de una etapa)
-    function tablillasP(g, n, x, y0, paso, w = 1.15, z = 0.08) {
-      const t = Array.from({ length: n }, (_, i) => { const m = caja(w, 0.42, 0.06, M.madera); m.position.set(x, y0 - i * paso, z); m.visible = false; m.userData.i = i; g.add(m); return m; });
-      let ops = [];
-      return {
-        poner(o) { ops = o; t.forEach((m, i) => (m.visible = i < o.length)); },
-        ocultar() { ops = []; t.forEach((m) => (m.visible = false)); },
-        tocar(px, py) { const h = rayo(px, py).intersectObjects(t.filter((m) => m.visible), false)[0]; return h ? h.object.userData.i : null; },
-        etiquetas() { t.forEach((m, i) => { const e = etiqueta("", "geo", () => { if (!m.visible || !ops[i]) return null; e.texto = ops[i][0]; return [x, y0 - i * paso + 0.02, z + 0.08]; }); }); },
-        get ops() { return ops; }
-      };
     }
 
     // =====================================================================
@@ -1551,18 +1553,18 @@
         for (let i = 0; i < 9; i++) { c.beginPath(); let x = azar() * CW, y = azar() * CH; c.moveTo(x, y); for (let j = 0; j < 7; j++) { x += (azar() - 0.5) * 60 * KP; y += azar() * 40 * KP; c.lineTo(x, y); } c.stroke(); }
       })();
       // Mano de referencia: 20 cm de la muñeca a la punta del dedo corazón
-      const MX = CW / 2, MY = CH * 0.86;
+      const MX = CW / 2, MY = Math.round(CH * 0.8);   // la mano queda entera dentro de la pared
       function dibujarMano(c, extra) {
         const s = PXCM;
         c.lineCap = "round"; c.lineJoin = "round";
-        const palma = { w: 8.6 * s, h: 11 * s };
+        const palma = { w: 10 * s, h: 11 * s };         // 10 cm: la palma ocupa justo 2 cuadros de ancho
         c.beginPath();
         const x0 = MX - palma.w / 2 - extra, y0 = MY - palma.h - extra, w = palma.w + 2 * extra, h = palma.h + 2 * extra, rad = 1.5 * s + extra;
         c.moveTo(x0 + rad, y0); c.arcTo(x0 + w, y0, x0 + w, y0 + h, rad); c.arcTo(x0 + w, y0 + h, x0, y0 + h, rad); c.arcTo(x0, y0 + h, x0, y0, rad); c.arcTo(x0, y0, x0 + w, y0, rad); c.fill();
         // Muñeca y arranque del antebrazo, más estrechos que la palma: la mano empieza en la línea MY
-        c.fillRect(MX - 3.1 * s - extra, MY - 1.2 * s, 6.2 * s + 2 * extra, 4.8 * s + extra);
+        c.fillRect(MX - 3.4 * s - extra, MY - 1.2 * s, 6.8 * s + 2 * extra, 3.4 * s + extra);
         // Dedo corazón: base en MY − 10,4 cm; 8,66 cm de trazo + 0,95 cm de punta redondeada = 20 cm desde la muñeca
-        const dedos = [[-3.1, -0.17, 7.3], [-1.0, -0.05, 8.66], [1.15, 0.07, 8.0], [3.15, 0.2, 6.35]];
+        const dedos = [[-3.6, -0.15, 7.3], [-1.2, -0.04, 8.66], [1.25, 0.06, 8.0], [3.6, 0.17, 6.35]];
         c.lineWidth = 1.9 * s + 2 * extra;
         for (const [dx, a, l] of dedos) { const bx = MX + dx * s, by = MY - palma.h + 0.6 * s; c.beginPath(); c.moveTo(bx, by); c.lineTo(bx + Math.sin(a) * l * s, by - Math.cos(a) * l * s); c.stroke(); }
         c.lineWidth = 2.2 * s + 2 * extra;
@@ -1622,18 +1624,31 @@
       macizo.position.set(0, CY + 0.25, -0.22); g.add(macizo);
       // Superficie de la mano (solo por encima de la muñeca), medida en el propio dibujo
       const AREA = (() => { const d = masc.getContext("2d").getImageData(0, 0, CW, Math.floor(MY)).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 127) n++; return n / (PXCM * PXCM); })();
-      const CUADROS = Math.round(AREA / 25), AREA_R = CUADROS * 25, PARED = 44 * 32, LIBRE = PARED - AREA_R;
+      // Cuadros de 5 × 5 cm que tapa la mano (por encima de la muñeca): enteros y trozos
+      const CELDAS = (() => {
+        const paso = 5 * PXCM, d = masc.getContext("2d").getImageData(0, 0, CW, CH).data, l = [];
+        for (let y1 = MY; y1 - paso > -1; y1 -= paso) for (let x0 = MX - Math.ceil(MX / paso) * paso; x0 < CW; x0 += paso) {
+          let n = 0, t = 0;
+          for (let y = Math.max(0, Math.ceil(y1 - paso)); y < y1; y += 2) for (let x = Math.max(0, Math.ceil(x0)); x < Math.min(CW, x0 + paso); x += 2) { t++; if (d[(y * CW + x) * 4 + 3] > 127) n++; }
+          const f = t ? n / t : 0;
+          if (f > 0.03) l.push({ x0, y0: y1 - paso, paso, entera: f >= 0.95 });
+        }
+        return l;
+      })();
+      const ENTEROS = CELDAS.filter((c) => c.entera).length, TROZOS = CELDAS.length - ENTEROS;
+      const AREA_R = (ENTEROS + TROZOS / 2) * 25, PARED = 44 * 32, LIBRE = PARED - AREA_R;
+      const cm2 = (n) => (n % 1 ? fmt(n, 1) : String(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
       const miles = (n) => n.toLocaleString("es-ES");
       const PREG = [
         { txt: "¡Retiras la mano y aparece en negativo! ¿Cuánto mide de LARGO, desde la muñeca (donde se estrecha) hasta la punta del dedo corazón? Cada cuadro mide 5 cm de lado. Te preguntamos la longitud, no la superficie.",
           ops: [["10 cm", "Cuenta los cuadros desde la línea de la muñeca hasta la punta del dedo más largo: cada uno mide 5 cm."], ["20 cm", null], ["40 cm", "Demasiado: cuenta otra vez los cuadros, desde la muñeca hasta la punta del dedo corazón."]],
           bien: "¡Exacto! 4 cuadros de 5 cm: 4 × 5 = 20 cm de largo." },
-        { txt: "Ahora la SUPERFICIE: ¿cuánta pared tapa la mano? Cada cuadro ocupa 5 × 5 = 25 cm². Cuenta los cuadros que cubre la mano, juntando los trozos.",
-          ops: [["Unos 20 cm²", "20 es la longitud en centímetros. La superficie se mide en cm²: cuenta cuadros de 25 cm²."], ["Unos " + AREA_R + " cm²", null], ["400 cm²", "400 cm² sería el cuadrado entero de 20 × 20 cm. La mano no lo llena: cuenta solo los cuadros que tapa."]],
-          bien: "¡Bien estimado! Unos " + CUADROS + " cuadros × 25 cm² = " + AREA_R + " cm²." },
+        { txt: "Ahora la SUPERFICIE: ¿cuánta pared tapa la mano? Cada cuadro mide 5 × 5 = 25 cm². Los cuadros VERDES quedan tapados enteros (" + ENTEROS + ") y los AMARILLOS solo en parte (" + TROZOS + "). Si cada trozo cuenta como medio cuadro, ¿qué superficie tapa la mano, más o menos?",
+          ops: [["Unos 20 cm²", "20 es la longitud en centímetros. La superficie se mide en cm²: cuenta cuadros de 25 cm²."], ["Unos " + cm2(AREA_R) + " cm²", null], ["Unos " + cm2((ENTEROS + TROZOS) * 25) + " cm²", "Así cuentas cada trozo como un cuadro entero y te sale de más. Un trozo vale, más o menos, medio cuadro: " + ENTEROS + " + " + TROZOS + " : 2."]],
+          bien: "¡Bien estimado! " + ENTEROS + " cuadros enteros + " + TROZOS + " trozos : 2 = " + fmt(ENTEROS + TROZOS / 2, (ENTEROS + TROZOS / 2) % 1 ? 1 : 0) + " cuadros; × 25 cm² = " + cm2(AREA_R) + " cm² (medida exacta del dibujo: unos " + Math.round(AREA) + " cm²)." },
         { txt: "El panel pintado de la pared mide 44 cm × 32 cm = " + miles(PARED) + " cm². Si quitamos lo que tapa la mano, ¿cuánta pared queda libre?",
-          ops: [[miles(PARED + AREA_R) + " cm²", "Si la mano tapa una parte, queda menos pared, no más: hay que restar."], [miles(LIBRE) + " cm²", null], [miles(PARED - 20) + " cm²", "Hay que restar la superficie de la mano (en cm²), no su longitud (20 cm)."]],
-          bien: "¡Correcto! " + miles(PARED) + " − " + AREA_R + " = " + miles(LIBRE) + " cm² libres. Si pudiéramos cubrir la pared sin dejar huecos, cabrían unas " + Math.floor(PARED / AREA_R) + " manos (" + miles(PARED) + " : " + AREA_R + "); en realidad, menos, porque las manos no encajan como baldosas." }
+          ops: [[cm2(PARED + AREA_R) + " cm²", "Si la mano tapa una parte, queda menos pared, no más: hay que restar."], [cm2(LIBRE) + " cm²", null], [cm2(PARED - 20) + " cm²", "Hay que restar la superficie de la mano (en cm²), no su longitud (20 cm)."]],
+          bien: "¡Correcto! " + cm2(PARED) + " − " + cm2(AREA_R) + " = " + cm2(LIBRE) + " cm² libres. Si pudiéramos cubrir la pared sin dejar huecos, cabrían unas " + Math.floor(PARED / AREA_R) + " manos (" + cm2(PARED) + " : " + cm2(AREA_R) + "); en realidad, menos, porque las manos no encajan como baldosas." }
       ];
       PREG.forEach((q) => (q.ops = barajar(q.ops)));
       const tabs = tablillasP(g, 3, 3.05, CY + 0.8, 0.8, 1.3, 0.05);
@@ -1644,6 +1659,7 @@
         cC.drawImage(base, 0, 0); cC.drawImage(pint, 0, 0);
         if (fase === "soplar") { cC.globalAlpha = 0.95; cC.drawImage(piel, 0, 0); cC.globalAlpha = 1; }
         if (fase !== "soplar") {
+          if (fase === "medir" && q >= 1 || fase === "hecho") for (const c of CELDAS) { cC.fillStyle = c.entera ? "rgba(34,197,94,.38)" : "rgba(250,204,21,.42)"; cC.fillRect(c.x0, c.y0, c.paso, c.paso); }
           cC.drawImage(contorno, 0, 0);
           cC.strokeStyle = "rgba(255,255,255,.6)"; cC.lineWidth = 1.5 * KP;
           const paso = 5 * PXCM;
@@ -1680,7 +1696,7 @@
         intentos++;
         const mal = PREG[q].ops[i][1];
         if (mal) { estado(mal, "status-error", "p2-mal-" + q + "-" + i); refrescar(); return; }
-        if (q < PREG.length - 1) { const bien = PREG[q].bien; q++; tabs.poner(PREG[q].ops); estado(bien + " " + PREG[q].txt, "status-ok", "p2-q" + q); reAlternativos(); }
+        if (q < PREG.length - 1) { const bien = PREG[q].bien; q++; tabs.poner(PREG[q].ops); componer(); estado(bien + " " + PREG[q].txt, "status-ok", "p2-q" + q); reAlternativos(); }
         else { hecho = true; fase = "hecho"; tabs.ocultar(); completar(1, PREG[q].bien + " Ahora mide tu propia mano con una regla y compárala."); }
         refrescar();
       }
@@ -1695,7 +1711,7 @@
       }
       function refrescar() {
         if (actual !== 1) return;
-        metricas(["Pigmento alrededor de la mano: " + Math.round(cobertura * 100) + " %", "Fase: " + (fase === "soplar" ? "soplar pigmento" : fase === "medir" ? ["medir la longitud", "medir la superficie", "pared libre"][q] : "terminada"), "Cuadro: 5 cm de lado = 25 cm²", "Respuestas: " + intentos]);
+        metricas(["Pigmento alrededor de la mano: " + Math.round(cobertura * 100) + " %", "Fase: " + (fase === "soplar" ? "soplar pigmento" : fase === "medir" ? ["medir la longitud", "medir la superficie", "pared libre"][q] : "terminada"), (q >= 1 ? "Verdes: " + ENTEROS + " · amarillos: " + TROZOS : "Cuadro: 5 cm de lado = 25 cm²"), "Respuestas: " + intentos]);
       }
       function uvDe(x, y) { const h = rayo(x, y).intersectObject(pared, false)[0]; return h && h.uv ? h.uv : null; }
       componer();
@@ -2694,7 +2710,7 @@
        <h3>Un debate abierto</h3><p>En 2018 un equipo propuso que una mano de la cueva de Maltravieso (Cáceres) tenía más de 64 000 años y que la habrían pintado neandertales. Otros especialistas no están de acuerdo. La ciencia también avanza así: discutiendo las pruebas.</p>
        <h3>Medir sin regla</h3><p>Una cuadrícula permite medir: si cada cuadro mide 5 cm, basta con contarlos y multiplicar. ¿Cuántos cuadros ocuparía tu mano?</p>
        <h3>Longitud y superficie</h3><p>La <strong>longitud</strong> dice cuánto mide algo de un extremo a otro y se mide en centímetros (cm). La <strong>superficie</strong> dice cuánto espacio tapa y se mide en centímetros cuadrados (cm²): cada cuadro de 5 × 5 cm ocupa 25 cm². Para estimarla se cuentan los cuadros enteros y se juntan los trozos.</p>
-       <p class="fuente">Pike et al. (2012), <em>Science</em>, 336, 1409-1413, doi:10.1126/science.1219957 · Hoffmann et al. (2018), <em>Science</em>, 359, 912-915, doi:10.1126/science.aap7778 · White et al. (2020), <em>Journal of Human Evolution</em>, 144, 102640, doi:10.1016/j.jhevol.2019.102640 · UNESCO, Lista del Patrimonio Mundial, n.º 310. La mano de la actividad es un modelo de 20 cm.</p>`,
+       <p class="fuente">Pike et al. (2012), <em>Science</em>, 336, 1409-1413, doi:10.1126/science.1219957 · Hoffmann et al. (2018), <em>Science</em>, 359, 912-915, doi:10.1126/science.aap7778 · White et al. (2020), <em>Journal of Human Evolution</em>, 144, 102640, doi:10.1016/j.jhevol.2019.102640 · UNESCO, Lista del Patrimonio Mundial, n.º 310. La mano de la actividad es un modelo.</p>`,
       `<h3>El barro del Neolítico</h3><p>En el Neolítico las personas empezaron a cultivar, a criar animales y a guardar alimentos. Para guardarlos modelaron vasijas de barro a mano, sin torno, a menudo uniendo rollos de arcilla («churros»), y las cocían al fuego.</p>
        <h3>Un cuerpo de revolución</h3><p>Una vasija es un perfil que gira alrededor de un eje, igual que un cilindro, un cono o una esfera. Por eso, al cambiar la anchura de cada anillo, cambia toda la forma.</p>
        <h3>Cerámica cardial</h3><p>Muchas de las primeras vasijas neolíticas de la península ibérica se decoraban presionando el barro con el borde de una concha de berberecho, que antes se clasificaba en el género <em>Cardium</em> (hoy <em>Cerastoderma</em>): por eso se llama cerámica <strong>cardial</strong>. En la Cova de l'Or (Alicante) se han datado semillas de trigo de esos niveles hacia el 5300 a. C.</p>

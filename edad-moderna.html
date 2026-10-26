@@ -325,7 +325,9 @@
     function verPista(texto) { const c = $("pista"); c.hidden = false; c.textContent = texto; }
     function mostrarPista() {
       if (!etapa) return;
-      const lista = etapa.pistas && etapa.pistas.length ? etapa.pistas : [etapa.nota];
+      // Las pistas pueden ser una lista fija o una función que devuelve las de la fase actual del reto
+      const ps = typeof etapa.pistas === "function" ? etapa.pistas() : etapa.pistas;
+      const lista = ps && ps.length ? ps : [etapa.nota];
       const n = nivelPista[actual] || 0, k = n % lista.length;
       nivelPista[actual] = n + 1;
       if (registro && !hechas[actual]) { registro[actual].pistas++; guardarRegistro(); }
@@ -1177,6 +1179,21 @@
       }
     }
 
+    // Desordena las opciones para que la respuesta correcta no esté siempre en el mismo sitio
+    function barajar(l) { const a = l.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+    // Tablillas de respuesta con texto variable (preguntas encadenadas dentro de una etapa)
+    function tablillasP(g, n, x, y0, paso, w = 1.15, z = 0.08) {
+      const t = Array.from({ length: n }, (_, i) => { const m = caja(w, 0.42, 0.06, M.madera); m.position.set(x, y0 - i * paso, z); m.visible = false; m.userData.i = i; g.add(m); return m; });
+      let ops = [];
+      return {
+        poner(o) { ops = o; t.forEach((m, i) => (m.visible = i < o.length)); },
+        ocultar() { ops = []; t.forEach((m) => (m.visible = false)); },
+        tocar(px, py) { const h = rayo(px, py).intersectObjects(t.filter((m) => m.visible), false)[0]; return h ? h.object.userData.i : null; },
+        etiquetas() { t.forEach((m, i) => { const e = etiqueta("", "geo", () => { if (!m.visible || !ops[i]) return null; e.texto = ops[i][0]; return [x, y0 - i * paso + 0.02, z + 0.08]; }); }); },
+        get ops() { return ops; }
+      };
+    }
+
     // Controles alternativos (DUA)
     function filaRango(etq, min, max, paso, valor, alCambiar, texto) {
       const id = "alt-" + Math.random().toString(36).slice(2, 8);
@@ -1231,8 +1248,17 @@
       const matVela = new THREE.MeshStandardMaterial({ color: 0xf1e7d0, roughness: 0.9, side: THREE.DoubleSide, bumpMap: TX.textura("pergamino").bump, bumpScale: 1.5 });
       let vela = null, t = 0, arrastre = null, fase = "vela", hecho = false, ctrl = null;
       const asa = new THREE.Mesh(new THREE.SphereGeometry(0.09, 16, 12), new THREE.MeshBasicMaterial({ color: 0xc2843a, depthTest: false })); asa.renderOrder = 6; g.add(asa);
-      const OPC = [["2 veces", 2], ["3 veces", 3], ["La mitad", 0.5]];
-      const preg = crearPreguntas(g, OPC, 3.0, 2.9, 0.62);
+      const tabsN1 = tablillasP(g, 3, 3.0, 2.9, 0.62, 1.3);
+      const PREG_N1 = [
+        { txt: "¡Vela cambiada! Antes de comparar, calcula: ¿cuál era el área de la vela triangular (latina)? Mide 8 m de base y 7 m de altura.",
+          ops: [["28 m²", null], ["56 m²", "56 m² sería el rectángulo. El triángulo es la mitad: base × altura : 2."], ["15 m²", "15 es la suma 8 + 7. El área se calcula multiplicando: base × altura : 2."]], bien: "¡Bien! 8 × 7 : 2 = 28 m²." },
+        { txt: "Ahora la vela rectangular (redonda), con la misma base y la misma altura: ¿qué área tiene?",
+          ops: [["56 m²", null], ["28 m²", "28 m² era la triangular. El rectángulo no se divide entre 2: base × altura."], ["30 m²", "30 m es el perímetro (8 + 7 + 8 + 7). El área es base × altura."]], bien: "¡Bien! 8 × 7 = 56 m²." },
+        { txt: "¿Cuántas veces es mayor la vela rectangular comparada con la vela triangular?",
+          ops: [["2 veces", null], ["3 veces", "Demasiado. Compara: 28 m² y 56 m². ¿Cuántas veces cabe 28 en 56?"], ["La mitad", "Al revés: la vela rectangular tiene más tela, no menos."]], bien: "" }
+      ];
+      PREG_N1.forEach((q) => (q.ops = barajar(q.ops)));
+      let qN1 = 0;
       const area = () => ((B + t) / 2) * HV * SC * SC;
       function construir() {
         const x0 = XM - B / 2, s = new THREE.Shape();
@@ -1247,37 +1273,45 @@
         if (actual !== 0) return;
         refrescar();
         if (fase === "vela" && t === B) {
-          fase = "pregunta"; preg.mostrar(true);
-          estado("¡Vela redonda! Con la misma base y la misma altura, el rectángulo tiene " + fmt(area(), 0) + " m² de tela. ¿Cuántas veces más que la vela triangular? Haz pinza sobre una tablilla.", "status-ok", "n1-preg");
-        } else if (fase === "vela") estado(t === 0 ? "Esta es la vela latina, triangular. Haz pinza sobre la esquina naranja y llévala a la derecha para convertirla en una vela redonda." : "Sigue: la vela va ganando tela. Lleva la esquina hasta el final de la verga.", "status-warn", "n1-v-" + (t === 0));
+          fase = "pregunta"; qN1 = 0; tabsN1.poner(PREG_N1[0].ops); reAltN1();
+          estado(PREG_N1[0].txt + " Haz pinza sobre una tablilla.", "status-ok", "n1-q0");
+        } else if (fase === "vela") estado(t === 0 ? "Esta es la vela latina, triangular. Haz pinza sobre la esquina naranja y llévala a la derecha, hasta el final de la verga, para convertirla en una vela «redonda»: así llamaban los marinos de la época a la vela cuadrada o rectangular." : "Sigue: la vela va ganando tela. Lleva la esquina hasta el final de la verga.", "status-warn", "n1-v-" + (t === 0));
       }
-      function responder(v) {
+      function responder(i) {
         if (fase !== "pregunta" || hecho) return;
-        if (v === 2) { hecho = true; fase = "hecho"; completar(0, "¡Correcto! Triángulo: 8 · 7 : 2 = 28 m². Rectángulo: 8 · 7 = 56 m². La vela redonda tiene el doble de tela y aprovecha mejor el viento que sopla por detrás."); }
-        else estado(v === 3 ? "Demasiado. Compara: 28 m² y 56 m². ¿Cuántas veces cabe 28 en 56?" : "Al revés: la vela redonda tiene más tela, no menos.", "status-warn", "n1-mal-" + v);
+        const op = PREG_N1[qN1].ops[i]; if (!op) return;
+        if (op[1]) { estado(op[1], "status-error", "n1-mal-" + qN1 + "-" + i); return; }
+        if (qN1 < 2) { const bien = PREG_N1[qN1].bien; qN1++; tabsN1.poner(PREG_N1[qN1].ops); reAltN1(); estado(bien + " " + PREG_N1[qN1].txt, "status-ok", "n1-q" + qN1); return; }
+        hecho = true; fase = "hecho"; tabsN1.ocultar(); reAltN1();
+        completar(0, "¡Correcto! 56 : 28 = 2: la vela rectangular tiene el doble de tela, porque el triángulo es la mitad del rectángulo con la misma base y altura. Con más tela, la vela redonda aprovecha mejor el viento que sopla por detrás.");
+      }
+      function reAltN1() { if (actual !== 0) return; alternativos.replaceChildren(); construirAltN1(); }
+      function construirAltN1() {
+        ctrl = filaRango("Esquina de la vela (%)", 0, 100, 5, Math.round((t / B) * 100), (v) => { if (fase === "vela") poner((v / 100) * B); }, (v) => v + " por ciento del camino");
+        if (fase === "pregunta") filaBotones(PREG_N1[qN1].ops.map((o, i) => [o[0], () => responder(i)]));
       }
       function refrescar() {
         if (actual !== 0) return;
-        metricas(["Base: 8 m · altura: 7 m", "Tela de la vela: " + fmt(area(), 1) + " m²", "Triangular: 8 · 7 : 2 = 28 m²", "Rectangular: 8 · 7 = 56 m²"]);
+        metricas(["Base de la vela: 8 m", "Altura de la vela: 7 m", "Forma: " + (t === 0 ? "triangular (latina)" : t === B ? "rectangular («redonda»)" : "cambiando…"), "Las áreas: ¡calcúlalas tú!"]);
       }
       construir();
       return {
         nombre: "Las velas de la carabela", grupo: g, marco: { ancho: 7.2, alto: 4.2, cy: 1.9 }, fondo: "gomera",
-        pistas: ["Haz pinza sobre la esfera naranja, en la esquina de la vela, y lleva la mano a la derecha hasta el final de la verga.", "Triángulo: base × altura : 2. Rectángulo: base × altura. Con la misma base y la misma altura, compara las dos áreas."],
+        pistas: ["Haz pinza sobre la esfera naranja, en la esquina de la vela, y lleva la mano a la derecha hasta el final de la verga.", "Área del triángulo: base × altura : 2. Área del rectángulo: base × altura. Con la misma base y la misma altura, ¿cuántas veces cabe una en la otra?"],
+        contexto: { epoca: "Edad Moderna · agosto de 1492", titulo: "Velas para cruzar el océano",
+          texto: "<p>En agosto de 1492, la flota de Cristóbal Colón se detuvo en Gran Canaria y La Gomera antes de cruzar el Atlántico. Allí se reparó la Pinta y una de las carabelas cambió sus velas <strong>latinas</strong>, triangulares, por velas <strong>redondas</strong>.</p><p>Los marinos llamaban «redondas» a las velas <strong>cuadradas o rectangulares</strong> que cuelgan de una verga horizontal, aunque no tengan forma de círculo. Con más tela, aprovechaban mejor el viento que sopla por detrás, como el que empujaba a las carabelas hacia el oeste.</p><p class=\"reto\"><strong>Tu reto:</strong> convierte la vela triangular en rectangular. Después calcula el área de cada vela y compara cuántas veces es mayor la rectangular.</p>" },
         agarres() { return fase === "vela" ? [[asa.position.x, asa.position.y, 0.4]] : []; },
         nota: "Agosto de 1492: la flota de Colón se detuvo en Gran Canaria y La Gomera. Allí se reparó la Pinta y una carabela cambió sus velas latinas (triangulares) por redondas.",
         entrar() {
           etiqueta("vela", "", () => [XM - B / 2 - 0.35, (YB + YT) / 2, 0.4]);
           etiqueta("verga", "geo", () => [XM + B / 2 + 0.35, YT + 0.1, 0.4]);
-          preg.etiquetas(() => fase !== "vela");
+          tabsN1.etiquetas();
           poner(t);
+          if (fase === "pregunta") estado(PREG_N1[qN1].txt + " Haz pinza sobre una tablilla.", "status-warn", "n1-q-ini");
         },
-        alternativos() {
-          ctrl = filaRango("Esquina de la vela (%)", 0, 100, 5, Math.round((t / B) * 100), (v) => { if (fase === "vela") poner((v / 100) * B); }, (v) => v + " por ciento del camino");
-          filaBotones(OPC.map((o) => ["Tiene " + o[0], () => responder(o[1])]));
-        },
+        alternativos() { construirAltN1(); },
         down(x, y) {
-          if (fase === "pregunta") { const v = preg.tocar(x, y); if (v !== null) responder(v); return false; }
+          if (fase === "pregunta") { const i = tabsN1.tocar(x, y); if (i !== null) responder(i); return false; }
           if (fase !== "vela") return false;
           const p = enPlano(x, y); if (!p) return false;
           if (Math.hypot(p.x - asa.position.x, p.y - YT) > 0.5) return false;
@@ -1305,8 +1339,15 @@
       const HZ = 0.42 * CH, FX = 0.58 * CW, YB = CH * 0.97;           // horizonte y punto de fuga correcto
       const NB = 9, base = Array.from({ length: NB }, (_, i) => CW * (0.06 + (i * 0.88) / (NB - 1)));
       let pf = [CW * 0.3, CH * 0.25], fase = "fuga", hecho = false, arrastre = null, ctrlX = null, ctrlY = null;
-      const OPC = [["Están más lejos", 1], ["Son más pequeñas", 2], ["Están rotas", 3]];
-      const preg = crearPreguntas(g, OPC, 3.25, 2.6, 0.62, 1.3);
+      const tabsN2 = tablillasP(g, 4, 3.3, 2.9, 0.58, 1.5);
+      const PREG_N2 = [
+        { txt: "¿Por qué las baldosas del fondo se ven más pequeñas, si en la plaza todas miden lo mismo?",
+          ops: [["Porque están más lejos", null], ["Porque son más pequeñas", "Todas las baldosas miden lo mismo. Fíjate en dónde están."], ["Porque están rotas", "No están rotas: todas son iguales. Fíjate en dónde están."]], bien: "¡Eso es! Las lejanas se ven más pequeñas: sus formas son semejantes." },
+        { txt: "En la plaza real, los bordes del suelo son paralelos. En el cuadro, en cambio, se juntan en el punto de fuga. ¿Cómo son esas líneas en el dibujo?",
+          ops: [["Secantes: se cortan en un punto", null], ["Paralelas: nunca se cortan", "En la plaza real sí son paralelas, pero en el dibujo se juntan. ¿Se cortan o no?"], ["Perpendiculares", "No forman ángulos rectos entre ellas: se juntan poco a poco en un punto."], ["Tangentes", "Tangente es una recta que toca una curva en un solo punto. Aquí son rectas que se cortan."]], bien: "" }
+      ];
+      PREG_N2.forEach((q) => (q.ops = barajar(q.ops)));
+      let qN2 = 0;
       const D = 2.2;                                    // distancia del pintor al cuadro, en baldosas
       const filaY = (z) => HZ + (YB - HZ) * D / (D + z);
       const enFila = (xb, z) => FX + (xb - FX) * D / (D + z);
@@ -1339,18 +1380,27 @@
         if (Math.hypot(pf[0] - FX, pf[1] - HZ) < 30) pf = [FX, HZ];
         ctrlX && ctrlX.poner(Math.round((pf[0] / CW) * 100)); ctrlY && ctrlY.poner(Math.round((1 - pf[1] / CH) * 100));
         if (fase === "fuga" && pf[0] === FX && pf[1] === HZ) {
-          fase = "pregunta"; preg.mostrar(true);
-          estado("¡Punto de fuga encontrado! Todas las rectas que se alejan se juntan en un punto de la línea del horizonte. ¿Por qué las baldosas del fondo se ven más pequeñas? Haz pinza sobre una tablilla.", "status-ok", "n2-preg");
+          fase = "pregunta"; qN2 = 0; tabsN2.poner(PREG_N2[0].ops); reAltN2();
+          estado("¡Punto de fuga encontrado! Todas las rectas que se alejan se juntan en un punto de la línea del horizonte. Ya no hace falta mover nada: responde con las tablillas. " + PREG_N2[0].txt, "status-ok", "n2-preg");
         } else if (fase === "fuga") {
           const lejos = Math.abs(pf[1] - HZ) > 30 ? "Primero, lleva el punto a la línea del horizonte (la línea azul discontinua)." : "Ya está en el horizonte. Ahora muévelo a izquierda o derecha hasta que las líneas grises sigan los bordes rojos.";
           estado(lejos, "status-warn", "n2-" + (Math.abs(pf[1] - HZ) > 30));
         }
         pintar(); refrescar();
       }
-      function responder(v) {
+      function responder(i) {
         if (fase !== "pregunta" || hecho) return;
-        if (v === 1) { hecho = true; fase = "hecho"; completar(1, "¡Eso es! Las baldosas son iguales, pero las lejanas se ven más pequeñas: sus formas son semejantes. Es la perspectiva que describió Leon Battista Alberti en 1435."); }
-        else estado("Todas las baldosas miden lo mismo. Fíjate en dónde están.", "status-warn", "n2-mal-" + v);
+        const op = PREG_N2[qN2].ops[i]; if (!op) return;
+        if (op[1]) { estado(op[1], "status-error", "n2-mal-" + qN2 + "-" + i); return; }
+        if (qN2 === 0) { qN2 = 1; tabsN2.poner(PREG_N2[1].ops); reAltN2(); estado(PREG_N2[0].bien + " " + PREG_N2[1].txt, "status-ok", "n2-q1"); return; }
+        hecho = true; fase = "hecho"; tabsN2.ocultar(); reAltN2();
+        completar(1, "¡Correcto! En la realidad los bordes de la plaza son paralelos, pero en el dibujo en perspectiva son rectas secantes que se cortan en el punto de fuga. Es el método que describió Leon Battista Alberti en 1435.");
+      }
+      function reAltN2() { if (actual !== 1) return; alternativos.replaceChildren(); construirAltN2(); }
+      function construirAltN2() {
+        ctrlX = filaRango("Punto de fuga: izquierda-derecha (%)", 0, 100, 1, Math.round((pf[0] / CW) * 100), (v) => { if (fase === "fuga") poner((v / 100) * CW, pf[1]); }, (v) => v + " por ciento");
+        ctrlY = filaRango("Punto de fuga: abajo-arriba (%)", 0, 100, 1, Math.round((1 - pf[1] / CH) * 100), (v) => { if (fase === "fuga") poner(pf[0], (1 - v / 100) * CH); }, (v) => v + " por ciento");
+        if (fase === "pregunta") filaBotones(PREG_N2[qN2].ops.map((o, i) => [o[0], () => responder(i)]));
       }
       function refrescar() {
         if (actual !== 1) return;
@@ -1360,24 +1410,27 @@
       pintar();
       function uvDe(x, y) { const h = rayo(x, y).intersectObject(lienzoM, false)[0]; return h && h.uv ? [h.uv.x * CW, (1 - h.uv.y) * CH] : null; }
       return {
-        nombre: "La perspectiva del Renacimiento", grupo: g, marco: { ancho: 6.6, alto: 3.8, cy: 1.75 }, fondo: "florencia",
-        pistas: ["Haz pinza sobre el cuadro y mueve la mano: el punto naranja te sigue. Primero llévalo a la línea azul discontinua del horizonte.", "Después desplázalo a izquierda o derecha hasta que las líneas grises sigan los dos bordes rojos de la plaza."],
+        nombre: "La perspectiva del Renacimiento", grupo: g, marco: { ancho: 8.8, alto: 3.8, cy: 1.75 }, fondo: "florencia",
+        // Pistas según la fase: mientras se busca el punto de fuga, cómo moverlo; después, cómo razonar las preguntas
+        pistas() {
+          if (fase === "fuga") return ["Haz pinza sobre el cuadro y mueve la mano: el punto naranja te sigue. Primero llévalo a la línea azul discontinua del horizonte.", "Después desplázalo a izquierda o derecha hasta que las líneas grises sigan los dos bordes rojos de la plaza."];
+          return ["Ya no hay que mover el punto: responde con las tablillas. Piensa en lo que pasa cuando algo se aleja de ti: ¿cambia de tamaño o solo lo parece?", "Dos rectas son secantes si se cortan en un punto, paralelas si nunca se cortan y perpendiculares si se cortan formando ángulos rectos."];
+        },
+        contexto: { epoca: "Renacimiento · siglo XV", titulo: "Pintar la profundidad",
+          texto: "<p>En el Renacimiento, los pintores italianos buscaron cómo dibujar en una superficie plana lo que el ojo ve en tres dimensiones. <strong>Leon Battista Alberti</strong> explicó en 1435, en su tratado <em>De pictura</em>, un método: las líneas que en la realidad son paralelas y se alejan, en el cuadro se juntan en un punto, el <strong>punto de fuga</strong>, situado en la <strong>línea del horizonte</strong>, a la altura de los ojos.</p><p>Así, los objetos iguales se dibujan más pequeños cuanto más lejos están, y el cuadro parece tener profundidad.</p><p class=\"reto\"><strong>Tu reto:</strong> encuentra el punto de fuga del cuadro. Después explica por qué las baldosas lejanas parecen más pequeñas y cómo son las líneas que se juntan en el punto de fuga.</p>" },
         agarres() { return fase === "fuga" ? [[pf[0] / CW * W - W / 2, CY + H / 2 - pf[1] / CH * H, 0.1]] : []; },
         nota: "En el Renacimiento, los pintores aprendieron a dibujar la profundidad: las rectas que se alejan parecen juntarse en un punto de fuga situado en la línea del horizonte.",
         entrar() {
           etiqueta("punto de fuga", "geo", () => { const x = (fase === "fuga" ? pf[0] : FX) / CW * W - W / 2, y = CY + H / 2 - (fase === "fuga" ? pf[1] : HZ) / CH * H; return [x, y + 0.22, 0.1]; });
           etiqueta("línea del horizonte", "", () => [-W / 2 + 0.75, CY + H / 2 - HZ / CH * H + 0.18, 0.1]);
-          preg.etiquetas(() => fase !== "fuga");
-          if (fase === "fuga") estado("Haz pinza sobre el punto naranja y muévelo hasta donde se juntan los dos bordes rojos de la plaza.", "status-warn", "n2-ini");
+          tabsN2.etiquetas();
+          if (fase === "fuga") estado("Un pintor del Renacimiento empezó este cuadro: ya trazó los dos bordes rojos de la plaza. Haz pinza sobre el punto naranja y muévelo hasta donde se juntan esos bordes, en la línea azul del horizonte.", "status-warn", "n2-ini");
+          else if (fase === "pregunta") estado(PREG_N2[qN2].txt + " Haz pinza sobre una tablilla.", "status-warn", "n2-q-ini");
           refrescar();
         },
-        alternativos() {
-          ctrlX = filaRango("Punto de fuga: izquierda-derecha (%)", 0, 100, 1, Math.round((pf[0] / CW) * 100), (v) => { if (fase === "fuga") poner((v / 100) * CW, pf[1]); }, (v) => v + " por ciento");
-          ctrlY = filaRango("Punto de fuga: abajo-arriba (%)", 0, 100, 1, Math.round((1 - pf[1] / CH) * 100), (v) => { if (fase === "fuga") poner(pf[0], (1 - v / 100) * CH); }, (v) => v + " por ciento");
-          filaBotones(OPC.map((o) => ["Porque " + o[0].toLowerCase(), () => responder(o[1])]));
-        },
+        alternativos() { construirAltN2(); },
         down(x, y) {
-          if (fase === "pregunta") { const v = preg.tocar(x, y); if (v !== null) responder(v); return false; }
+          if (fase === "pregunta") { const i = tabsN2.tocar(x, y); if (i !== null) responder(i); return false; }
           if (fase !== "fuga") return false;
           const q = uvDe(x, y); if (!q) return false;
           arrastre = { q0: q, p0: pf.slice() }; return true;
@@ -1409,8 +1462,24 @@
       const muros = new THREE.Group(); g.add(muros);
       const guia = new THREE.Group(); g.add(guia);
       let fase = "colocar", arrastre = null, angFant = ANG0 + 72, hecho = false, ctrl = null;
-      const OPC = [["72°", 72], ["108°", 108], ["120°", 120]];
-      const preg = crearPreguntas(g, OPC, 3.05, 0.65, 0.62);
+      const tabsN3 = tablillasP(g, 3, 3.3, 1.0, 0.62, 1.65, 0.3);
+      const PREG_N3 = [
+        { txt: "Fíjate en el triángulo amarillo, dibujado desde el centro. Su punta más cercana al centro mide 72°, y los tres ángulos de un triángulo suman siempre 180°. ¿Cuánto miden juntos los otros dos ángulos, los que están en las esquinas del pentágono?",
+          ops: [["108°", null], ["72°", "72° es el ángulo del centro. Calcula lo que falta hasta 180°: 180° − 72°."], ["252°", "No hay que sumar: los tres ángulos juntos son 180°. Resta: 180° − 72°."]],
+          bien: "¡Correcto! 180° − 72° = 108°: cada uno mide 54°. En cada esquina del pentágono se juntan dos triángulos: 54° + 54° = 108°, el ángulo interior del pentágono regular." },
+        { txt: "¿Qué tipo de ángulo es el ángulo central (72°) y qué tipo es el ángulo interior del pentágono (108°)?",
+          ops: [["72°: agudo · 108°: obtuso", null], ["Los dos son agudos", "Un ángulo agudo mide menos de 90°. ¿108° es menos de 90°?"], ["72°: recto · 108°: llano", "Recto es justo 90° y llano, 180°. Compara 72° y 108° con 90°."]], bien: "" }
+      ];
+      PREG_N3.forEach((q) => (q.ops = barajar(q.ops)));
+      let qN3 = 0;
+      // Referencia visual del giro mientras se arrastra el baluarte: sector y grados desde el anterior
+      const matSector = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false });
+      let sector = null;
+      function dibujarSector(a0, giro) {
+        if (sector) { g.remove(sector); sector.geometry.dispose(); sector = null; }
+        if (giro === null) return;
+        sector = new THREE.Mesh(new THREE.RingGeometry(0.45, R - 0.15, 48, 1, THREE.MathUtils.degToRad(a0), THREE.MathUtils.degToRad(giro)), matSector); sector.position.z = 0.2; g.add(sector);
+      }
       const dif = (a, b) => { let d = ((a - b) % 360 + 360) % 360; return d; };
       function poner(a) { puestos.push(((a % 360) + 360) % 360); const m = bastion(a, matPiedra); g.add(m); mallas.push(m); dibujarGuia(); evaluar(); }
       function dibujarGuia() {
@@ -1421,27 +1490,43 @@
       function evaluar() {
         if (actual !== 2) return;
         const ult = puestos[puestos.length - 1], ant = puestos[puestos.length - 2];
-        if (puestos.length < 5) estado(puestos.length === 1 ? "El primer baluarte ya está. Haz pinza junto a la muralla y gira la mano alrededor del centro para colocar el siguiente: los cinco deben quedar a la misma distancia." : "Baluartes: " + puestos.length + " de 5. El último está a " + Math.round(dif(ult, ant)) + "° del anterior.", "status-warn", "n3-" + puestos.length + "-" + Math.round(dif(ult, ant || ult)));
+        if (puestos.length < 5) estado(puestos.length === 1 ? "Hay que repartir 5 baluartes por igual alrededor del centro: una vuelta completa son 360°. El primero ya está. Haz pinza junto a la muralla y gira la mano alrededor del centro: el sector azul te muestra cuántos grados giras desde el anterior. Al soltar, se coloca." : "Baluartes: " + puestos.length + " de 5. El último está a " + Math.round(dif(ult, ant)) + "° del anterior.", "status-warn", "n3-" + puestos.length + "-" + Math.round(dif(ult, ant || ult)));
         else {
           const orden = puestos.slice().sort((a, b) => a - b), d = orden.map((a, i) => dif(orden[(i + 1) % 5], a));
           if (d.every((x) => Math.abs(x - 72) < 0.6)) {
-            fase = "pregunta"; preg.mostrar(true);
+            fase = "pregunta";
             const pts = orden.map((a) => { const r = THREE.MathUtils.degToRad(a); return [Math.cos(r) * R * 0.82, Math.sin(r) * R * 0.82]; });
             for (let i = 0; i < 5; i++) { const [x0, y0] = pts[i], [x1, y1] = pts[(i + 1) % 5], L = Math.hypot(x1 - x0, y1 - y0); const m = caja(L, 0.16, 0.2, matPiedra); m.position.set((x0 + x1) / 2, (y0 + y1) / 2, 0.1); m.rotation.z = Math.atan2(y1 - y0, x1 - x0); muros.add(m); }
-            estado("¡Pentágono regular! Cinco baluartes, cada uno a 72° del siguiente (360° : 5). ¿Cuánto mide cada ángulo interior del pentágono? Haz pinza sobre una tablilla.", "status-ok", "n3-preg");
+            // Triángulos desde el centro; uno destacado en amarillo
+            const matRadio = new THREE.LineBasicMaterial({ color: 0x1c1917, depthTest: false });
+            for (const [x, y] of pts) { const l = linea([[0, 0, 0.32], [x, y, 0.32]], matRadio, 0.012); l.renderOrder = 6; muros.add(l); }
+            const tri = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(...pts[0]), new THREE.Vector2(...pts[1])])), new THREE.MeshBasicMaterial({ color: 0xfacc15, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }));
+            tri.position.z = 0.25; muros.add(tri); triN3 = pts;
+            dibujarSector(null, null); qN3 = 0; tabsN3.poner(PREG_N3[0].ops); reAltN3();
+            estado("¡Pentágono regular! Cinco baluartes colocados, cada uno a 72° del siguiente (360° : 5). " + PREG_N3[0].txt + " Haz pinza sobre una tablilla.", "status-ok", "n3-preg");
           } else estado("Los ángulos entre baluartes no son iguales (" + d.map((x) => Math.round(x) + "°").join(", ") + "). Pulsa «Quitar el último» en «Otra forma de mover» o haz pinza en el centro para quitarlo.", "status-warn", "n3-mal-" + d.map(Math.round).join("-"));
         }
         refrescar();
       }
       function quitar() { if (puestos.length <= 1 || fase !== "colocar") return; puestos.pop(); const m = mallas.pop(); g.remove(m); dibujarGuia(); evaluar(); }
-      function responder(v) {
+      let triN3 = null;
+      function responder(i) {
         if (fase !== "pregunta" || hecho) return;
-        if (v === 108) { hecho = true; fase = "hecho"; completar(2, "¡Correcto! El pentágono se divide en 3 triángulos: 3 · 180° = 540°, y 540° : 5 = 108°. La ciudadela de Jaca, mandada construir por Felipe II, conserva esta planta de cinco puntas."); }
-        else estado(v === 72 ? "72° es el ángulo central, desde el centro de la ciudadela. Piensa en el ángulo de la esquina, dentro del pentágono." : "120° sería el de un hexágono. El pentágono tiene una esquina menos.", "status-warn", "n3-mal-" + v);
+        const op = PREG_N3[qN3].ops[i]; if (!op) return;
+        if (op[1]) { estado(op[1], "status-error", "n3-mal-" + qN3 + "-" + i); return; }
+        if (qN3 === 0) { qN3 = 1; tabsN3.poner(PREG_N3[1].ops); reAltN3(); estado(PREG_N3[0].bien + " " + PREG_N3[1].txt, "status-ok", "n3-q1"); return; }
+        hecho = true; fase = "hecho"; tabsN3.ocultar(); reAltN3();
+        completar(2, "¡Exacto! El ángulo central (72°) es agudo y el interior (108°) es obtuso. La ciudadela de Jaca, mandada construir por Felipe II, conserva esta planta de cinco puntas.");
+      }
+      function reAltN3() { if (actual !== 2) return; alternativos.replaceChildren(); construirAltN3(); }
+      function construirAltN3() {
+        ctrl = filaRango("Giro del nuevo baluarte desde el anterior (°)", 30, 120, 1, 60, (v) => { if (fase !== "colocar") return; angFant = puestos[puestos.length - 1] + v; const r = THREE.MathUtils.degToRad(angFant); fantasma.position.set(Math.cos(r) * R, Math.sin(r) * R, 0); fantasma.rotation.z = r - Math.PI / 2; fantasma.visible = true; dibujarSector(puestos[puestos.length - 1], v); refrescar(); }, (v) => v + " grados");
+        filaBotones([["Colocar el baluarte", () => { if (fase === "colocar" && fantasma.visible && puestos.length < 5) { fantasma.visible = false; dibujarSector(null, null); poner(angFant); } }], ["Quitar el último", quitar]]);
+        if (fase === "pregunta") filaBotones(PREG_N3[qN3].ops.map((o, i) => [o[0], () => responder(i)]));
       }
       function refrescar() {
         if (actual !== 2) return;
-        metricas(["Baluartes colocados: " + puestos.length + " de 5", "Ángulo central del pentágono: 360° : 5 = 72°", fase === "colocar" && fantasma.visible ? "Giro desde el anterior: " + Math.round(dif(angFant, puestos[puestos.length - 1])) + "°" : "Giro desde el anterior: —", "Suma de ángulos interiores: 3 · 180° = 540°"]);
+        metricas(["Baluartes colocados: " + puestos.length + " de 5", "Una vuelta completa: 360°", fase === "colocar" && fantasma.visible ? "Giro desde el anterior: " + Math.round(dif(angFant, puestos[puestos.length - 1])) + "°" : "Giro desde el anterior: —", "Ángulos de un triángulo: suman 180°"]);
       }
       function mover(x, y) {
         if (!arrastre) return; const p = enPlano(x, y); if (!p) return;
@@ -1449,26 +1534,27 @@
         let giro = dif(a, base); if (Math.abs(giro - 72) <= 4) giro = 72; giro = Math.round(giro);
         angFant = base + giro; const r = THREE.MathUtils.degToRad(angFant);
         fantasma.position.set(Math.cos(r) * R, Math.sin(r) * R, 0); fantasma.rotation.z = r - Math.PI / 2; fantasma.visible = true;
+        dibujarSector(base, giro);
         ctrl && ctrl.poner(clamp(giro, 30, 120)); refrescar();
       }
       poner(ANG0);
       return {
-        nombre: "La ciudadela de Jaca", grupo: g, marco: { ancho: 6.6, alto: 4.6, cy: 0 }, fondo: "cenital",
-        pistas: ["Haz pinza junto a la muralla, no en el centro, y gira la mano alrededor del centro. Al soltar, se coloca el baluarte.", "Una vuelta son 360° y hay 5 baluartes: repártelos por igual. Si te equivocas, haz pinza en el centro para quitar el último."],
+        nombre: "La ciudadela de Jaca", grupo: g, marco: { ancho: 8.6, alto: 4.6, cy: 0 }, fondo: "cenital",
+        pistas: ["Haz pinza junto a la muralla, no en el centro, y gira la mano alrededor del centro: el sector azul y su número te dicen cuántos grados giras. Al soltar, se coloca el baluarte. Si te equivocas, haz pinza en el centro para quitar el último.", "Una vuelta son 360° y hay 5 baluartes: 360° : 5. Para las preguntas: los tres ángulos de un triángulo suman 180°; agudo es menos de 90° y obtuso, entre 90° y 180°."],
+        contexto: { epoca: "Edad Moderna · finales del siglo XVI", titulo: "Una fortaleza de cinco puntas",
+          texto: "<p>Con la artillería, las murallas altas y rectas de los castillos medievales dejaron de servir: los cañones las derribaban. Los ingenieros diseñaron fortalezas más bajas, con <strong>baluartes</strong> en punta repartidos con geometría, para poder defender todos los lados.</p><p>La <strong>ciudadela de Jaca</strong> (Huesca), mandada construir por Felipe II a finales del siglo XVI, tiene planta de <strong>pentágono regular</strong>: cinco baluartes iguales, repartidos alrededor del centro.</p><p class=\"reto\"><strong>Tu reto:</strong> coloca los cinco baluartes a la misma distancia unos de otros, girando alrededor del centro. Después descubre, con los triángulos que salen desde el centro, cuánto miden los ángulos del pentágono y de qué tipo son.</p>" },
         nota: "Vista desde arriba. Las ciudadelas con baluartes en punta se diseñaron para resistir la artillería. La de Jaca (Huesca), del siglo XVI, tiene planta pentagonal.",
         entrar() {
           etiqueta("centro", "", () => [0, -0.25, 0.3]);
           etiqueta("baluarte", "geo", () => [0, R + 0.85, 0.3]);
-          preg.etiquetas(() => fase !== "colocar");
-          if (fase === "colocar") evaluar(); else refrescar();
+          tabsN3.etiquetas();
+          const eGiro = etiqueta("", "agua", () => { if (fase !== "colocar" || !fantasma.visible) return null; const base = puestos[puestos.length - 1], gi = Math.round(dif(angFant, base)), r = THREE.MathUtils.degToRad(base + gi / 2); eGiro.texto = "giro: " + gi + "°"; return [Math.cos(r) * 1.0, Math.sin(r) * 1.0, 0.4]; });
+          etiqueta("72°", "geo", () => (triN3 && fase !== "colocar" ? [(triN3[0][0] + triN3[1][0]) * 0.18, (triN3[0][1] + triN3[1][1]) * 0.18, 0.4] : null));
+          if (fase === "colocar") evaluar(); else { refrescar(); if (fase === "pregunta") estado(PREG_N3[qN3].txt + " Haz pinza sobre una tablilla.", "status-warn", "n3-q-ini"); }
         },
-        alternativos() {
-          ctrl = filaRango("Giro del nuevo baluarte desde el anterior (°)", 30, 120, 1, 60, (v) => { if (fase !== "colocar") return; angFant = puestos[puestos.length - 1] + v; const r = THREE.MathUtils.degToRad(angFant); fantasma.position.set(Math.cos(r) * R, Math.sin(r) * R, 0); fantasma.rotation.z = r - Math.PI / 2; fantasma.visible = true; refrescar(); }, (v) => v + " grados");
-          filaBotones([["Colocar el baluarte", () => { if (fase === "colocar" && fantasma.visible && puestos.length < 5) { fantasma.visible = false; poner(angFant); } }], ["Quitar el último", quitar]]);
-          filaBotones(OPC.map((o) => ["Mide " + o[0], () => responder(o[1])]));
-        },
+        alternativos() { construirAltN3(); },
         down(x, y) {
-          if (fase === "pregunta") { const v = preg.tocar(x, y); if (v !== null) responder(v); return false; }
+          if (fase === "pregunta") { const i = tabsN3.tocar(x, y); if (i !== null) responder(i); return false; }
           if (fase !== "colocar") return false;
           const p = enPlano(x, y); if (!p) return false;
           const d = Math.hypot(p.x, p.y);
@@ -1477,7 +1563,7 @@
           arrastre = true; mover(x, y); return true;
         },
         move(x, y) { mover(x, y); },
-        up() { if (!arrastre) return; arrastre = null; fantasma.visible = false; if (puestos.length < 5 && dif(angFant, puestos[puestos.length - 1]) > 20) poner(angFant); },
+        up() { if (!arrastre) return; arrastre = null; fantasma.visible = false; dibujarSector(null, null); if (puestos.length < 5 && dif(angFant, puestos[puestos.length - 1]) > 20) poner(angFant); },
         tick() {}
       };
     })();
@@ -1508,8 +1594,26 @@
       const dirA = () => THREE.MathUtils.degToRad(angA), dirB = () => THREE.MathUtils.degToRad(180 - angB);
       const C = (() => { const ra = THREE.MathUtils.degToRad(AA), rb = THREE.MathUtils.degToRad(180 - AB); const s = (Bp[0] - A[0]) * Math.sin(rb) / Math.sin(rb - ra); return [A[0] + s * Math.cos(ra), A[1] + s * Math.sin(ra), s]; })();
       const AC = C[2] * KM;
-      const OPC = [["Unos 7 km", 7], ["Unos 13 km", 13], ["Unos 20 km", 20]];
-      const preg = crearPreguntas(g, OPC, 3.4, 3.6, 0.62, 1.15);
+      const tabsN4 = tablillasP(g, 3, 3.5, 3.6, 0.62, 1.4);
+      // Compás de puntas abierto como un tramo de la escala (2 km), que se «camina» de A a la cumbre
+      const PASO_N4 = 2 / KM, N_PASOS4 = Math.ceil(AC / 2);
+      const tramosN4 = new THREE.Group(); g.add(tramosN4);
+      const matT4 = [new THREE.MeshBasicMaterial({ color: 0x1c1917, depthTest: false }), new THREE.MeshBasicMaterial({ color: 0xf5f0e6, depthTest: false })];
+      let pasosN4 = 0, respN4 = [];
+      const OPC_CUMBRE = barajar([["48°", null], ["132°", "132° = 62° + 70°. Los tres ángulos suman 180°: falta restar, 180° − 132°."], ["58°", "Revisa la resta: 180° − 62° − 70°."]]);
+      const OPC_DIST = () => barajar([["Unos " + Math.round(AC) + " km", null], [N_PASOS4 + " km", "Has contado los pasos, pero cada paso del compás mide 2 km. Multiplica."], ["Unos " + Math.round(AC * 2) + " km", "Demasiado: has contado cada paso como si fueran 4 km. Cada tramo de la escala mide 2 km."]]);
+      function darPasoN4() {
+        if (fase !== "medir" || pasosN4 >= N_PASOS4) return;
+        const d = new THREE.Vector3(C[0] - A[0], C[1] - A[1], 0).normalize(), a0 = new THREE.Vector3(A[0], A[1], 0.09).addScaledVector(d, pasosN4 * PASO_N4);
+        const t = new THREE.Mesh(new THREE.PlaneGeometry(PASO_N4, 0.06), matT4[pasosN4 % 2]); t.renderOrder = 8; t.position.copy(a0).addScaledVector(d, PASO_N4 / 2); t.rotation.z = Math.atan2(d.y, d.x); tramosN4.add(t);
+        pasosN4++;
+        if (pasosN4 < N_PASOS4) estado("Paso " + pasosN4 + " del compás: " + pasosN4 * 2 + " km. Todavía no llegas a la cumbre: da otro paso.", "status-warn", "n4-paso" + pasosN4);
+        else {
+          fase = "distancia"; respN4 = OPC_DIST(); tabsN4.poner(respN4); reAltN4();
+          estado("Con el paso " + pasosN4 + " el compás llega a la cumbre (y se pasa un poquito). Cada paso mide 2 km. ¿Cuántos kilómetros hay, más o menos, de A a la cumbre? Haz pinza sobre una tablilla.", "status-ok", "n4-dist");
+        }
+        refrescar();
+      }
       function dibujar() {
         [rayoA, rayoB].forEach((r) => { if (r) { g.remove(r); liberar(r); } });
         const okA = angA === AA, okB = angB === AB;
@@ -1525,28 +1629,44 @@
         dibujar();
         if (actual !== 3) return;
         if (fase === "angulos" && angA === AA && angB === AB) {
-          fase = "pregunta"; preg.mostrar(true);
+          fase = "cumbre"; respN4 = OPC_CUMBRE; tabsN4.poner(respN4); reAltN4();
           const m = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape([new THREE.Vector2(A[0], A[1]), new THREE.Vector2(Bp[0], Bp[1]), new THREE.Vector2(C[0], C[1])])), new THREE.MeshBasicMaterial({ color: 0x166534, transparent: true, opacity: 0.18 }));
           m.position.z = 0.03; triangulo.add(m);
           const pico = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.4, 24), TX.mat("caliza", { color: 0x8a8f9a })); pico.rotation.x = Math.PI / 2; pico.position.set(C[0], C[1], 0.15); triangulo.add(pico);
-          estado("¡Los dos rayos se cortan en la cumbre! Ya tienes el triángulo dibujado a escala. Usa la escala (cada tramo, 2 km): ¿cuánto hay, más o menos, de A a la cumbre? Haz pinza sobre una tablilla.", "status-ok", "n4-preg");
+          estado("¡Los dos rayos se cortan en la cumbre! Ya tienes un triángulo: A, B y la cumbre. Conoces dos de sus ángulos: 62° en A y 70° en B. Si los tres ángulos de un triángulo suman 180°, ¿cuánto mide el ángulo de la cumbre? Haz pinza sobre una tablilla.", "status-ok", "n4-cumbre");
         } else if (fase === "angulos") estado("Orienta los dos rayos con los ángulos medidos: " + AA + "° en A y " + AB + "° en B. Ahora: A = " + angA + "°, B = " + angB + "°.", "status-warn", "n4-" + angA + "-" + angB);
         refrescar();
       }
-      function responder(v) {
-        if (fase !== "pregunta" || hecho) return;
-        if (v === 13) { hecho = true; fase = "hecho"; completar(3, "¡Bien medido! De A a la cumbre hay unos " + fmt(AC, 1) + " km. Sin recorrerlo, solo con una base medida y dos ángulos: así trabajaron Jorge Juan y Antonio de Ulloa con una cadena de triángulos."); }
-        else estado("Cuenta cuántos tramos de 2 km caben en el lado de A a la cumbre.", "status-warn", "n4-mal-" + v);
+      function responder(i) {
+        if (hecho || (fase !== "cumbre" && fase !== "distancia") || !respN4[i]) return;
+        const mal = respN4[i][1];
+        if (mal) { estado(mal, "status-error", "n4-mal-" + fase + "-" + i); return; }
+        if (fase === "cumbre") {
+          fase = "medir"; tabsN4.ocultar(); reAltN4();
+          estado("¡Correcto! 180° − 62° − 70° = 48°. Ahora mide la distancia de A a la cumbre con el compás de puntas, abierto como un tramo de la escala (2 km): haz pinza sobre el mapa para dar un paso desde A, y repite.", "status-ok", "n4-medir");
+          return;
+        }
+        hecho = true; fase = "hecho"; tabsN4.ocultar(); reAltN4();
+        completar(3, "¡Bien medido! De A a la cumbre hay unos " + fmt(AC, 1) + " km. Sin recorrerlo, solo con una base medida y dos ángulos: así trabajaron Jorge Juan y Antonio de Ulloa con una cadena de triángulos.");
+      }
+      function reAltN4() { if (actual !== 3) return; alternativos.replaceChildren(); construirAltN4(); }
+      function construirAltN4() {
+        ctrlA = filaRango("Ángulo en A (°)", 10, 120, 1, angA, (v) => { if (fase === "angulos") poner("A", v); }, (v) => v + " grados");
+        ctrlB = filaRango("Ángulo en B (°)", 10, 120, 1, angB, (v) => { if (fase === "angulos") poner("B", v); }, (v) => v + " grados");
+        if (fase === "medir") filaBotones([["Dar un paso con el compás (2 km)", darPasoN4]]);
+        if (fase === "cumbre" || fase === "distancia") filaBotones(respN4.map((o, i) => [o[0], () => responder(i)]));
       }
       function refrescar() {
         if (actual !== 3) return;
-        metricas(["Base medida AB: 10 km", "Ángulo en A: " + angA + "° (medido: " + AA + "°) · en B: " + angB + "° (medido: " + AB + "°)", "Ángulo en la cumbre: 180° − " + AA + "° − " + AB + "° = " + (180 - AA - AB) + "°", "Escala: cada tramo, 2 km"]);
+        metricas(["Base medida AB: 10 km", "Ángulo en A: " + angA + "° (medido: " + AA + "°) · en B: " + angB + "° (medido: " + AB + "°)", "Ángulos de un triángulo: suman 180°", "Compás: " + pasosN4 + " paso" + (pasosN4 === 1 ? "" : "s") + " de 2 km"]);
       }
       dibujar();
       function rayoDe(x, y) { const p = enPlano(x, y); return p; }
       return {
-        nombre: "La expedición al meridiano", grupo: g, marco: { ancho: 7.2, alto: 4.5, cy: MCY }, fondo: "andes",
-        pistas: ["Haz pinza sobre una esfera naranja, la del rayo A o la del rayo B, y gira la mano alrededor de su punto.", "El rayo A debe marcar 62° y el B, 70°. Para medir, cuenta los tramos de 2 km de la escala que caben de A a la cumbre."],
+        nombre: "La expedición al meridiano", grupo: g, marco: { ancho: 8.4, alto: 4.5, cy: MCY }, fondo: "andes",
+        pistas: ["Haz pinza sobre una esfera naranja, la del rayo A o la del rayo B, y gira la mano alrededor de su punto: el A debe marcar 62° y el B, 70°.", "Ángulo de la cumbre: 180° menos los otros dos. Para medir, da pasos con el compás (haz pinza sobre el mapa): cada paso mide 2 km, como un tramo de la escala."],
+        contexto: { epoca: "Siglo XVIII · 1735-1744", titulo: "Medir la Tierra con triángulos",
+          texto: "<p>En el siglo XVIII los científicos discutían si la Tierra era una esfera perfecta o estaba achatada por los polos. Para saberlo, una expedición viajó a los Andes, cerca de Quito, a medir la longitud de un grado de meridiano. En ella participaron los marinos españoles <strong>Jorge Juan</strong> y <strong>Antonio de Ulloa</strong>.</p><p>No podían medir todo con cuerdas. Midieron con mucho cuidado una <strong>base</strong> y, desde sus dos extremos, los ángulos hacia picos lejanos. Con una cadena de triángulos calcularon distancias sin recorrerlas: es la <strong>triangulación</strong>. El resultado confirmó que la Tierra está achatada por los polos.</p><p class=\"reto\"><strong>Tu reto:</strong> orienta los dos rayos con los ángulos medidos, calcula el ángulo de la cumbre y mide la distancia de A a la cumbre con el compás y la escala.</p>" },
         agarres() { return fase === "angulos" ? [[asaA.position.x, asaA.position.y, 0.2], [asaB.position.x, asaB.position.y, 0.2]] : []; },
         nota: "Entre 1735 y 1744, cerca de Quito, una expedición midió un grado de meridiano con una cadena de triángulos. Participaron los marinos españoles Jorge Juan y Antonio de Ulloa.",
         entrar() {
@@ -1554,16 +1674,15 @@
           etiqueta("base: 10 km", "", () => [(A[0] + Bp[0]) / 2, A[1] - 0.3, 0.2]);
           etiqueta("cumbre", "geo", () => (fase !== "angulos" ? [C[0], C[1] + 0.4, 0.2] : null));
           etiqueta("escala: 0 - 2 - 4 - 6 - 8 - 10 km", "", () => [-2.5 + 5 / KM, MCY - MH / 2 + 0.5, 0.1]);
-          preg.etiquetas(() => fase !== "angulos");
+          tabsN4.etiquetas();
           poner("A", angA);
+          if (fase === "angulos") estado("Queremos saber a qué distancia está la cumbre sin ir hasta ella. Desde A y desde B, separados 10 km, se midieron los ángulos hacia la cumbre: 62° y 70°. Haz pinza sobre la esfera naranja de cada rayo y gíralo hasta su ángulo.", "status-warn", "n4-ini");
+          else if (fase === "medir") estado("Haz pinza sobre el mapa para dar pasos de 2 km con el compás, desde A hacia la cumbre.", "status-warn", "n4-medir-ini");
         },
-        alternativos() {
-          ctrlA = filaRango("Ángulo en A (°)", 10, 120, 1, angA, (v) => { if (fase === "angulos") poner("A", v); }, (v) => v + " grados");
-          ctrlB = filaRango("Ángulo en B (°)", 10, 120, 1, angB, (v) => { if (fase === "angulos") poner("B", v); }, (v) => v + " grados");
-          filaBotones(OPC.map((o) => [o[0], () => responder(o[1])]));
-        },
+        alternativos() { construirAltN4(); },
         down(x, y) {
-          if (fase === "pregunta") { const v = preg.tocar(x, y); if (v !== null) responder(v); return false; }
+          if (fase === "cumbre" || fase === "distancia") { const i = tabsN4.tocar(x, y); if (i !== null) responder(i); return false; }
+          if (fase === "medir") { if (rayo(x, y).intersectObject(mapa, false)[0]) darPasoN4(); return false; }
           if (fase !== "angulos") return false;
           const p = rayoDe(x, y); if (!p) return false;
           const dA = Math.hypot(p.x - asaA.position.x, p.y - asaA.position.y), dB = Math.hypot(p.x - asaB.position.x, p.y - asaB.position.y);
@@ -1614,7 +1733,22 @@
       const N1D = 40;
       const grande = engranaje(N1D); grande.position.set(RX, RY, ZG); g.add(grande);
       const OPCN = [8, 10, 20, 40];
-      let n2 = 20, pinon = null, apertura = 0, fase = "agua", hecho = false, arrastre = null, angR = 0, ctrlA = null, ctrlN = null;
+      let n2 = 20, pinon = null, apertura = 0, fase = "agua", hecho = false, arrastre = null, angR = 0, ctrlA = null, ctrlN = null, respN5 = [], tCuenta = 0;
+      const tabsN5 = tablillasP(g, 3, 3.3, 3.5, 0.62, 1.3);
+      const OPC_N5 = barajar([["10 dientes", null], ["160 dientes", "40 × 4 = 160 daría una rueda enorme, y el molino iría más despacio, no más deprisa."], ["4 dientes", "4 son las vueltas que debe dar el molino, no los dientes. Reparte los 40 dientes de la grande en 4 vueltas."]]);
+      function responderN5(i) {
+        if (fase !== "calcular" || !respN5[i]) return;
+        const mal = respN5[i][1];
+        if (mal) { estado(mal, "status-error", "n5-mal-" + i); return; }
+        fase = "engranaje"; tabsN5.ocultar(); reAltN5();
+        estado("¡Bien pensado! 40 : 4 = 10. Ahora compruébalo: haz pinza sobre la rueda dentada pequeña y sube o baja la mano para cambiarla por la de 10 dientes. Mira el contador de vueltas.", "status-ok", "n5-comprobar");
+      }
+      function reAltN5() { if (actual !== 4) return; alternativos.replaceChildren(); construirAltN5(); }
+      function construirAltN5() {
+        ctrlA = filaRango("Compuerta abierta (%)", 0, 100, 5, Math.round(apertura * 100), (v) => ponerAgua(v / 100), (v) => v + " por ciento");
+        ctrlN = filaRango("Dientes de la rueda pequeña (1 = 8, 2 = 10, 3 = 20, 4 = 40)", 1, 4, 1, OPCN.indexOf(n2) + 1, (v) => { if (fase === "engranaje") ponerN(v - 1); }, (v) => OPCN[v - 1] + " dientes");
+        if (fase === "calcular") filaBotones(respN5.map((o, i) => [o[0], () => responderN5(i)]));
+      }
       const muela = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.3, 48), matPiedra); muela.rotation.x = Math.PI / 2;
       const marcaMuela = caja(0.5, 0.06, 0.32, new THREE.MeshStandardMaterial({ color: 0x5a4a3a })); muela.add(marcaMuela); marcaMuela.rotation.x = -Math.PI / 2; marcaMuela.position.set(0.22, 0, 0);
       const ejeM = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1, 10), matMadera); ejeM.rotation.z = Math.PI / 2;
@@ -1633,7 +1767,10 @@
         compuerta.position.y = RY + RR + 0.6 + apertura * 0.45; agua.visible = apertura > 0.05;
         ctrlA && ctrlA.poner(Math.round(apertura * 100));
         if (actual !== 4) return;
-        if (fase === "agua" && apertura === 1) { fase = "engranaje"; estado("¡El agua mueve la rueda! Ahora el molino debe dar 4 vueltas por cada vuelta de la rueda. Haz pinza sobre la rueda dentada pequeña y sube o baja la mano para cambiar su número de dientes.", "status-ok", "n5-eng"); }
+        if (fase === "agua" && apertura === 1) {
+          fase = "calcular"; respN5 = OPC_N5; tabsN5.poner(respN5); reAltN5();
+          estado("¡El agua mueve la rueda! La rueda dentada grande tiene 40 dientes. Cada diente empuja un diente de la rueda pequeña, que mueve el molino. El molino debe dar 4 vueltas por cada vuelta de la rueda grande. ¿Cuántos dientes debe tener la rueda pequeña? Haz pinza sobre una tablilla.", "status-ok", "n5-calcular");
+        }
         else if (fase === "agua") estado("Haz pinza sobre la compuerta de la acequia y súbela para que el agua caiga sobre la rueda.", "status-warn", "n5-agua");
         refrescar();
       }
@@ -1642,32 +1779,36 @@
         if (actual !== 4) return;
         if (fase === "engranaje") {
           if (vueltas() === 4) { hecho = true; fase = "hecho"; completar(4, "¡Molino a punto! 40 dientes : 10 dientes = 4. Por cada vuelta de la rueda, el molino da 4 vueltas. Después, la caña molida se prensaba y el jugo se cocía en calderas hasta hacer azúcar."); abrirPanel("panel-final"); }
-          else estado("Con " + n2 + " dientes, el molino da 40 : " + n2 + " = " + fmt(vueltas(), 1) + " vueltas por cada vuelta de la rueda. Necesitamos 4.", "status-warn", "n5-n" + n2);
+          else estado("Con " + n2 + " dientes, el molino da 40 : " + n2 + " = " + fmt(vueltas(), 1) + " vueltas por cada vuelta de la rueda. Necesitamos 4: cambia a la de 10 dientes.", "status-warn", "n5-n" + n2);
         }
         refrescar();
       }
       function refrescar() {
         if (actual !== 4) return;
-        metricas(["Compuerta: " + Math.round(apertura * 100) + " % abierta", "Rueda dentada grande: 40 dientes", "Rueda dentada pequeña: " + n2 + " dientes", "Vueltas del molino por vuelta de la rueda: 40 : " + n2 + " = " + fmt(vueltas(), 1)]);
+        const vR = angR / (Math.PI * 2), vM = vR * vueltas();
+        metricas(["Compuerta: " + Math.round(apertura * 100) + " % abierta", "Rueda dentada grande: 40 dientes · pequeña: " + n2, "Vueltas de la rueda grande: " + fmt(vR, 1), "Vueltas del molino: " + fmt(vM, 1)]);
       }
       colocarPinon();
       return {
-        nombre: "El ingenio de azúcar", grupo: g, marco: { ancho: 7.4, alto: 4.4, cy: 1.75 }, fondo: "canaveral",
-        pistas: ["Primero haz pinza sobre la compuerta de la acequia y súbela del todo para que el agua mueva la rueda.", "Después haz pinza sobre la rueda dentada pequeña y sube o baja la mano. Busca el número de dientes que cabe 4 veces en 40."],
+        nombre: "El ingenio de azúcar", grupo: g, marco: { ancho: 8.4, alto: 4.4, cy: 1.75 }, fondo: "canaveral",
+        pistas: ["Primero haz pinza sobre la compuerta de la acequia y súbela del todo para que el agua mueva la rueda.", "En una vuelta, la rueda grande empuja sus 40 dientes. Si la pequeña tiene n dientes, da 40 : n vueltas. ¿Qué número cabe 4 veces en 40? Después cambia la rueda pequeña y mira el contador."],
+        contexto: { epoca: "Canarias · siglo XVI", titulo: "El azúcar de las islas",
+          texto: "<p>Tras la conquista, en Gran Canaria, Tenerife, La Palma y La Gomera se plantó caña de azúcar y se construyeron decenas de <strong>ingenios</strong> para fabricar azúcar, que se vendía en Europa. En ellos trabajaban personas especializadas y también personas esclavizadas.</p><p>La mayoría de los ingenios usaba la fuerza del agua: una <strong>rueda hidráulica</strong> movía unas <strong>ruedas dentadas</strong>, y estas hacían girar el molino que trituraba la caña. Con ruedas de distinto número de dientes se conseguía que el molino girara más deprisa que la rueda: es una relación de <strong>proporcionalidad</strong>.</p><p class=\"reto\"><strong>Tu reto:</strong> abre la compuerta para mover la rueda. Después calcula cuántos dientes debe tener la rueda pequeña para que el molino dé 4 vueltas por cada vuelta de la rueda grande, y compruébalo.</p>" },
         agarres() { return fase === "agua" ? [[compuerta.position.x, compuerta.position.y, 0]] : fase === "engranaje" ? [[pinon.position.x, pinon.position.y, ZG + 0.1]] : []; },
+
         nota: "Siglo XVI: en Gran Canaria, Tenerife, La Palma y La Gomera hubo decenas de ingenios. La mayoría usaba la fuerza del agua. Modelo simplificado.",
         entrar() {
           etiqueta("compuerta", "", () => [RX + 0.05, RY + RR + 1.15 + apertura * 0.45, 0]);
           etiqueta("rueda hidráulica", "", () => [RX - 0.4, RY - RR - 0.25, 0]);
           etiqueta("rueda dentada: 40 dientes", "geo", () => [RX, RY + N1D * MOD + 0.3, ZG]);
           etiqueta("molino", "geo", () => [1.75, RY + 0.85, ZG]);
-          if (fase === "agua") ponerAgua(apertura); else refrescar();
+          tabsN5.etiquetas();
+          if (fase === "agua") { ponerAgua(apertura); estado("En el ingenio, la fuerza del agua mueve el molino que tritura la caña. Haz pinza sobre la compuerta de la acequia y súbela del todo para que el agua caiga sobre la rueda.", "status-warn", "n5-agua"); }
+          else { refrescar(); if (fase === "calcular") estado("El molino debe dar 4 vueltas por cada vuelta de la rueda grande (40 dientes). ¿Cuántos dientes debe tener la pequeña?", "status-warn", "n5-calcular-ini"); }
         },
-        alternativos() {
-          ctrlA = filaRango("Compuerta abierta (%)", 0, 100, 5, Math.round(apertura * 100), (v) => ponerAgua(v / 100), (v) => v + " por ciento");
-          ctrlN = filaRango("Dientes de la rueda pequeña (1 = 8, 2 = 10, 3 = 20, 4 = 40)", 1, 4, 1, OPCN.indexOf(n2) + 1, (v) => { if (fase === "engranaje") ponerN(v - 1); }, (v) => OPCN[v - 1] + " dientes");
-        },
+        alternativos() { construirAltN5(); },
         down(x, y) {
+          if (fase === "calcular") { const i = tabsN5.tocar(x, y); if (i !== null) responderN5(i); return false; }
           const p = enPlano(x, y); if (!p) return false;
           if (fase === "agua" && Math.hypot(p.x - compuerta.position.x, p.y - compuerta.position.y) < 0.6) { arrastre = { tipo: "agua", py: p.y, v0: apertura }; return true; }
           if (fase === "engranaje" && Math.hypot(p.x - pinon.position.x, p.y - pinon.position.y) < 0.7) { arrastre = { tipo: "n", py: p.y, i0: OPCN.indexOf(n2) }; return true; }
@@ -1681,6 +1822,7 @@
         up() { arrastre = null; },
         tick(dt) {
           const w = apertura * 0.9; angR += w * dt;
+          if ((tCuenta += dt) > 0.25) { tCuenta = 0; refrescar(); }
           rueda.rotation.z = -angR; grande.rotation.z = -angR;
           if (pinon) pinon.rotation.z = angR * (N1D / n2) + Math.PI / n2; muela.rotation.y = angR * (N1D / n2);
           if (agua.visible) {
@@ -1991,7 +2133,7 @@
        <p class="fuente">Alberti, L. B. (1435). <em>De pictura</em> (libro I: el pavimento en perspectiva). El cuadro de la actividad es un modelo.</p>`,
       `<h3>Fortalezas contra la artillería</h3><p>Con los cañones, las murallas altas dejaron de ser seguras. En la Edad Moderna se construyeron fortalezas bajas con <strong>baluartes</strong> en punta en cada esquina, para disparar a lo largo de los muros y no dejar zonas sin defensa.</p>
        <h3>La ciudadela de Jaca</h3><p>Felipe II mandó construirla a finales del siglo XVI; la diseñó el ingeniero Tiburcio Spannocchi. Tiene planta de <strong>pentágono</strong> con un baluarte en cada vértice, como una estrella de cinco puntas.</p>
-       <h3>El pentágono regular</h3><p>Desde el centro, cada vértice está a 360° : 5 = 72° del siguiente. El pentágono se divide en tres triángulos: sus ángulos interiores suman 3 × 180° = 540°, y cada uno mide 540° : 5 = 108°.</p>
+       <h3>El pentágono regular</h3><p>Tiene cinco lados iguales y cinco ángulos iguales. Desde el centro, la vuelta completa (360°) se reparte en cinco partes iguales, y al unir el centro con los vértices salen cinco triángulos iguales. En cualquier triángulo, los tres ángulos suman siempre 180°.</p>
        <p class="fuente">Turespaña, ficha «Castillo de San Pedro o Ciudadela de Jaca». La ciudadela de la actividad es un modelo.</p>`,
       `<h3>¿Qué forma tiene la Tierra?</h3><p>En el siglo XVIII se discutía si la Tierra estaba achatada por los polos o alargada. Para saberlo había que medir la longitud de un grado de meridiano cerca del ecuador y compararla con otra medida tomada cerca del polo.</p>
        <h3>La expedición</h3><p>Entre 1735 y 1744, una expedición francesa con los marinos españoles Jorge Juan y Antonio de Ulloa midió un arco de meridiano cerca de Quito. Midieron con mucho cuidado una base y, desde sus extremos, los ángulos hacia montañas lejanas: así formaron una <strong>cadena de unos 29 triángulos</strong>. La conclusión: la Tierra está achatada por los polos.</p>
@@ -2000,7 +2142,7 @@
       `<h3>El azúcar en Canarias</h3><p>Desde finales del siglo XV y durante el XVI, Canarias produjo azúcar para Europa. Hubo decenas de <strong>ingenios</strong> en Gran Canaria, Tenerife, La Palma y La Gomera. Los primeros ingenios azucareros del Atlántico están en la Lista Indicativa de España para el Patrimonio Mundial desde 2025.</p>
        <h3>Cómo funcionaba un ingenio</h3><p>El agua de una acequia se almacenaba en un depósito y caía sobre una gran <strong>rueda</strong>; la rueda movía el molino que trituraba la caña. Después, la caña se prensaba, el jugo se cocía en calderas de cobre y el azúcar se purgaba en <strong>formas cónicas de barro</strong>.</p>
        <h3>Personas</h3><p>En los ingenios trabajaron maestros de azúcar, carpinteros, caldereros, moledores y purgadores, muchos de ellos portugueses. También trabajaron personas esclavizadas.</p>
-       <h3>Ruedas dentadas</h3><p>Si una rueda de 40 dientes mueve otra de 10, la pequeña da 40 : 10 = 4 vueltas por cada vuelta de la grande: el número de vueltas es inversamente proporcional al número de dientes.</p>
+       <h3>Ruedas dentadas</h3><p>Si una rueda de 30 dientes mueve otra de 15, la pequeña da 30 : 15 = 2 vueltas por cada vuelta de la grande: cuantos menos dientes tiene una rueda, más vueltas da. El número de vueltas es inversamente proporcional al número de dientes.</p>
        <p class="fuente">Gambín García, M. (2008). Especialistas y trabajadores en el ingenio de azúcar de Agaete (1503-1504). <em>Revista de Historia Canaria</em>, 190, 69-82 · Viña Brito, A. (2006). La organización social del trabajo en los ingenios azucareros canarios (siglos XV-XVI). <em>En la España Medieval</em>, 29, 359-381 · RTVC (9-2-2026), candidatura «Primeros ingenios azucareros del Atlántico». El mecanismo de la actividad es un modelo simplificado.</p>`
     ];
     let focoPrevio = null;
