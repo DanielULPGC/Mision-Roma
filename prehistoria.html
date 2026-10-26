@@ -39,7 +39,10 @@
     #escena{position:fixed;inset:0;background:linear-gradient(#cfe3ec 0%,#e9dfcc 62%,#b89c78 100%)}
     #video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);opacity:0;transition:opacity .3s}
     #video.visible{opacity:1}
-    #lienzo3d,#lienzoManos,#lienzoEfectos{position:absolute;inset:0;width:100%;height:100%}
+    #lienzo3d{position:absolute;inset:0;width:100%;height:100%}
+    #lienzoManos,#lienzoEfectos{position:fixed;inset:0;width:100%;height:100%}
+    #lienzoEfectos{z-index:25} #lienzoManos{z-index:30}
+    .mano-encima{outline:4px solid var(--ok)!important;outline-offset:3px;box-shadow:0 0 0 8px rgba(74,222,128,.25)!important}
     #lienzo3d{touch-action:none}
     #lienzoManos,#lienzoEfectos{pointer-events:none}
     .etq{position:absolute;transform:translate(-50%,-100%);background:var(--panel);color:var(--texto);font-variant-numeric:tabular-nums;
@@ -89,6 +92,7 @@
     .tarjeta h2{margin:0 0 4px;font-size:1.25rem}
     .tarjeta h3{margin:14px 0 4px;font-size:1rem;color:var(--ocre)}
     .tarjeta p,.tarjeta li{margin:6px 0;font-size:.92rem}
+    #cuerpo-contexto .reto{background:rgba(194,132,58,.16);border-left:4px solid var(--ocre);padding:8px 10px;border-radius:6px}
     .tarjeta .botones{display:flex;flex-direction:column;gap:8px;margin-top:14px}
     .privacidad,.fuente{font-size:.76rem;opacity:.8}
     #portada{background:linear-gradient(rgba(28,25,23,.92),rgba(28,25,23,.97))}
@@ -128,10 +132,11 @@
   <main id="escena">
     <video id="video" playsinline muted aria-hidden="true"></video>
     <canvas id="lienzo3d" role="img" aria-label="Escena 3D de la etapa actual. Los elementos marcados se pueden mover con la pinza, con el dedo o con los controles alternativos."></canvas>
-    <canvas id="lienzoManos" aria-hidden="true"></canvas>
-    <canvas id="lienzoEfectos" aria-hidden="true"></canvas>
     <div id="etiquetas" aria-hidden="true"></div>
   </main>
+
+  <canvas id="lienzoManos" aria-hidden="true"></canvas>
+  <canvas id="lienzoEfectos" aria-hidden="true"></canvas>
 
   <header id="hud">
     <div class="cabecera">
@@ -156,6 +161,7 @@
 
   <nav id="controles" aria-label="Herramientas">
     <div id="alternativos" hidden></div>
+    <button type="button" id="btn-contexto" hidden>Contexto</button>
     <button type="button" id="btn-pista">Pista</button>
     <button type="button" id="btn-saber">Saber más</button>
     <button type="button" id="btn-imagen" aria-pressed="false" hidden>Mostrar mi imagen</button>
@@ -179,6 +185,15 @@
       </div>
       <label class="opcion"><input type="checkbox" id="chk-imagen"> <span>Ver mi imagen de la cámara detrás de la escena (realidad aumentada). Si no lo marcas, solo se ven unas manos dibujadas.</span></label>
       <p class="privacidad">La cámara se usa solo para localizar las manos. La imagen se procesa en este dispositivo: no se graba ni se envía. Tu imagen solo se muestra si marcas la casilla o pulsas «Mostrar mi imagen».</p>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-contexto" role="dialog" aria-modal="true" hidden aria-labelledby="t-contexto">
+    <div class="tarjeta">
+      <p class="antetitulo" id="epoca-contexto"></p>
+      <h2 id="t-contexto">Contexto</h2>
+      <div id="cuerpo-contexto"></div>
+      <div class="botones"><button type="button" class="principal" data-cerrar>¡Manos a la obra!</button></div>
     </div>
   </section>
 
@@ -207,10 +222,10 @@
       <h2 id="t-final">¡Capítulo completado!</h2>
       <p>Tus manos han recorrido la Prehistoria:</p>
       <ol>
-        <li><strong>Tallar:</strong> diste a un bifaz una forma simétrica.</li>
-        <li><strong>Pintar:</strong> dejaste una mano en negativo y la mediste con una cuadrícula.</li>
-        <li><strong>Modelar:</strong> creaste una vasija, un cuerpo de revolución, y la decoraste con un friso.</li>
-        <li><strong>Orientar:</strong> giraste un dolmen hasta que su corredor miró al este, a 90° del norte.</li>
+        <li><strong>Tallar:</strong> elegiste la piedra, tallaste un bifaz hasta el 100 % de simetría y encontraste su eje.</li>
+        <li><strong>Pintar:</strong> dejaste una mano en negativo y mediste su longitud y su superficie con una cuadrícula.</li>
+        <li><strong>Modelar:</strong> creaste una vasija, un cuerpo de revolución, la decoraste con un friso y mediste su capacidad.</li>
+        <li><strong>Orientar:</strong> giraste un dolmen hasta el este, mediste el giro en grados y clasificaste el ángulo.</li>
         <li><strong>Canarias:</strong> diseñaste una pintadera con simetría de rotación y viste que imprime al revés.</li>
       </ol>
       <p>Durante la Prehistoria, las manos aprendieron a planificar, a medir y a repetir. En la Edad Antigua, esas mismas destrezas levantarán acueductos.</p>
@@ -263,6 +278,7 @@
     let audioCtx = null;
     const ultimoSonido = {};
     let cambiosJuego = 0;        // cambios visibles (mensajes y métricas): indican si una pinza ha tenido efecto
+    let registro = null;         // tiempo, intentos fallidos y pistas por etapa (se crea en la sección 8)
     let erroresEtapa = 0, ultimoError = 0, ultimaActividad = performance.now(), fallosSeguidos = 0, anillosPantalla = [];
     const nivelPista = [], efectos = [];
     const lienzoEf = $("lienzoEfectos"), ctxE = lienzoEf.getContext("2d");
@@ -301,6 +317,7 @@
       // Durante un arrastre los avisos cambian sin parar: solo cuentan como error las respuestas y las acciones sueltas
       if (mal && !captura) {
         sonar("error");
+        if (registro && actual >= 0 && !hechas[actual]) { registro[actual].errores++; guardarRegistro(); }
         const ahora = performance.now();
         if (ahora - ultimoError > 2500) { ultimoError = ahora; if (++erroresEtapa >= 2) $("btn-pista").classList.add("llamativa"); }
       } else if (clase === "status-ok" && !categoria.startsWith("completa-") && !mal) sonar("ok");
@@ -311,6 +328,7 @@
       const lista = etapa.pistas && etapa.pistas.length ? etapa.pistas : [etapa.nota];
       const n = nivelPista[actual] || 0, k = n % lista.length;
       nivelPista[actual] = n + 1;
+      if (registro && !hechas[actual]) { registro[actual].pistas++; guardarRegistro(); }
       verPista("Pista " + (k + 1) + " de " + lista.length + ": " + lista[k]);
       $("btn-pista").classList.remove("llamativa");
       $("btn-pista").textContent = lista.length > 1 ? "Otra pista" : "Pista";
@@ -1179,6 +1197,21 @@
       alternativos.appendChild(fila);
     }
 
+    // Desordena las opciones para que la respuesta correcta no esté siempre en el mismo sitio
+    function barajar(l) { const a = l.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+    // Tablillas de respuesta con texto variable (preguntas encadenadas dentro de una etapa)
+    function tablillasP(g, n, x, y0, paso, w = 1.15, z = 0.08) {
+      const t = Array.from({ length: n }, (_, i) => { const m = caja(w, 0.42, 0.06, M.madera); m.position.set(x, y0 - i * paso, z); m.visible = false; m.userData.i = i; g.add(m); return m; });
+      let ops = [];
+      return {
+        poner(o) { ops = o; t.forEach((m, i) => (m.visible = i < o.length)); },
+        ocultar() { ops = []; t.forEach((m) => (m.visible = false)); },
+        tocar(px, py) { const h = rayo(px, py).intersectObjects(t.filter((m) => m.visible), false)[0]; return h ? h.object.userData.i : null; },
+        etiquetas() { t.forEach((m, i) => { const e = etiqueta("", "geo", () => { if (!m.visible || !ops[i]) return null; e.texto = ops[i][0]; return [x, y0 - i * paso + 0.02, z + 0.08]; }); }); },
+        get ops() { return ops; }
+      };
+    }
+
     // =====================================================================
     // 3. ETAPA 1 · TALLAR UN BIFAZ (Paleolítico) — simetría axial
     // =====================================================================
@@ -1203,6 +1236,7 @@
       // Nódulo inicial: canto de sílex más grande e irregular (más piedra a la derecha), cubierto de córtex
       const inicial = objetivo.map((v, k) => { const t = ang(k); return v + 0.22 + 0.07 * Math.sin(3 * t + 0.6) + 0.05 * Math.cos(5 * t + 1.3) + 0.3 * Math.max(0, Math.cos(t - 0.4)) ** 1.5; });
       let r = inicial.slice(), golpes = 0, hecho = false, malla = null, ctrlAng = null;
+      let fase = "elegir", trazoEje = null, lineaEje = null;
       const negativos = [];                           // negativos de lascado: { t, rc, cara, w, L, D }
       // Materiales: córtex (corteza calcárea, mate) y sílex fresco (brillo graso, vetas); el color va por vértice
       // Un solo material: el atributo «talla» (0 = córtex, 1 = sílex recién tallado) gradúa el color y el brillo sin escalones
@@ -1217,7 +1251,7 @@
       const vetas = (x, y) => 0.5 * ruido(x * 3, y * 3) + 0.3 * ruido(x * 7 + 5, y * 7) + 0.2 * ruido(x * 17, y * 17 + 3);
       const cSilex = [new THREE.Color(0x3e352e), new THREE.Color(0x6e6050), new THREE.Color(0x9a8a72)], cCortex = [new THREE.Color(0x7e6646), new THREE.Color(0xb3976b)];
       const ejeMat = M.cota.clone(); ejeMat.depthTest = false;
-      const eje = linea([[CX, CY + YB - 0.45, 0.5], [CX, CY + YB + LARGO + 0.25, 0.5]], ejeMat); eje.renderOrder = 5;
+      const eje = linea([[CX, CY + YB - 0.45, 0.5], [CX, CY + YB + LARGO + 0.25, 0.5]], ejeMat); eje.renderOrder = 5; eje.visible = false;
       // Guía discontinua (color claro, legible sobre el sílex oscuro)
       const guiaMat = new THREE.LineBasicMaterial({ color: 0xfff4dc, transparent: true, opacity: 0.95, depthTest: false });
       const guia = new THREE.Group();
@@ -1229,6 +1263,72 @@
       const marca = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), new THREE.MeshBasicMaterial({ color: 0x38bdf8, depthTest: false }));
       marca.renderOrder = 6; marca.visible = false;
       g.add(eje, guia, percutor, marca);
+      guia.visible = false;
+      // Fase «elegir»: cuatro piedras; solo el nódulo de sílex grande y sano sirve para un bifaz
+      const TIPOS = [
+        { id: "nodulo", nombre: "nódulo de sílex", esc: [0.42, 0.62, 0.3], color: 0xb3976b, x: -1.35, ok: true },
+        { id: "pequeno", nombre: "canto de sílex pequeño", esc: [0.17, 0.14, 0.12], color: 0xa98d63, x: -0.45 },
+        { id: "grietas", nombre: "sílex con grietas", esc: [0.4, 0.58, 0.28], color: 0x9c8a6e, x: 0.45, grietas: true },
+        { id: "arenisca", nombre: "arenisca", esc: [0.42, 0.56, 0.3], color: 0xc9a46a, x: 1.35 }
+      ];
+      const MAL_PIEDRA = {
+        pequeno: "Es buen sílex, pero demasiado pequeño: el bifaz no llenaría la mano ni tendría filos largos.",
+        grietas: "Las grietas desvían la fuerza de los golpes: la piedra se rompería en trozos sin control.",
+        arenisca: "La arenisca es granulosa y se desmorona: no se rompe en lascas finas ni deja filos cortantes."
+      };
+      const piedras = TIPOS.map((tp, i) => {
+        const geo = new THREE.IcosahedronGeometry(1, 3), pp = geo.attributes.position, v = new THREE.Vector3();
+        for (let k = 0; k < pp.count; k++) { v.fromBufferAttribute(pp, k); const f = 1 + 0.16 * (ruido(v.x * 2 + i * 3, v.y * 2 + v.z) - 0.5) + 0.06 * (ruido(v.x * 6, v.z * 6 + i) - 0.5); pp.setXYZ(k, v.x * f, v.y * f, v.z * f); }
+        geo.computeVertexNormals();
+        const mat = tp.id === "arenisca" ? TX.mat("tierra", { color: tp.color, rugosidad: 1, relieve: 4 }) : TX.mat("granito", { color: tp.color, rugosidad: 0.9, relieve: 2 });
+        const m = new THREE.Mesh(geo, mat); m.scale.set(...tp.esc); m.position.set(tp.x, CY - 0.1, 0.15); m.userData = { tp, lineas: [] };
+        if (tp.grietas) {
+          const mc = new THREE.LineBasicMaterial({ color: 0x1c140c, depthTest: false });
+          for (const pts of [[[-0.6, 0.75], [-0.2, 0.3], [0.05, -0.2], [0.45, -0.7]], [[0.65, 0.45], [0.2, 0.1]], [[-0.55, -0.35], [-0.15, -0.5]]]) {
+            const ln = linea(pts.map(([a, b]) => [tp.x + a * tp.esc[0], CY - 0.1 + b * tp.esc[1], 0.55]), mc, 0.014); ln.renderOrder = 6; m.userData.lineas.push(ln); g.add(ln);
+          }
+        }
+        g.add(m); return m;
+      });
+      function elegirPiedra(m) {
+        if (fase !== "elegir") return;
+        const tp = m.userData.tp;
+        if (!tp.ok) { estado(MAL_PIEDRA[tp.id], "status-error", "p1-mal-" + tp.id); return; }
+        fase = "tallar";
+        piedras.forEach((p) => { g.remove(p); p.userData.lineas.forEach((l) => g.remove(l)); });
+        malla.visible = true; guia.visible = true;
+        evaluar();
+        estado("¡Buena elección! El sílex es duro y homogéneo: al golpearlo se rompe en lascas con filo cortante. Haz pinza sobre el borde para golpear con el percutor hasta llegar a la línea discontinua.", "status-ok", "p1-elegida");
+      }
+      // Fase «eje»: el alumnado traza el eje de simetría del bifaz terminado
+      const matTrazo = new THREE.LineBasicMaterial({ color: 0x38bdf8, depthTest: false });
+      function dibujarTrazo(a, b) {
+        if (lineaEje) { g.remove(lineaEje); liberar(lineaEje); lineaEje = null; }
+        if (!a || !b) return;
+        lineaEje = linea([[a.x, a.y, 0.6], [b.x, b.y, 0.6]], matTrazo, 0.02); lineaEje.renderOrder = 7; g.add(lineaEje);
+      }
+      function comprobarEje(a, b) {
+        if (fase !== "eje") return;
+        const dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy);
+        if (L < 0.9) { estado("Traza una línea más larga, de un extremo al otro del bifaz.", "status-warn", "p1-eje-corto"); dibujarTrazo(null); return; }
+        const inclinacion = THREE.MathUtils.radToDeg(Math.atan2(Math.abs(dx), Math.abs(dy)));   // 0° = vertical
+        const centrada = Math.abs((a.x + b.x) / 2 - CX) < 0.15 && Math.abs(a.x - CX) < 0.25 && Math.abs(b.x - CX) < 0.25;
+        if (inclinacion <= 7 && centrada) {
+          dibujarTrazo(null); eje.visible = true; hecho = true; fase = "hecho";
+          completar(0, "¡Bifaz terminado en " + golpes + " golpes y eje encontrado! Si lo doblaras por esa línea, las dos mitades coincidirían: es su eje de simetría.");
+          evaluar(); return;
+        }
+        if (inclinacion > 60) estado("Esa línea lo corta en dos partes, pero no iguales: la punta y la base son distintas. Prueba en otra dirección.", "status-error", "p1-mal-eje-horizontal");
+        else if (!centrada && inclinacion <= 12) estado("La dirección es buena, pero la línea no pasa por el centro: una mitad sería más ancha que la otra.", "status-error", "p1-mal-eje-desplazado");
+        else estado("Si doblaras el bifaz por esa línea, las mitades no coincidirían. Busca la línea que va de la punta a la base.", "status-error", "p1-mal-eje-inclinado");
+      }
+      function marcarEjeAlternativo(tipo) {
+        if (fase !== "eje") return;
+        const tope = CY + YB + LARGO, pie = CY + YB;
+        if (tipo === "vertical") comprobarEje({ x: CX, y: pie }, { x: CX, y: tope });
+        else if (tipo === "horizontal") comprobarEje({ x: CX - 0.7, y: CY }, { x: CX + 0.7, y: CY });
+        else comprobarEje({ x: CX - 0.5, y: pie }, { x: CX + 0.5, y: tope });
+      }
       // Lascas: delgadas, con el mismo sílex; al caer se quedan en el suelo como restos de talla
       const lascas = [], restos = [];
       const geoLasca = new THREE.SphereGeometry(0.075, 9, 6); geoLasca.scale(1, 0.72, 0.22);
@@ -1295,7 +1395,7 @@
         geo.setIndex(idx);
         geo.computeVertexNormals();
         if (malla) { g.remove(malla); malla.geometry.dispose(); }
-        malla = new THREE.Mesh(geo, matPiedra); g.add(malla);
+        malla = new THREE.Mesh(geo, matPiedra); malla.visible = fase !== "elegir"; g.add(malla);
       }
       function medidas() {
         let dif = 0, suma = 0, dF = 0, sT = 0, izq = 0, der = 0;
@@ -1308,21 +1408,38 @@
       }
       function evaluar() {
         if (actual !== 0) return;
+        if (fase === "elegir") { metricas(["Piedra: sin elegir", "Simetría: —", "Forma de bifaz: —", "Eje de simetría: —"]); }
         const m = medidas();
-        metricas(["Golpes: " + golpes, "Simetría: " + Math.round(m.S * 100) + " %", "Forma de bifaz: " + Math.round(m.F * 100) + " %", "Eje de simetría: vertical"]);
-        if (hecho) return;
-        if (m.S >= 0.95 && m.F >= 0.9) { hecho = true; guia.visible = false; completar(0, "¡Bifaz terminado en " + golpes + " golpes! Sus dos mitades son casi iguales: tiene un eje de simetría."); }
+        // Se redondea hacia abajo: el 100 % solo aparece cuando la talla es exacta
+        if (fase !== "elegir") metricas(["Golpes: " + golpes, "Simetría: " + Math.floor(m.S * 100 + 1e-6) + " %", "Forma de bifaz: " + Math.floor(m.F * 100 + 1e-6) + " %", "Eje de simetría: " + (fase === "hecho" ? "encontrado" : fase === "eje" ? "¡márcalo tú!" : "—")]);
+        if (hecho || fase === "eje") return;
+        if (fase === "elegir") { estado("Antes de tallar hay que elegir bien la piedra. ¿Cuál de las cuatro servirá para un bifaz grande y cortante? Haz pinza sobre ella.", "status-warn", "p1-elegir"); return; }
+        if (m.S >= 0.995 && m.F >= 0.995) {
+          // Retoque final: el filo queda exactamente sobre la línea
+          for (let k = 0; k < N; k++) r[k] = objetivo[k];
+          reconstruir(); guia.visible = false; fase = "eje";
+          metricas(["Golpes: " + golpes, "Simetría: 100 %", "Forma de bifaz: 100 %", "Eje de simetría: ¡márcalo tú!"]);
+          estado("¡Forma y simetría al 100 %! Ahora señala tú el eje de simetría: haz pinza en un extremo del bifaz y arrastra hasta el otro, dividiéndolo en dos mitades iguales.", "status-ok", "p1-eje");
+          return;
+        }
+        if (m.S >= 0.9 && m.F >= 0.85) {
+          const k = maxExceso(), t = ang(k), dirY = Math.sin(t), dirX = Math.cos(t);
+          const zona = (dirY > 0.55 ? "arriba, cerca de la punta" : dirY < -0.55 ? "abajo, en la base" : "en el centro del borde") + (dirX > 0.3 ? ", a la derecha" : dirX < -0.3 ? ", a la izquierda" : "");
+          estado("¡Ya casi! Queda piedra de más " + zona + ". Retócala con golpes pequeños hasta que forma y simetría lleguen al 100 %.", "status-warn", "p1-retoque-" + k);
+        }
         else if (m.lado === "izq") estado("El lado izquierdo tiene más piedra que el derecho. Golpea el borde izquierdo.", "status-warn", "p1-izq");
         else if (m.lado === "der") estado("El lado derecho tiene más piedra que el izquierdo. Golpea el borde derecho.", "status-warn", "p1-der");
         else estado("Los dos lados están equilibrados. Sigue golpeando el borde hasta llegar a la línea discontinua.", "status-warn", "p1-igual");
       }
+      function maxExceso() { let k0 = 0, e0 = -1; for (let k = 0; k < N; k++) { const e = r[k] - objetivo[k]; if (e > e0) { e0 = e; k0 = k; } } return k0; }
       function golpear(t) {
-        if (hecho) return;
+        if (hecho || fase !== "tallar") return;
         t = envolver(t);
+        // El golpe nunca pasa de la línea; el sobrante muy pequeño salta de una vez (retoque del filo)
         for (let k = 0; k < N; k++) {
           let d = Math.abs(ang(k) - t); d = Math.min(d, 2 * Math.PI - d);
           const b = Math.exp(-((d / 0.24) ** 2));
-          if (b > 0.02) r[k] = Math.max(objetivo[k] - 0.03, r[k] - 0.19 * b);
+          if (b > 0.02) { let nv = Math.max(objetivo[k], r[k] - 0.19 * b); if (nv - objetivo[k] < 0.05) nv = objetivo[k]; r[k] = nv; }
         }
         golpes++;
         // Talla bifacial: cada golpe saca la lasca de una cara distinta (alternante); el negativo nace en el filo
@@ -1351,12 +1468,21 @@
       reconstruir();
       return {
         nombre: "Tallar un bifaz", grupo: g, marco: { ancho: 3.8, alto: 3.4, cy: 1.5 }, fondo: "sabana",
-        pistas: ["Golpea siempre cerca del borde de la piedra: las lascas salen de los bordes, no del centro.", "Lee el mensaje: golpea el lado que tiene más piedra, alternando, hasta llegar a la línea discontinua. Los dos lados deben quedar como en un espejo."],
+        pistas: ["Primero elige una piedra dura, sin grietas y grande. Después golpea siempre cerca del borde: las lascas salen de los bordes, no del centro.", "Lee el mensaje: golpea el lado que tiene más piedra, hasta la línea discontinua. Para el eje, busca la línea que deja dos mitades iguales, como en un espejo."],
+        agarres() {
+          if (fase === "elegir") return piedras.map((p) => [p.position.x, p.position.y, 0.5]);
+          if (fase === "tallar") { const m = medidas(); if (m.S >= 0.9 && m.F >= 0.85) { const k = maxExceso(), t = ang(k); return [[CX + r[k] * Math.cos(t), CY + r[k] * Math.sin(t), 0.5]]; } }
+          return [];
+        },
+        contexto: { epoca: "Paleolítico inferior · hace más de un millón y medio de años", titulo: "Una herramienta para todo",
+          texto: "<p>En África, hace más de un millón y medio de años, los grupos humanos vivían de lo que cazaban y recolectaban. Para cortar carne, raspar pieles o trabajar la madera inventaron una herramienta nueva: el <strong>bifaz</strong>, una piedra tallada por sus dos caras hasta tener forma de almendra y filos cortantes. Los más antiguos conocidos, en Kokiselei (Kenia), tienen unos 1,76 millones de años; en la península ibérica los hay de hace alrededor de un millón de años.</p><p>Tallar no era golpear al azar: había que elegir bien la piedra y quitar lascas de un lado y de otro para que las dos mitades quedaran iguales.</p><p class=\"reto\"><strong>Tu reto:</strong> elige la piedra adecuada, tállala hasta que su forma y su simetría lleguen al 100 % y, al final, señala tú su eje de simetría.</p>" },
         nota: "Bifaz: piedra tallada por las dos caras. Entre los más antiguos conocidos están los de Kokiselei (Kenia), de hace unos 1,76 millones de años.",
         entrar() {
-          etiqueta("eje de simetría", "geo", () => [CX, CY + YB + LARGO + 0.3, 0.5]);
-          etiqueta("forma del bifaz", "", () => (hecho ? null : [CX + 0.95, CY - 0.75, 0.5]));
-          if (!hecho) estado("Haz pinza sobre el borde de la piedra para golpearla con el percutor y quitar lascas. Intenta que los dos lados queden iguales.", "status-warn", "p1-ini");
+          etiqueta("eje de simetría", "geo", () => (fase === "hecho" ? [CX, CY + YB + LARGO + 0.3, 0.5] : null));
+          etiqueta("forma del bifaz", "", () => (fase === "tallar" ? [CX + 0.95, CY - 0.75, 0.5] : null));
+          piedras.forEach((p) => etiqueta(p.userData.tp.nombre, "geo", () => (fase === "elegir" ? [p.position.x, p.position.y - p.scale.y - 0.12, 0.5] : null)).el.classList.add("abajo"));
+          if (fase === "tallar") estado("Haz pinza sobre el borde de la piedra para golpearla con el percutor y quitar lascas. Intenta que los dos lados queden iguales.", "status-warn", "p1-ini");
+          else if (fase === "eje") estado("Señala tú el eje de simetría: haz pinza en un extremo del bifaz y arrastra hasta el otro.", "status-warn", "p1-eje-ini");
           evaluar();
         },
         alternativos() {
@@ -1366,14 +1492,19 @@
             marca.position.set(CX + r[k] * Math.cos(t), CY + r[k] * Math.sin(t), 0.5); marca.visible = true;
           }, (v) => v + " grados; 0 es la derecha y 90 es arriba");
           filaBotones([["Golpear en ese punto", () => golpear(THREE.MathUtils.degToRad(gr))]]);
+          filaBotones(TIPOS.map((tp, i) => ["Elegir: " + tp.nombre, () => elegirPiedra(piedras[i])]));
+          filaBotones([["Eje: vertical, de la punta a la base", () => marcarEjeAlternativo("vertical")], ["Eje: horizontal", () => marcarEjeAlternativo("horizontal")], ["Eje: inclinado", () => marcarEjeAlternativo("inclinado")]]);
         },
         down(x, y) {
+          if (fase === "elegir") { const h = rayo(x, y).intersectObjects(piedras, false)[0]; if (h) elegirPiedra(h.object); return false; }
+          if (fase === "eje") { const p = enPlano(x, y); if (!p || Math.hypot(p.x - CX, p.y - CY) > 1.9) return false; trazoEje = { a: { x: p.x, y: p.y }, b: { x: p.x, y: p.y } }; return true; }
           const a = anguloPantalla(x, y); if (!a) return false;
           if (a.d > a.borde * 0.55 && a.d < a.borde + 0.5) golpear(a.t);
           else if (a.d <= a.borde * 0.55) estado("Golpea cerca del borde: las lascas salen de los bordes, no del centro.", "status-warn", "p1-centro");
           return false;
         },
-        move() {}, up() {},
+        move(x, y) { if (!trazoEje) return; const p = enPlano(x, y); if (!p) return; trazoEje.b = { x: p.x, y: p.y }; dibujarTrazo(trazoEje.a, trazoEje.b); },
+        up() { if (!trazoEje) return; const t = trazoEje; trazoEje = null; comprobarEje(t.a, t.b); },
         tick(dt) {
           const u = percutor.userData;
           if (percutor.visible) {
@@ -1399,7 +1530,7 @@
     const P2 = (() => {
       const g = new THREE.Group();
       const W = 4.4, H = 3.2, CY = 1.6, CW = 1024, CH = Math.round(1024 * H / W), KP = CW / 512;
-      const PXCM = (CW / W) / 20;                   // 1 unidad = 20 cm de pared
+      const PXCM = (CW / W) / 10;                   // 1 unidad = 10 cm de pared: panel de 44 × 32 cm, mano grande para contar cuadros
       const lienzo = () => { const c = document.createElement("canvas"); c.width = CW; c.height = CH; return c; };
       const base = lienzo(), pint = lienzo(), masc = lienzo(), piel = lienzo(), comp = lienzo();
       const cP = pint.getContext("2d", { willReadFrequently: true }), cC = comp.getContext("2d");
@@ -1426,9 +1557,12 @@
         c.lineCap = "round"; c.lineJoin = "round";
         const palma = { w: 8.6 * s, h: 11 * s };
         c.beginPath();
-        const x0 = MX - palma.w / 2 - extra, y0 = MY - palma.h - extra, w = palma.w + 2 * extra, h = palma.h + 2 * extra + 1.5 * s, rad = 2.2 * s + extra;
+        const x0 = MX - palma.w / 2 - extra, y0 = MY - palma.h - extra, w = palma.w + 2 * extra, h = palma.h + 2 * extra, rad = 1.5 * s + extra;
         c.moveTo(x0 + rad, y0); c.arcTo(x0 + w, y0, x0 + w, y0 + h, rad); c.arcTo(x0 + w, y0 + h, x0, y0 + h, rad); c.arcTo(x0, y0 + h, x0, y0, rad); c.arcTo(x0, y0, x0 + w, y0, rad); c.fill();
-        const dedos = [[-3.1, -0.17, 7.6], [-1.0, -0.05, 9.0], [1.15, 0.07, 8.3], [3.15, 0.2, 6.6]];
+        // Muñeca y arranque del antebrazo, más estrechos que la palma: la mano empieza en la línea MY
+        c.fillRect(MX - 3.1 * s - extra, MY - 1.2 * s, 6.2 * s + 2 * extra, 4.8 * s + extra);
+        // Dedo corazón: base en MY − 10,4 cm; 8,66 cm de trazo + 0,95 cm de punta redondeada = 20 cm desde la muñeca
+        const dedos = [[-3.1, -0.17, 7.3], [-1.0, -0.05, 8.66], [1.15, 0.07, 8.0], [3.15, 0.2, 6.35]];
         c.lineWidth = 1.9 * s + 2 * extra;
         for (const [dx, a, l] of dedos) { const bx = MX + dx * s, by = MY - palma.h + 0.6 * s; c.beginPath(); c.moveTo(bx, by); c.lineTo(bx + Math.sin(a) * l * s, by - Math.cos(a) * l * s); c.stroke(); }
         c.lineWidth = 2.2 * s + 2 * extra;
@@ -1436,6 +1570,9 @@
       }
       (() => { const c = masc.getContext("2d"); c.fillStyle = c.strokeStyle = "#fff"; dibujarMano(c, 0); })();
       (() => { const c = piel.getContext("2d"); c.drawImage(masc, 0, 0); c.globalCompositeOperation = "source-in"; c.fillStyle = "#d8a07a"; c.fillRect(0, 0, CW, CH); })();
+      // Contorno fino de la mano para medir (aunque el pigmento haya quedado irregular)
+      const contorno = lienzo();
+      (() => { const c = contorno.getContext("2d"); c.fillStyle = c.strokeStyle = "rgba(60,30,15,.9)"; dibujarMano(c, 1.8 * KP); c.globalCompositeOperation = "destination-out"; c.fillStyle = c.strokeStyle = "#000"; dibujarMano(c, 0); })();
       // Puntos del halo alrededor de la mano para medir cuánto pigmento hay
       const halo = [];
       (() => {
@@ -1483,16 +1620,31 @@
       matMacizo.alphaTest = 0.5;
       const macizo = new THREE.Mesh(gMacizo, matMacizo);
       macizo.position.set(0, CY + 0.25, -0.22); g.add(macizo);
-      // Tablillas de respuesta (fase de medida)
-      const OPC = [["10 cm", 10], ["20 cm", 20], ["40 cm", 40]];
-      const tablillas = OPC.map((o, i) => { const t = caja(1.0, 0.5, 0.08, M.madera); t.position.set(2.95, CY + 0.8 - i * 0.8, 0.05); t.visible = false; t.userData.cm = o[1]; g.add(t); return t; });
-      let fase = "soplar", soplando = false, cobertura = 0, sucio = false, tMedida = 0, hecho = false, intentos = 0;
+      // Superficie de la mano (solo por encima de la muñeca), medida en el propio dibujo
+      const AREA = (() => { const d = masc.getContext("2d").getImageData(0, 0, CW, Math.floor(MY)).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 127) n++; return n / (PXCM * PXCM); })();
+      const CUADROS = Math.round(AREA / 25), AREA_R = CUADROS * 25, PARED = 44 * 32, LIBRE = PARED - AREA_R;
+      const miles = (n) => n.toLocaleString("es-ES");
+      const PREG = [
+        { txt: "¡Retiras la mano y aparece en negativo! ¿Cuánto mide de LARGO, desde la muñeca (donde se estrecha) hasta la punta del dedo corazón? Cada cuadro mide 5 cm de lado. Te preguntamos la longitud, no la superficie.",
+          ops: [["10 cm", "Cuenta los cuadros desde la línea de la muñeca hasta la punta del dedo más largo: cada uno mide 5 cm."], ["20 cm", null], ["40 cm", "Demasiado: cuenta otra vez los cuadros, desde la muñeca hasta la punta del dedo corazón."]],
+          bien: "¡Exacto! 4 cuadros de 5 cm: 4 × 5 = 20 cm de largo." },
+        { txt: "Ahora la SUPERFICIE: ¿cuánta pared tapa la mano? Cada cuadro ocupa 5 × 5 = 25 cm². Cuenta los cuadros que cubre la mano, juntando los trozos.",
+          ops: [["Unos 20 cm²", "20 es la longitud en centímetros. La superficie se mide en cm²: cuenta cuadros de 25 cm²."], ["Unos " + AREA_R + " cm²", null], ["400 cm²", "400 cm² sería el cuadrado entero de 20 × 20 cm. La mano no lo llena: cuenta solo los cuadros que tapa."]],
+          bien: "¡Bien estimado! Unos " + CUADROS + " cuadros × 25 cm² = " + AREA_R + " cm²." },
+        { txt: "El panel pintado de la pared mide 44 cm × 32 cm = " + miles(PARED) + " cm². Si quitamos lo que tapa la mano, ¿cuánta pared queda libre?",
+          ops: [[miles(PARED + AREA_R) + " cm²", "Si la mano tapa una parte, queda menos pared, no más: hay que restar."], [miles(LIBRE) + " cm²", null], [miles(PARED - 20) + " cm²", "Hay que restar la superficie de la mano (en cm²), no su longitud (20 cm)."]],
+          bien: "¡Correcto! " + miles(PARED) + " − " + AREA_R + " = " + miles(LIBRE) + " cm² libres. Si pudiéramos cubrir la pared sin dejar huecos, cabrían unas " + Math.floor(PARED / AREA_R) + " manos (" + miles(PARED) + " : " + AREA_R + "); en realidad, menos, porque las manos no encajan como baldosas." }
+      ];
+      PREG.forEach((q) => (q.ops = barajar(q.ops)));
+      const tabs = tablillasP(g, 3, 3.05, CY + 0.8, 0.8, 1.3, 0.05);
+      let fase = "soplar", soplando = false, cobertura = 0, sucio = false, tMedida = 0, hecho = false, intentos = 0, q = 0, ctrlAlt = null;
 
       function componer() {
         cC.globalCompositeOperation = "source-over";
         cC.drawImage(base, 0, 0); cC.drawImage(pint, 0, 0);
         if (fase === "soplar") { cC.globalAlpha = 0.95; cC.drawImage(piel, 0, 0); cC.globalAlpha = 1; }
         if (fase !== "soplar") {
+          cC.drawImage(contorno, 0, 0);
           cC.strokeStyle = "rgba(255,255,255,.6)"; cC.lineWidth = 1.5 * KP;
           const paso = 5 * PXCM;
           for (let x = MX % paso; x < CW; x += paso) { cC.beginPath(); cC.moveTo(x, 0); cC.lineTo(x, CH); cC.stroke(); }
@@ -1500,11 +1652,11 @@
         }
         tex.needsUpdate = true;
       }
-      function soplar(u, v, n = 34) {
+      function soplar(u, v, n = 52) {
         const cx = u * CW, cy = (1 - v) * CH;
         cP.globalCompositeOperation = "source-over"; cP.fillStyle = "rgba(150,40,22,0.28)";
         for (let i = 0; i < n; i++) {
-          const a = Math.random() * Math.PI * 2, d = Math.sqrt(-2 * Math.log(Math.random() + 1e-6)) * 11 * KP;
+          const a = Math.random() * Math.PI * 2, d = Math.sqrt(-2 * Math.log(Math.random() + 1e-6)) * 17 * KP;
           cP.beginPath(); cP.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d, (1.2 + Math.random() * 2.2) * KP, 0, Math.PI * 2); cP.fill();
         }
         cP.globalCompositeOperation = "destination-out"; cP.drawImage(masc, 0, 0); cP.globalCompositeOperation = "source-over";
@@ -1515,44 +1667,58 @@
         for (const [x, y] of halo) if (d[((y - HY0) * ancho + (x - HX0)) * 4 + 3] > 70) n++;
         cobertura = n / halo.length; sucio = false;
         if (fase === "soplar" && cobertura >= 0.7) {
-          fase = "medir"; tablillas.forEach((t) => (t.visible = true)); componer(); refrescar();
-          estado("¡Retiras la mano y aparece en negativo! Cada cuadro mide 5 cm. ¿Cuánto mide la mano de la muñeca a la punta del dedo corazón? Haz pinza sobre una tablilla.", "status-ok", "p2-medir");
+          fase = "medir"; q = 0; preguntar(); componer(); refrescar();
         } else refrescar();
       }
-      function responder(cm) {
-        if (hecho) return;
+      function preguntar() {
+        tabs.poner(PREG[q].ops);
+        estado(PREG[q].txt + " Haz pinza sobre una tablilla.", q === 0 ? "status-ok" : "status-warn", "p2-q" + q);
+        reAlternativos();
+      }
+      function responder(i) {
+        if (hecho || fase !== "medir" || !PREG[q].ops[i]) return;
         intentos++;
-        if (cm === 20) { hecho = true; fase = "hecho"; completar(1, "¡Exacto! La mano mide 4 cuadros de 5 cm: 4 × 5 = 20 cm. Ahora mide tu mano con una regla y compárala."); }
-        else estado("No es " + cm + " cm. Cuenta los cuadros de la muñeca a la punta del dedo más largo: cada uno mide 5 cm.", "status-error", "p2-mal-" + cm);
+        const mal = PREG[q].ops[i][1];
+        if (mal) { estado(mal, "status-error", "p2-mal-" + q + "-" + i); refrescar(); return; }
+        if (q < PREG.length - 1) { const bien = PREG[q].bien; q++; tabs.poner(PREG[q].ops); estado(bien + " " + PREG[q].txt, "status-ok", "p2-q" + q); reAlternativos(); }
+        else { hecho = true; fase = "hecho"; tabs.ocultar(); completar(1, PREG[q].bien + " Ahora mide tu propia mano con una regla y compárala."); }
         refrescar();
+      }
+      function reAlternativos() { if (actual !== 1) return; alternativos.replaceChildren(); construirAlternativos(); }
+      function construirAlternativos() {
+        filaBotones([["Soplar pigmento alrededor", () => {
+          if (fase !== "soplar") return;
+          for (let i = 0; i < 90; i++) { const [px, py] = halo[(Math.random() * halo.length) | 0]; soplar(px / CW, 1 - py / CH, 16); }
+          medirCobertura();
+        }]]);
+        if (fase === "medir") filaBotones(PREG[q].ops.map((o, i) => [o[0], () => responder(i)]));
       }
       function refrescar() {
         if (actual !== 1) return;
-        metricas(["Pigmento alrededor de la mano: " + Math.round(cobertura * 100) + " %", "Fase: " + (fase === "soplar" ? "soplar pigmento" : fase === "medir" ? "medir la mano" : "terminada"), "Cuadrícula: 5 cm", "Intentos de medida: " + intentos]);
+        metricas(["Pigmento alrededor de la mano: " + Math.round(cobertura * 100) + " %", "Fase: " + (fase === "soplar" ? "soplar pigmento" : fase === "medir" ? ["medir la longitud", "medir la superficie", "pared libre"][q] : "terminada"), "Cuadro: 5 cm de lado = 25 cm²", "Respuestas: " + intentos]);
       }
       function uvDe(x, y) { const h = rayo(x, y).intersectObject(pared, false)[0]; return h && h.uv ? h.uv : null; }
       componer();
       return {
-        nombre: "La mano en la pared", grupo: g, marco: { ancho: 6.6, alto: 3.6, cy: 1.6 }, fondo: "cueva",
-        pistas: ["Haz pinza muy cerca del borde de la mano y muévete a su alrededor para soplar el pigmento.", "Para medir, cuenta los cuadros que hay desde la muñeca hasta la punta del dedo corazón. Cada cuadro mide 5 cm."],
+        nombre: "La mano en la pared", grupo: g, marco: { ancho: 7.6, alto: 3.6, cy: 1.6 }, fondo: "cueva",
+        pistas: ["Haz pinza muy cerca del borde de la mano y muévete a su alrededor para soplar el pigmento.", "La longitud se cuenta en cuadros de 5 cm, de la muñeca a la punta del dedo corazón. La superficie se cuenta en cuadros enteros de 25 cm², juntando los trozos; la pared libre es la pared menos la mano."],
+        contexto: { epoca: "Paleolítico superior · hace más de 37 000 años", titulo: "Una huella en la roca",
+          texto: "<p>En las cuevas del norte de la península ibérica, grupos de cazadores y recolectores apoyaban la mano en la pared y soplaban pigmento a su alrededor, con la boca o con un tubo. Al retirarla quedaba su silueta en <strong>negativo</strong>. En la cueva de El Castillo (Cantabria) hay una con al menos 37 300 años.</p><p>No sabemos con seguridad por qué lo hacían: quizá como firma, como señal o como parte de un ritual. Lo que sí podemos hacer es medirlas, y algunos especialistas usan esas medidas para estimar si eran manos de personas adultas o de niños y niñas.</p><p class=\"reto\"><strong>Tu reto:</strong> deja la mano en negativo y mide su <strong>longitud</strong> (de la muñeca a la punta del dedo corazón) y la <strong>superficie</strong> que ocupa en la pared.</p>" },
         nota: "Manos en negativo: se apoyaba la mano en la roca y se soplaba pigmento alrededor. En El Castillo (Cantabria) hay una con más de 37 300 años.",
         entrar() {
           etiqueta("pared de la cueva", "", () => [-1.55, CY + 1.45]);
-          OPC.forEach((o, i) => etiqueta(o[0], "geo", () => (fase === "medir" || fase === "hecho" ? [2.95, CY + 0.8 - i * 0.8 + 0.42, 0.1] : null)));
+          tabs.etiquetas();
+          const enPared = (px, py) => [(px / CW - 0.5) * W, CY + (0.5 - py / CH) * H, 0.1];
+          etiqueta("muñeca", "geo", () => (fase === "medir" && q === 0 ? enPared(MX - 9.5 * PXCM, MY + 0.3 * PXCM) : null)).el.classList.add("abajo");
+          etiqueta("punta del dedo corazón", "geo", () => (fase === "medir" && q === 0 ? enPared(MX + 8.5 * PXCM, MY - 19.2 * PXCM) : null));
           if (fase === "soplar") estado("Tu mano está apoyada en la pared. Haz pinza junto a sus bordes y muévete para soplar el pigmento alrededor.", "status-warn", "p2-ini");
+          else if (fase === "medir") preguntar();
           refrescar();
         },
-        alternativos() {
-          filaBotones([["Soplar pigmento alrededor", () => {
-            if (fase !== "soplar") return;
-            for (let i = 0; i < 40; i++) { const [px, py] = halo[(Math.random() * halo.length) | 0]; soplar(px / CW, 1 - py / CH, 14); }
-            medirCobertura();
-          }]]);
-          filaBotones(OPC.map((o) => ["Mide " + o[0], () => { if (fase === "medir") responder(o[1]); }]));
-        },
+        alternativos() { construirAlternativos(); },
         down(x, y) {
           if (fase === "soplar") { const uv = uvDe(x, y); if (!uv) return false; soplando = true; soplar(uv.x, uv.y); return true; }
-          if (fase === "medir") { const h = rayo(x, y).intersectObjects(tablillas, false)[0]; if (h) responder(h.object.userData.cm); }
+          if (fase === "medir") { const i = tabs.tocar(x, y); if (i !== null) responder(i); }
           return false;
         },
         move(x, y) { if (soplando) { const uv = uvDe(x, y); if (uv) soplar(uv.x, uv.y); } },
@@ -1713,9 +1879,85 @@
         concha.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(d, A, Z));
         concha.userData.anim = { p0: p.clone().addScaledVector(n, 0.085), n, t: 0 }; concha.visible = !MOV_REDUCIDO;
         sellos++;
-        if (sellos >= 8 && !hecho) { hecho = true; fase = "hecho"; completar(2, "¡Vasija decorada! La misma marca repetida a la misma distancia forma un friso: un movimiento de traslación."); }
-        else if (!hecho) estado("Conchas impresas: " + sellos + " de 8. Intenta dejar la misma distancia entre una y otra.", "status-warn", "p3-c" + sellos);
+        if (sellos >= 8 && fase === "decorar") { fase = "medir"; iniciarMedida(); }
+        else if (fase === "decorar") estado("Conchas impresas: " + sellos + " de 8. Intenta dejar la misma distancia entre una y otra.", "status-warn", "p3-c" + sellos);
         refrescar();
+      }
+      // ---- Medir la capacidad con jarras: se vierte o se saca agua hasta llenar la vasija ----
+      const JARRAS = [[2, -1.3, 0.2, 0.44], [1, 1.15, 0.155, 0.34], [0.5, 1.52, 0.12, 0.26]];   // litros, x, radio, alto
+      const matJarra = TX.mat("barro", { color: 0xe6d3b3, rugosidad: 0.55 });
+      const jarras = JARRAS.map(([l, x, rd, h]) => {
+        const j = new THREE.Group(); j.position.set(x, 0, 0.3); j.visible = false; j.userData.litros = l;
+        const cuerpo = new THREE.Mesh(new THREE.CylinderGeometry(rd * 0.82, rd, h, 32, 1, true), matJarra); cuerpo.position.y = h / 2;
+        const fondoJ = new THREE.Mesh(new THREE.CircleGeometry(rd, 32), matJarra); fondoJ.rotation.x = -Math.PI / 2; fondoJ.position.y = 0.005;
+        const aguaJ = new THREE.Mesh(new THREE.CylinderGeometry(rd * 0.8, rd * 0.86, h * 0.75, 32), new THREE.MeshStandardMaterial({ color: 0x3b82c4, roughness: 0.15 })); aguaJ.position.y = h * 0.39;
+        const asaJ = new THREE.Mesh(new THREE.TorusGeometry(h * 0.22, 0.018, 8, 20, Math.PI), matJarra); asaJ.rotation.z = -Math.PI / 2; asaJ.position.set(rd * 0.95, h * 0.55, 0);
+        j.add(cuerpo, fondoJ, aguaJ, asaJ); j.userData.cuerpo = cuerpo; g.add(j); return j;
+      });
+      const cartel = caja(0.62, 0.3, 0.05, M.madera); cartel.position.set(-1.3, 0.9, 0.3); cartel.visible = false; g.add(cartel);
+      const tabsP3 = tablillasP(g, 3, 1.3, 1.45, 0.48, 0.95, 0.35);
+      const matAguaV = new THREE.MeshStandardMaterial({ color: 0x3b82c4, transparent: true, opacity: 0.75, roughness: 0.12, side: THREE.DoubleSide, depthWrite: false });
+      let litros = 0, capR = 0, vertidos = 0, modo = "verter", aguaV = null, respuestasP3 = [];
+      function alturaPara(vol) {
+        const pts = perfilActual; let v = 0;
+        for (let i = 1; i < pts.length; i++) {
+          const dh = pts[i].y - pts[i - 1].y; if (dh <= 0) continue;
+          const rm = (pts[i].x + pts[i - 1].x) / 2, dv = Math.PI * rm * rm * dh * 8;
+          if (v + dv >= vol) return pts[i - 1].y + dh * (vol - v) / dv;
+          v += dv;
+        }
+        return pts[pts.length - 1].y;
+      }
+      function dibujarAgua() {
+        if (aguaV) { g.remove(aguaV); aguaV.geometry.dispose(); aguaV = null; }
+        if (litros <= 0) return;
+        const h = alturaPara(Math.min(litros, capR)), pts = [new THREE.Vector2(0.001, 0.01)];
+        for (const p of perfilActual) { if (p.y >= h) break; if (p.y > 0.01) pts.push(new THREE.Vector2(p.x * 0.96, p.y)); }
+        pts.push(new THREE.Vector2(radioA(h) * 0.96, h), new THREE.Vector2(0.001, h));
+        aguaV = new THREE.Mesh(new THREE.LatheGeometry(pts, 64), matAguaV); aguaV.renderOrder = 4; g.add(aguaV);
+      }
+      function iniciarMedida() {
+        capR = Math.round(capacidad(perfilActual) * 2) / 2;
+        matBarro.transparent = true; matBarro.opacity = 0.42; matBarro.depthWrite = false; matBarro.needsUpdate = true;   // vista «en corte» para ver el agua
+        jarras.forEach((j) => (j.visible = true)); cartel.visible = true;
+        estado("¡Vasija decorada! La misma marca repetida a la misma distancia forma un friso: una traslación. Ahora averigua cuánto cabe: haz pinza sobre una jarra para verter su agua en la vasija, hasta llenarla justo hasta el borde.", "status-ok", "p3-medir");
+        reAlternativosP3(); refrescar();
+      }
+      function usarJarra(l) {
+        if (fase !== "medir") return;
+        if (modo === "verter") { litros += l; vertidos++; }
+        else if (litros >= l) { litros -= l; vertidos++; }
+        else { estado("En la vasija no hay tanta agua para sacar con esa jarra.", "status-warn", "p3-sacar-no-" + litros); return; }
+        dibujarAgua();
+        const txt = (n) => fmt(n, n % 1 ? 1 : 0).replace(",0", "") + " L";
+        if (litros === capR) {
+          fase = "pregunta-cap"; jarras.forEach((j) => (j.visible = false)); cartel.visible = false;
+          const opciones = [[txt(capR), null], [vertidos + " L", "Has usado " + vertidos + " jarras, pero no todas tienen 1 L. Suma los litros de cada una."], [txt(capR * 2), "Demasiado: la vasija está llena con el agua que has vertido. Suma lo que has echado."]];
+          if (vertidos === capR) opciones[1] = [txt(capR + 1.5), "Más de lo que has echado: suma solo el agua que hay dentro."];
+          respuestasP3 = barajar(opciones);
+          tabsP3.poner(respuestasP3);
+          estado("¡Llena justo hasta el borde! Entonces, ¿qué capacidad tiene la vasija, más o menos? Haz pinza sobre una tablilla.", "status-ok", "p3-pregunta");
+          reAlternativosP3();
+        } else if (litros > capR) estado("¡Se desborda! Hay " + txt(litros) + " y no caben. Cambia el cartel a «sacar» y quita agua con una jarra pequeña.", "status-error", "p3-desborda-" + litros);
+        else estado("Dentro hay " + txt(litros) + ". " + (capR - litros <= 1 ? "¡Ya casi! Afina con la jarra pequeña." : "Sigue llenando."), "status-warn", "p3-l" + litros);
+        refrescar();
+      }
+      function cambiarModo() { if (fase !== "medir") return; modo = modo === "verter" ? "sacar" : "verter"; estado(modo === "sacar" ? "Ahora cada jarra SACA agua de la vasija." : "Ahora cada jarra VIERTE agua en la vasija.", "status-warn", "p3-modo-" + modo); refrescar(); }
+      function responderCap(i) {
+        if (fase !== "pregunta-cap" || !respuestasP3[i]) return;
+        const mal = respuestasP3[i][1];
+        if (mal) { estado(mal, "status-error", "p3-mal-" + i); return; }
+        fase = "hecho"; hecho = true; tabsP3.ocultar();
+        completar(2, "¡Correcto! Caben unos " + respuestasP3[i][0] + ". Es una medida aproximada: con jarras de 0,5 L no podemos afinar más. Recuerda: 1 litro es lo que cabe en un cubo de 10 cm de lado (1 dm³).");
+        refrescar();
+      }
+      function reAlternativosP3() { if (actual !== 2) return; alternativos.replaceChildren(); construirAltP3(); }
+      function construirAltP3() {
+        ctrlSel = filaRango("Anillo (1 = abajo)", 1, NA, 1, sel + 1, (v) => { sel = v - 1; reconstruir(); }, (v) => "anillo " + v);
+        ctrlAnch = filaRango("Anchura (cm)", 8, 38, 1, Math.round(rr[sel] * CM * 2), (v) => { if (fase === "modelar") ponerRadio(sel, v / CM / 2); }, (v) => v + " centímetros de diámetro");
+        filaBotones([["Imprimir una concha", imprimirFriso]]);
+        if (fase === "medir") { filaBotones(JARRAS.map(([l]) => ["Jarra de " + fmt(l, l % 1 ? 1 : 0).replace(",0", "") + " L", () => usarJarra(l)])); filaBotones([["Cambiar: verter o sacar", cambiarModo]]); }
+        if (fase === "pregunta-cap") filaBotones(respuestasP3.map((o, i) => ["Caben " + o[0], () => responderCap(i)]));
       }
       function imprimirFriso() {
         if (fase !== "decorar") return;
@@ -1725,26 +1967,31 @@
       }
       function refrescar(pts) {
         if (actual !== 2) return;
-        metricas([fase === "modelar" ? "Anillo elegido: " + (sel + 1) + " (anchura " + Math.round(rr[sel] * CM * 2) + " cm)" : "Forma: lista", "Parecido con el modelo: " + Math.round(parecido() * 100) + " %", "Capacidad aprox.: " + fmt(capacidad(pts || perfil()), 1) + " L", "Conchas impresas: " + sellos]);
+        if (fase === "medir" || fase === "pregunta-cap" || (fase === "hecho" && capR)) { metricas(["Agua en la vasija: " + fmt(litros, 1) + " L", "Jarras usadas: " + vertidos, "Las jarras ahora: " + (modo === "verter" ? "vierten agua" : "sacan agua"), "Jarras: 2 L · 1 L · 0,5 L"]); }
+        else metricas([fase === "modelar" ? "Anillo elegido: " + (sel + 1) + " (anchura " + Math.round(rr[sel] * CM * 2) + " cm)" : "Forma: lista", "Parecido con el modelo: " + Math.round(parecido() * 100) + " %", "Altura: " + Math.round((HS[NA - 1]) * CM) + " cm", "Conchas impresas: " + sellos + " de 8"]);
         ctrlSel && ctrlSel.poner(sel + 1); ctrlAnch && ctrlAnch.poner(Math.round(rr[sel] * CM * 2));
       }
       reconstruir();
       return {
-        nombre: "Modelar una vasija", grupo: g, marco: { ancho: 2.6, alto: 2.0, cy: 0.7 }, fondo: "aldea",
-        pistas: ["Haz pinza sobre un punto naranja del borde y mueve la mano hacia fuera o hacia dentro hasta encajar con la línea del modelo.", "Para decorar, haz pinza dentro de la franja marcada en el hombro de la vasija. Deja la misma distancia entre una concha y otra: harán falta 8."],
-        agarres() { return fase === "modelar" ? rr.map((r, j) => [r, HS[j], 0.05]) : []; },
+        nombre: "Modelar una vasija", grupo: g, marco: { ancho: 3.7, alto: 2.0, cy: 0.75 }, fondo: "aldea",
+        pistas: ["Haz pinza sobre un punto naranja del borde y mueve la mano hasta encajar con la línea del modelo. Luego imprime 8 conchas dentro de la franja.", "Para medir: vierte con las jarras grandes y afina con la de 0,5 L. Si se desborda, cambia el cartel a «sacar». La capacidad es la suma de lo que queda dentro."],
+        agarres() { return fase === "modelar" ? rr.map((r, j) => [r, HS[j], 0.05]) : fase === "medir" ? jarras.map((j) => [j.position.x, 0.2, 0.45]).concat([[cartel.position.x, cartel.position.y, 0.35]]) : []; },
+        contexto: { epoca: "Neolítico · hace unos 7300 años", titulo: "Guardar la cosecha",
+          texto: "<p>Con el Neolítico llegaron la agricultura y la ganadería. Las personas empezaron a vivir en aldeas y necesitaron recipientes para <strong>guardar</strong> el grano, el agua y otros alimentos, y para cocinarlos. Así se extendió la cerámica: vasijas de barro modeladas a mano, sin torno, y cocidas en hogueras.</p><p>En la península ibérica, algunas de las primeras se decoraban imprimiendo el borde de una concha de berberecho (<em>Cerastoderma</em>): es la <strong>cerámica cardial</strong>. En la Cova de l'Or (Alicante) hay vasijas de hacia el 5300 a. C.</p><p class=\"reto\"><strong>Tu reto:</strong> modela la vasija siguiendo el modelo, decórala con una franja de conchas y averigua cuántos litros caben usando jarras de medida de hoy.</p>" },
         nota: "Sin torno: el barro se modelaba a mano, a menudo con rollos (churros). La cerámica cardial se decoraba con el borde de una concha de berberecho.",
         entrar() {
           etiqueta("eje de giro", "geo", () => [0, HS[NA - 1] + 0.3]);
           etiqueta("modelo", "", () => (fase === "modelar" ? [-OBJ[3] - 0.25, HS[3]] : null));
+          jarras.forEach((j) => etiqueta(fmt(j.userData.litros, j.userData.litros % 1 ? 1 : 0).replace(",0", "") + " L", "agua", () => (j.visible ? [j.position.x, -0.02, 0.5] : null)).el.classList.add("abajo"));
+          const eCartel = etiqueta("", "geo", () => { if (!cartel.visible) return null; eCartel.texto = modo === "verter" ? "Jarras: VERTER ⇄" : "Jarras: SACAR ⇄"; return [cartel.position.x, cartel.position.y + 0.02, 0.4]; });
+          tabsP3.etiquetas();
           if (fase === "modelar") estado("Haz pinza sobre un punto naranja del borde y mueve la mano hacia fuera o hacia dentro hasta encajar con la línea del modelo.", "status-warn", "p3-ini");
+          else if (fase === "decorar") estado("Haz pinza dentro de la franja marcada para imprimir el borde de una concha. Hacen falta 8.", "status-warn", "p3-decorar-ini");
+          else if (fase === "medir") estado("Haz pinza sobre una jarra para verter su agua en la vasija, hasta llenarla justo hasta el borde.", "status-warn", "p3-medir-ini");
+          else if (fase === "pregunta-cap") estado("¿Qué capacidad tiene la vasija, más o menos? Haz pinza sobre una tablilla.", "status-warn", "p3-pregunta-ini");
           reconstruir();
         },
-        alternativos() {
-          ctrlSel = filaRango("Anillo (1 = abajo)", 1, NA, 1, sel + 1, (v) => { sel = v - 1; reconstruir(); }, (v) => "anillo " + v);
-          ctrlAnch = filaRango("Anchura (cm)", 8, 38, 1, Math.round(rr[sel] * CM * 2), (v) => { if (fase === "modelar") ponerRadio(sel, v / CM / 2); }, (v) => v + " centímetros de diámetro");
-          filaBotones([["Imprimir una concha", imprimirFriso]]);
-        },
+        alternativos() { construirAltP3(); },
         down(x, y) {
           if (fase === "modelar") {
             const p = enPlano(x, y); if (!p) return false;
@@ -1757,6 +2004,11 @@
             const h = rayo(x, y).intersectObject(malla, false)[0];
             if (h && h.face) imprimir(h.point, h.face.normal.clone().normalize());
           }
+          if (fase === "medir") {
+            const h = rayo(x, y).intersectObjects(jarras.concat([cartel]), true)[0];
+            if (h) { if (h.object === cartel) cambiarModo(); else { let o = h.object; while (o && !o.userData.litros) o = o.parent; if (o) usarJarra(o.userData.litros); } }
+          }
+          if (fase === "pregunta-cap") { const i = tabsP3.tocar(x, y); if (i !== null) responderCap(i); }
           return false;
         },
         // Ganancia 0,5: el borde se mueve a media velocidad que la mano, para poder afinar con la pinza
@@ -1793,39 +2045,87 @@
       const flecha = linea([[0, 0, 0.16], [0, 1.95, 0.16]], M.cota); dolmen.add(flecha);
       const haz = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape([new THREE.Vector2(R + 0.32, 0.2), new THREE.Vector2(R + 0.32, -0.2), new THREE.Vector2(0, -0.12), new THREE.Vector2(0, 0.12)])), new THREE.MeshBasicMaterial({ color: 0xfde68a, transparent: true, opacity: 0, depthWrite: false }));
       haz.position.z = 0.2; g.add(haz);
-      let az = 215, hecho = false, arrastre = false, ctrl = null, luz = 0;
       const CARD = ["norte", "noreste", "este", "sureste", "sur", "suroeste", "oeste", "noroeste"];
       const cardinal = (a) => CARD[Math.round(a / 45) % 8];
+      // Cada vez que se carga el reto, el corredor empieza en una posición distinta
+      const INICIOS = [0, 30, 45, 135, 180, 210, 240, 270, 300, 330];
+      const AZ0 = INICIOS[Math.floor(Math.random() * INICIOS.length)];
+      let az = AZ0, hecho = false, arrastre = false, ctrl = null, luz = 0, orientado = false, fase = "girar", respP4 = [];
+      const delta = (() => { let d = ((90 - AZ0) % 360 + 540) % 360 - 180; if (d === -180) d = 180; return d; })();   // giro más corto, con signo
+      const GIRO = Math.abs(delta), TIPO = GIRO < 90 ? "agudo" : GIRO === 90 ? "recto" : GIRO < 180 ? "obtuso" : "llano";
+      // Posición inicial (línea discontinua) y sector del giro, que aparece al orientar el corredor
+      const matInicial = new THREE.LineDashedMaterial({ color: 0x1c1917, dashSize: 0.12, gapSize: 0.08, transparent: true, opacity: 0.8 });
+      const tIni = THREE.MathUtils.degToRad(AZ0), lineaIni = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0.14), new THREE.Vector3(Math.sin(tIni) * 1.95, Math.cos(tIni) * 1.95, 0.14)]), matInicial);
+      lineaIni.computeLineDistances(); g.add(lineaIni);
+      const sector = new THREE.Mesh(new THREE.RingGeometry(0.55, 1.0, 64, 1, Math.PI / 2 - THREE.MathUtils.degToRad(Math.max(AZ0, AZ0 + delta)), THREE.MathUtils.degToRad(GIRO)), new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.38, side: THREE.DoubleSide, depthWrite: false }));
+      sector.position.z = 0.18; sector.visible = false; g.add(sector);
+      const tabsP4 = tablillasP(g, 4, 3.15, 1.5, 0.62, 1.2, 0.1);
+      const opcionesGiro = (() => {
+        const otro = GIRO === 180 ? 90 : 360 - GIRO, tercero = GIRO + (GIRO <= 120 ? 30 : -30);
+        const l = [[GIRO + "°", null], [otro + "°", GIRO === 180 ? "Del " + cardinal(AZ0) + " al este hay más de un cuarto de vuelta: compara con las marcas de 90°." : otro + "° sería girar por el camino largo. Pregunta por el camino más corto."], [tercero + "°", "Cuenta las marcas de la rosa: cada una vale 30°. Fíjate en el sector azul."]];
+        return barajar(l);
+      })();
+      const opcionesTipo = [["Agudo (menos de 90°)", "agudo"], ["Recto (90°)", "recto"], ["Obtuso (entre 90° y 180°)", "obtuso"], ["Llano (180°)", "llano"]].map(([t, id]) => [t, id === TIPO ? null : "Un giro de " + GIRO + "° no es " + id + ". Compara con el ángulo recto (90°) y con el llano (180°)."]);
       function poner(v) {
         az = ((Math.round(v) % 360) + 360) % 360;
         if (Math.abs(az - 90) <= 4) az = 90;
         dolmen.rotation.z = -THREE.MathUtils.degToRad(az);
         ctrl && ctrl.poner(az);
         if (actual !== 3) return;
-        metricas(["Orientación del corredor: " + az + "°", "Mira hacia el " + cardinal(az), "Sol del equinoccio: 90° (este)", "Diferencia: " + Math.min(Math.abs(az - 90), 360 - Math.abs(az - 90)) + "°"]);
-        if (hecho) return;
-        if (az === 90) { hecho = true; completar(3, "¡El sol del equinoccio entra por el corredor hasta la cámara! El corredor mira al este: 90° desde el norte, un ángulo recto."); }
+        metricas(["Orientación del corredor: " + az + "° (" + cardinal(az) + ")", "Posición inicial: " + AZ0 + "° (" + cardinal(AZ0) + ")", "Sol del equinoccio: 90° (este)", "Faltan: " + Math.min(Math.abs(az - 90), 360 - Math.abs(az - 90)) + "°"]);
+        if (hecho || fase !== "girar") return;
+        if (az === 90) {
+          orientado = true; fase = "grados"; sector.visible = true; respP4 = opcionesGiro; tabsP4.poner(respP4); reAltP4();
+          estado("¡El sol del equinoccio entra por el corredor! Al empezar, el corredor miraba al " + cardinal(AZ0) + " (" + AZ0 + "°), la línea discontinua. ¿Cuántos grados lo has girado, por el camino más corto? Haz pinza sobre una tablilla.", "status-ok", "p4-grados");
+        }
         else estado("El corredor mira hacia el " + cardinal(az) + " (" + az + "°). Gíralo para que el sol del equinoccio entre hasta la cámara.", "status-warn", "p4-" + az);
+      }
+      function responderP4(i) {
+        if (!respP4[i] || (fase !== "grados" && fase !== "tipo")) return;
+        const mal = respP4[i][1];
+        if (mal) { estado(mal, "status-error", "p4-mal-" + fase + "-" + i); return; }
+        if (fase === "grados") {
+          fase = "tipo"; respP4 = opcionesTipo; tabsP4.poner(respP4); reAltP4();
+          estado("¡Correcto! Has girado el corredor " + GIRO + "°. ¿Qué tipo de ángulo forma ese giro? Haz pinza sobre una tablilla.", "status-ok", "p4-tipo");
+        } else {
+          fase = "hecho"; hecho = true; tabsP4.ocultar(); reAltP4();
+          completar(3, "¡Exacto! Un giro de " + GIRO + "° es un ángulo " + TIPO + ". Ahora el corredor mira al este (90° desde el norte) y el sol del equinoccio entra hasta la cámara.");
+        }
+      }
+      function reAltP4() { if (actual !== 3) return; alternativos.replaceChildren(); construirAltP4(); }
+      function construirAltP4() {
+        ctrl = filaRango("Orientación (°)", 0, 359, 1, az, (v) => { if (fase === "girar") poner(v); }, (v) => v + " grados desde el norte, hacia el " + cardinal(v));
+        if (fase === "grados" || fase === "tipo") filaBotones(respP4.map((o, i) => [o[0], () => responderP4(i)]));
       }
       poner(az);
       return {
-        nombre: "Orientar el dolmen", grupo: g, marco: { ancho: 6.0, alto: 5.0, cy: 0 }, fondo: "cenital",
+        nombre: "Orientar el dolmen", grupo: g, marco: { ancho: 7.9, alto: 5.0, cy: 0 }, fondo: "cenital",
         pistas: ["Haz pinza sobre el dolmen y gira la mano: el corredor apunta hacia donde la muevas.", "En los equinoccios, el sol sale justo por el este. Mira la rosa de los vientos: ¿cuántos grados hay del norte al este?"],
-        agarres() { const t = THREE.MathUtils.degToRad(az); return hecho ? [] : [[Math.sin(t) * 1.45, Math.cos(t) * 1.45, 0.2]]; },
+        agarres() { const t = THREE.MathUtils.degToRad(az); return fase === "girar" ? [[Math.sin(t) * 1.45, Math.cos(t) * 1.45, 0.2]] : []; },
+        contexto: { epoca: "Neolítico y Calcolítico · hace entre 5000 y 6000 años", titulo: "Una tumba que mira al sol",
+          texto: "<p>Hace entre 5000 y 6000 años, comunidades de agricultores levantaron en Antequera (Málaga) grandes tumbas colectivas con losas de piedra: los <strong>dólmenes</strong>. Algunos se orientaron con mucho cuidado: el corredor del dolmen de Viera apunta hacia donde sale el sol en los equinoccios, el este; el de Menga, en cambio, mira hacia la Peña de los Enamorados.</p><p>Para orientar un corredor había que observar el cielo y girar la construcción hasta la dirección elegida. Hoy medimos esos giros en grados.</p><p class=\"reto\"><strong>Tu reto:</strong> gira el corredor hasta que mire al sol del equinoccio. Después, calcula cuántos grados lo has girado y qué tipo de ángulo forma ese giro.</p>" },
         nota: "Vista desde arriba. Simplificación: con el horizonte plano, en los equinoccios el sol sale justo por el este (90°).",
         entrar() {
           [["N", 0], ["E", 90], ["S", 180], ["O", 270]].forEach(([l, a]) => { const t = THREE.MathUtils.degToRad(a); etiqueta(l, "geo", () => [Math.sin(t) * (R + 0.02), Math.cos(t) * (R + 0.02) + (a === 180 ? -0.05 : 0.17)]); });
           etiqueta("sol del equinoccio", "", () => [R - 0.15, 0.62]);
           etiqueta("cámara", "", () => [0, -0.12]).el.classList.add("abajo");
           etiqueta("corredor", "geo", () => { const t = THREE.MathUtils.degToRad(az); return [Math.sin(t) * 1.75, Math.cos(t) * 1.75 + 0.15, 0.2]; });
+          etiqueta("posición inicial", "", () => (fase !== "hecho" ? [Math.sin(tIni) * 2.05, Math.cos(tIni) * 2.05 - 0.2, 0.2] : null));
+          etiqueta("giro: " + GIRO + "°", "agua", () => (sector.visible ? [Math.sin(THREE.MathUtils.degToRad(AZ0 + delta / 2)) * 0.78, Math.cos(THREE.MathUtils.degToRad(AZ0 + delta / 2)) * 0.78, 0.3] : null));
+          tabsP4.etiquetas();
           poner(az);
-          if (!hecho) estado("Haz pinza sobre el dolmen y gira la mano: el corredor apunta hacia donde la muevas. Haz que mire al sol del equinoccio.", "status-warn", "p4-ini");
+          if (fase === "girar") estado("Al empezar, el corredor mira al " + cardinal(AZ0) + " (" + AZ0 + "°). Haz pinza sobre el dolmen y gira la mano hasta que mire al sol del equinoccio. Fíjate en cuánto lo giras.", "status-warn", "p4-ini");
+          else if (fase === "grados" || fase === "tipo") estado(fase === "grados" ? "¿Cuántos grados has girado el corredor, por el camino más corto? Haz pinza sobre una tablilla." : "¿Qué tipo de ángulo forma ese giro? Haz pinza sobre una tablilla.", "status-warn", "p4-" + fase + "-ini");
         },
-        alternativos() { ctrl = filaRango("Orientación (°)", 0, 359, 1, az, poner, (v) => v + " grados desde el norte, hacia el " + cardinal(v)); },
-        down(x, y) { const p = enPlano(x, y); if (!p || Math.hypot(p.x, p.y) > R) return false; arrastre = true; poner(THREE.MathUtils.radToDeg(Math.atan2(p.x, p.y))); return true; },
-        move(x, y) { if (!arrastre) return; const p = enPlano(x, y); if (p) poner(THREE.MathUtils.radToDeg(Math.atan2(p.x, p.y))); },
+        alternativos() { construirAltP4(); },
+        down(x, y) {
+          if (fase === "grados" || fase === "tipo") { const i = tabsP4.tocar(x, y); if (i !== null) responderP4(i); return false; }
+          if (fase !== "girar") return false;
+          const p = enPlano(x, y); if (!p || Math.hypot(p.x, p.y) > R) return false; arrastre = true; poner(THREE.MathUtils.radToDeg(Math.atan2(p.x, p.y))); return true;
+        },
+        move(x, y) { if (!arrastre || fase !== "girar") return; const p = enPlano(x, y); if (p) poner(THREE.MathUtils.radToDeg(Math.atan2(p.x, p.y))); },
         up() { arrastre = false; },
-        tick(dt) { luz = clamp(luz + (hecho ? dt : -dt) * 0.8, 0, 0.55); haz.material.opacity = luz; }
+        tick(dt) { luz = clamp(luz + (orientado ? dt : -dt) * 0.8, 0, 0.55); haz.material.opacity = luz; }
       };
     })();
 
@@ -1983,7 +2283,9 @@
         for (let k = 0; k < n; k++) { const [a, b, ang] = rotar(x, y, k, n); excisiones.push([a, b, forma === "circular" ? radial + ang : forma === "triangular" || forma === "cuadrada" ? 0 : ang]); marcas += 3; }
         return true;
       }
-      function borrar() { huellas.length = 0; incisiones.length = 0; excisiones.length = 0; marcas = 0; componer(); refrescar(); }
+      function limpiarPapel() { TX.pintarFondo(cI, "pergamino", T, T); texI.needsUpdate = true; impresiones = 0; refrescar(); }
+      // «Borrar» deja la pintadera y el papel como al principio
+      function borrar() { huellas.length = 0; incisiones.length = 0; excisiones.length = 0; marcas = 0; componer(); limpiarPapel(); estado("Pintadera y papel borrados. Puedes empezar un diseño nuevo.", "status-warn", "p5-borrado-" + Date.now()); }
       function cambiarForma(f) {
         forma = f; construirPieza(); borrar();
         const F = FORMAS[f];
@@ -2043,6 +2345,9 @@
       }
       construirPieza(); componer();
       return {
+        controlesSiempre: true,   // forma, técnica, orden y esquemas están en el menú: visible también con la cámara
+        contexto: { epoca: "Sociedad indígena de Gran Canaria · antes de la conquista (siglo XV)", titulo: "Sellos de barro",
+          texto: "<p>Las islas Canarias se poblaron mucho más tarde que la península: los estudios recientes sitúan un poblamiento estable hacia los siglos II y III d. C., aunque la fecha sigue en debate. Las sociedades indígenas vivieron en las islas hasta la conquista castellana del siglo XV.</p><p>En Gran Canaria se han encontrado <strong>pintaderas</strong>: pequeñas piezas de barro cocido con dibujos geométricos y, a menudo, un mango perforado. El Museo Canario conserva más de doscientas. No se sabe con certeza para qué servían: quizá para pintar la piel, para marcar objetos o como signo de identidad.</p><p class=\"reto\"><strong>Tu reto:</strong> elige la forma de tu pintadera, decórala con las técnicas de la época (en el menú de abajo) y estámpala en el papel. Observa qué le pasa al dibujo al imprimirlo.</p>" },
         nombre: "La pintadera canaria", grupo: g, marco: { ancho: 5.8, alto: 3.0, cy: 1.45 }, fondo: "canarias",
         pistas: ["Haz pinza sobre el campo de la pintadera y arrastra: el punzón deja hileras de impresiones que se repiten al girar.", "Cuando hayas decorado bastante, haz pinza sobre la lámina de barro para estampar. Fíjate en cómo sale el dibujo: ¿igual o al revés?"],
         agarres() { return [marcas < 12 ? [XS, CY, 0.3] : [XI, CY, 0.1]]; },
@@ -2059,7 +2364,7 @@
         alternativos() {
           filaBotones([["Circular", () => cambiarForma("circular")], ["Cuadrada", () => cambiarForma("cuadrada")], ["Triangular", () => cambiarForma("triangular")], ["Rectangular", () => cambiarForma("rectangular")], ["Rómbica", () => cambiarForma("rombica")], ["Orden 4", () => cambiarOrden(4)], ["Orden 6", () => cambiarOrden(6)], ["Orden 8", () => cambiarOrden(8)]]);
           filaBotones([["Técnica: punzón", () => { tecnica = "punzon"; refrescar(); }], ["Técnica: incisión", () => { tecnica = "incision"; refrescar(); }], ["Técnica: excisión", () => { tecnica = "excision"; refrescar(); estado("Excisión: se vacía una figura con una punta en lengua de carpa. La figura acompaña a la forma del campo.", "status-warn", "p5-excision"); }], ["Ver el dorso y el apéndice", () => { giroObjetivo = GIRO_DORSO; estado("El dorso lleva el apéndice, un mango que facilita sujetar la pintadera; en el catálogo, 98 de los 124 apéndices completos están perforados.", "status-warn", "p5-dorso"); }], ["Ver el campo", () => { giroObjetivo = GIRO_CAMPO; }]]);
-          filaBotones([["Un anillo de impresiones", anillo], ["Una línea incisa", lineaIncisa], ["Una figura excisa", () => { const [cx, cy] = centro(), a = -Math.PI / 2 + Math.PI / orden(), r = (forma === "rectangular" || forma === "rombica" ? 0.3 : 0.55) * C; marcaExcision(cx + Math.cos(a) * r, cy + Math.sin(a) * r); componer(); refrescar(); }], ["Esquema del museo", esquema], ["Borrar", borrar], ["Estampar", () => estampar(0.5, 0.5)]]);
+          filaBotones([["Un anillo de impresiones", anillo], ["Una línea incisa", lineaIncisa], ["Una figura excisa", () => { const [cx, cy] = centro(), a = -Math.PI / 2 + Math.PI / orden(), r = (forma === "rectangular" || forma === "rombica" ? 0.3 : 0.55) * C; marcaExcision(cx + Math.cos(a) * r, cy + Math.sin(a) * r); componer(); refrescar(); }], ["Esquema del museo", esquema], ["Borrar pintadera e impresión", borrar], ["Limpiar solo el papel", limpiarPapel], ["Estampar", () => estampar(0.5, 0.5)]]);
         },
         down(x, y) {
           const s = uv(campo, x, y);
@@ -2096,6 +2401,25 @@
     ETAPAS.forEach((e) => { e.grupo.visible = false; scene.add(e.grupo); });
     const CLAVE = "lasManos.prehistoria.progreso";
     let hechas = [false, false, false, false, false];
+    // Registro para el pasaporte del aprendiz: segundos de trabajo, intentos fallidos y pistas de cada etapa
+    const CLAVE_REG = CLAVE.replace(/progreso$/, "registro");
+    registro = Array.from({ length: 5 }, () => ({ seg: 0, errores: 0, pistas: 0, fin: null }));
+    try { const r = JSON.parse(localStorage.getItem(CLAVE_REG) || "null"); if (Array.isArray(r) && r.length === 5) registro = r.map((x) => Object.assign({ seg: 0, errores: 0, pistas: 0, fin: null }, x)); } catch (e) {}
+    let ultimoGuardado = 0;
+    function guardarRegistro(forzar = true) {
+      const ahora = performance.now(); if (!forzar && ahora - ultimoGuardado < 5000) return; ultimoGuardado = ahora;
+      try { localStorage.setItem(CLAVE_REG, JSON.stringify(registro)); } catch (e) {}
+    }
+    // Solo cuenta el tiempo con la etapa a la vista, sin diálogos abiertos y sin terminar
+    // Se mide con el reloj real (no con el paso del fotograma, que se limita a 0,1 s en equipos lentos)
+    let relojPrevio = performance.now();
+    function contarTiempo() {
+      const ahora = performance.now(), d = Math.min(1, (ahora - relojPrevio) / 1000); relojPrevio = ahora;
+      if (!etapa || !modo || hechas[actual] || document.hidden) return;
+      if (document.querySelector("[role=dialog]:not([hidden])")) return;
+      registro[actual].seg += d; guardarRegistro(false);
+    }
+    window.addEventListener("pagehide", () => guardarRegistro());
     try { const s = JSON.parse(localStorage.getItem(CLAVE) || "null"); if (Array.isArray(s) && s.length === 5) hechas = s.map(Boolean); } catch (e) {}
     const botonesEtapa = [...document.querySelectorAll("#etapas button")];
 
@@ -2114,10 +2438,20 @@
     function completar(i, mensaje) {
       const nueva = !hechas[i];
       estado(mensaje, "status-ok", "completa-" + i);
-      if (nueva) { hechas[i] = true; try { localStorage.setItem(CLAVE, JSON.stringify(hechas)); } catch (e) {} }
+      if (nueva) { hechas[i] = true; try { localStorage.setItem(CLAVE, JSON.stringify(hechas)); } catch (e) {} registro[i].fin = new Date().toISOString(); registro[i].seg = Math.round(registro[i].seg); guardarRegistro(); }
       pintarProgreso();
       $("pista").hidden = true; $("btn-pista").classList.remove("llamativa");
       if (nueva) { sonar("fin"); celebrar(i); if (i < 4) $("btn-siguiente").classList.add("llamativa"); }
+    }
+    const contextosVistos = new Set();
+    // Contexto histórico de la etapa: se muestra la primera vez que se entra y con el botón «Contexto»
+    function mostrarContexto() {
+      if (!etapa || !etapa.contexto) return;
+      const c = etapa.contexto;
+      $("epoca-contexto").textContent = c.epoca; $("t-contexto").textContent = c.titulo;
+      $("cuerpo-contexto").innerHTML = c.texto;   // contenido estático propio, sin datos externos
+      document.querySelectorAll(".panel:not([hidden])").forEach((p) => { if (p.id !== "panel-contexto") p.hidden = true; });
+      abrirPanel("panel-contexto");
     }
     function irA(i, apilar = true) {
       if (!disponible(i) || i === actual) return;
@@ -2129,8 +2463,11 @@
       limpiarEtiquetas();
       alternativos.replaceChildren();
       etapa.alternativos();
+      if (etapa.controlesSiempre) mostrarAlternativo(true);
       categoriaPrevia = "";
       reiniciarAyudas();
+      $("btn-contexto").hidden = !etapa.contexto;
+      if (etapa.contexto && !contextosVistos.has(i)) { contextosVistos.add(i); setTimeout(() => mostrarContexto(), 0); }
       marco = etapa.marco;
       DEC.poner(etapa);
       etapa.entrar();
@@ -2192,6 +2529,7 @@
       if (modo === "manos") indicadorCamara("Cámara: en pausa", "aviso");
       if (video.srcObject) { video.srcObject.getTracks().forEach((t) => t.stop()); video.srcObject = null; }
       if (agarre) { pUp(0, 0); agarre = null; }
+      agarreUI = null; senalarControl(null);
       ctxM.clearRect(0, 0, escena.clientWidth, escena.clientHeight);
     }
     async function existeLocal(ruta) { try { return (await fetch(ruta, { method: "HEAD", cache: "no-store" })).ok; } catch (e) { return false; } }
@@ -2248,6 +2586,25 @@
       ctxM.beginPath(); ctxM.arc(m.x, m.y, cerca ? 17 : 14, 0, Math.PI * 2); ctxM.lineWidth = cerca ? 4 : 3; ctxM.strokeStyle = cerca ? "#4ade80" : "#38bdf8"; ctxM.stroke();
       if (cerrada) { ctxM.fillStyle = cerca ? "rgba(74,222,128,.6)" : "rgba(56,189,248,.6)"; ctxM.fill(); }
     }
+    // ---- Pinza sobre la interfaz ----
+    let agarreUI = null, controlSenalado = null;
+    const SELECTOR_UI = "button, a[href], input[type=range], input[type=checkbox], label, summary";
+    function controlBajo(x, y) {
+      const el = document.elementFromPoint(x, y);
+      if (!el || el === lienzo3d) return null;
+      const c = el.closest(SELECTOR_UI);
+      return c && !c.disabled && !c.closest("[hidden]") ? c : null;
+    }
+    function senalarControl(el) {
+      if (el === controlSenalado) return;
+      if (controlSenalado) controlSenalado.classList.remove("mano-encima");
+      controlSenalado = el; if (el) el.classList.add("mano-encima");
+    }
+    function moverRango(r, x) {
+      const b = r.getBoundingClientRect(), min = parseFloat(r.min), max = parseFloat(r.max), paso = parseFloat(r.step) || 1;
+      const v = clamp(min + ((x - b.left) / b.width) * (max - min), min, max), q = Math.round((v - min) / paso) * paso + min;
+      if (parseFloat(r.value) !== q) { r.value = q; r.dispatchEvent(new Event("input", { bubbles: true })); }
+    }
     function procesarManos() {
       if (!detector || video.readyState < 2 || video.currentTime === lastVideoTime) return;
       lastVideoTime = video.currentTime;
@@ -2257,7 +2614,7 @@
       catch (e) { if (++erroresDeteccion > 15) fallosDeteccion(); return; }
       ctxM.clearRect(0, 0, escena.clientWidth, escena.clientHeight);
       const lista = res.landmarks || [], lados = res.handednesses || res.handedness || [], vistas = new Set();
-      let primeraLibre = null;
+      let primeraLibre = null, uiSenalado = null;
       lista.forEach((mano, i) => {
         const lado = (lados[i] && lados[i][0] && lados[i][0].categoryName) || ("m" + i);
         vistas.add(lado);
@@ -2269,15 +2626,25 @@
         const medio = { x: (pts[4].x + pts[8].x) / 2, y: (pts[4].y + pts[8].y) / 2 };
         const s = suav[lado] || medio; suav[lado] = { x: s.x + (medio.x - s.x) * 0.5, y: s.y + (medio.y - s.y) * 0.5 };
         const pm = suav[lado];
-        if (!agarre && pinza[lado] && !antes && intentarAgarre(pm.x, pm.y)) agarre = { lado, perdidas: 0 };
+        // Pinza sobre la interfaz (botones, enlaces, casillas y deslizadores): se pulsan como con el dedo
+        const ui = agarreUI && agarreUI.lado === lado ? agarreUI.el : controlBajo(pm.x, pm.y);
+        if (ui && !uiSenalado) uiSenalado = ui;
+        if (!agarre && !agarreUI && pinza[lado] && !antes && ui) {
+          if (ui.matches("input[type=range]")) { agarreUI = { lado, el: ui }; moverRango(ui, pm.x); }
+          else { ui.click(); onda(pm.x, pm.y, "ok"); sonar("agarre"); }
+        } else if (agarreUI && agarreUI.lado === lado) {
+          if (pinza[lado]) moverRango(agarreUI.el, pm.x); else { agarreUI = null; }
+        } else if (!agarre && !ui && pinza[lado] && !antes && intentarAgarre(pm.x, pm.y)) agarre = { lado, perdidas: 0 };
         if (agarre && agarre.lado === lado) {
           agarre.perdidas = 0;
           if (pinza[lado]) pMove(pm.x, pm.y); else { pUp(pm.x, pm.y); agarre = null; }
         } else if (!agarre && !primeraLibre) primeraLibre = pm;
-        const cerca = !agarre && anillosPantalla.some((a) => Math.hypot(a.x - pm.x, a.y - pm.y) < 42);
+        const cerca = !agarre && (!!ui || anillosPantalla.some((a) => Math.hypot(a.x - pm.x, a.y - pm.y) < 42));
         dibujarMano(pts, pinza[lado], agarre && agarre.lado === lado, cerca);
       });
       if (!agarre && primeraLibre) pMove(primeraLibre.x, primeraLibre.y);
+      if (agarreUI && !vistas.has(agarreUI.lado)) agarreUI = null;
+      senalarControl(agarre ? null : agarreUI ? agarreUI.el : uiSenalado);
       if (agarre && !vistas.has(agarre.lado) && ++agarre.perdidas > 8) { pUp(0, 0); agarre = null; }
       for (const k of Object.keys(pinza)) if (!vistas.has(k)) { delete pinza[k]; delete suav[k]; }
       const n = lista.length, clave = n + "|" + (agarre ? 1 : 0);
@@ -2307,6 +2674,7 @@
       actualizarEtiquetas();
       renderer.render(scene, camera);
       pintarEfectos(dt);
+      contarTiempo();
       if (cuadros % 60 === 0) revisarInactividad();
       fpsN++;
       const ahora = performance.now();
@@ -2325,14 +2693,16 @@
        <h3>Patrimonio</h3><p>En la cueva de El Castillo (Puente Viesgo, Cantabria) hay una mano en negativo con más de 37 300 años. Forma parte de «Cueva de Altamira y arte rupestre paleolítico del norte de España», Patrimonio Mundial de la UNESCO.</p>
        <h3>Un debate abierto</h3><p>En 2018 un equipo propuso que una mano de la cueva de Maltravieso (Cáceres) tenía más de 64 000 años y que la habrían pintado neandertales. Otros especialistas no están de acuerdo. La ciencia también avanza así: discutiendo las pruebas.</p>
        <h3>Medir sin regla</h3><p>Una cuadrícula permite medir: si cada cuadro mide 5 cm, basta con contarlos y multiplicar. ¿Cuántos cuadros ocuparía tu mano?</p>
+       <h3>Longitud y superficie</h3><p>La <strong>longitud</strong> dice cuánto mide algo de un extremo a otro y se mide en centímetros (cm). La <strong>superficie</strong> dice cuánto espacio tapa y se mide en centímetros cuadrados (cm²): cada cuadro de 5 × 5 cm ocupa 25 cm². Para estimarla se cuentan los cuadros enteros y se juntan los trozos.</p>
        <p class="fuente">Pike et al. (2012), <em>Science</em>, 336, 1409-1413, doi:10.1126/science.1219957 · Hoffmann et al. (2018), <em>Science</em>, 359, 912-915, doi:10.1126/science.aap7778 · White et al. (2020), <em>Journal of Human Evolution</em>, 144, 102640, doi:10.1016/j.jhevol.2019.102640 · UNESCO, Lista del Patrimonio Mundial, n.º 310. La mano de la actividad es un modelo de 20 cm.</p>`,
       `<h3>El barro del Neolítico</h3><p>En el Neolítico las personas empezaron a cultivar, a criar animales y a guardar alimentos. Para guardarlos modelaron vasijas de barro a mano, sin torno, a menudo uniendo rollos de arcilla («churros»), y las cocían al fuego.</p>
        <h3>Un cuerpo de revolución</h3><p>Una vasija es un perfil que gira alrededor de un eje, igual que un cilindro, un cono o una esfera. Por eso, al cambiar la anchura de cada anillo, cambia toda la forma.</p>
        <h3>Cerámica cardial</h3><p>Muchas de las primeras vasijas neolíticas de la península ibérica se decoraban presionando el barro con el borde de una concha de berberecho, que antes se clasificaba en el género <em>Cardium</em> (hoy <em>Cerastoderma</em>): por eso se llama cerámica <strong>cardial</strong>. En la Cova de l'Or (Alicante) se han datado semillas de trigo de esos niveles hacia el 5300 a. C.</p>
-       <h3>¿Cuánto cabe?</h3><p>La capacidad se calcula sumando capas muy finas de la vasija. La de la pantalla es aproximada: no tiene en cuenta el grosor de la pared.</p>
+       <h3>¿Cuánto cabe?</h3><p>La capacidad es lo que cabe dentro. En la actividad la mides vertiendo agua con jarras de 2 L, 1 L y 0,5 L: es una medida aproximada, de medio en medio litro, y no tiene en cuenta el grosor de la pared. Un litro es lo que cabe en un cubo de 10 cm de lado (1 dm³).</p>
        <p class="fuente">Zilhão, J. (2001), <em>PNAS</em>, 98(24), 14180-14185, doi:10.1073/pnas.241522898. Las medidas de la vasija de la actividad son inventadas.</p>`,
       `<h3>Los megalitos</h3><p>Hace más de 6000 años, comunidades campesinas levantaron monumentos con piedras enormes. Los dólmenes eran construcciones funerarias con una cámara y, muchas veces, un corredor de entrada, cubiertas por un montículo de tierra llamado túmulo.</p>
        <h3>Patrimonio: los dólmenes de Antequera</h3><p>Menga, Viera y El Romeral (Málaga) son Patrimonio Mundial desde 2016. Menga se construyó hace unos 5600-5800 años y su mayor piedra de cubierta pesa unas 150 toneladas. Su corredor no mira al sol, sino a una montaña, la Peña de los Enamorados. En Viera, en cambio, el sol del equinoccio entra por el corredor hasta la cámara.</p>
+       <h3>Tipos de ángulo</h3><p>Un giro de menos de 90° forma un ángulo <strong>agudo</strong>; de 90°, <strong>recto</strong>; de entre 90° y 180°, <strong>obtuso</strong>; y de 180°, <strong>llano</strong> (media vuelta).</p>
        <h3>Ángulos y puntos cardinales</h3><p>Medimos la orientación en grados desde el norte, girando como las agujas del reloj: el este está a 90°, el sur a 180° y el oeste a 270°. En nuestro modelo el horizonte es plano; en la realidad, las montañas cambian un poco el punto por donde sale el sol.</p>
        <p class="fuente">UNESCO, «Antequera Dolmens Site» (2016) · Lozano Rodríguez et al. (2024), <em>Science Advances</em>, doi:10.1126/sciadv.adp1295 · Junta de Andalucía, Conjunto Arqueológico Dólmenes de Antequera. El dolmen de la actividad es un modelo simplificado.</p>`,
       `<h3>Las pintaderas</h3><p>Son matrices de barro cocido de Gran Canaria. Tienen un <strong>cuerpo</strong>, con el <strong>campo</strong> decorado, los laterales y el dorso, y casi siempre un <strong>apéndice</strong> o mango en el centro del dorso, a menudo perforado. El Museo Canario conserva 214. De las 183 matrices simples, 77 son rectangulares, 34 cuadradas, 29 circulares y 29 triangulares. Los campos miden entre unos 2 × 2 cm y 4 × 10 cm.</p>
@@ -2353,6 +2723,7 @@
       abrirPanel("panel-info");
     });
     $("btn-pista").addEventListener("click", mostrarPista);
+    $("btn-contexto").addEventListener("click", mostrarContexto);
     function pintarSonido() { $("btn-sonido").setAttribute("aria-pressed", String(sonidoActivo)); }
     $("btn-sonido").addEventListener("click", () => {
       sonidoActivo = !sonidoActivo; pintarSonido();

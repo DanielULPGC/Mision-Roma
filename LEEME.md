@@ -1,4 +1,4 @@
-# Las manos que construyeron la historia · v3.9.1 (edición para GitHub Pages)
+# Las manos que construyeron la historia · v3.10 (edición para GitHub Pages)
 
 Proyecto «Las manos que construyeron la historia». Geometría, patrimonio histórico y realidad aumentada en Educación Primaria (5.º y 6.º).
 
@@ -39,6 +39,27 @@ Los botones «← Línea del tiempo» de los capítulos llevan a la línea del t
 - **Ideas previas.** Antes de entrar, cada página plantea una pregunta sencilla con tres opciones, sin nota. Al completar el capítulo, se estampa el sello y aparece «Antes pensabas…» junto con la respuesta comprobada. Sirve para iniciar la sesión en el aula activando conocimientos previos.
 - **Sellos.** Son dibujos originales (pintadera, arcos, rosetón, carabela y faro). La primera vez que se ve un sello nuevo, se estampa con una animación, que no aparece si el sistema pide reducir el movimiento.
 - **Privacidad.** Solo se guardan en el navegador la miniatura de la mano dibujada, las ideas elegidas y los sellos ya vistos. Sin nombres ni datos personales. El botón «Borrar mi pasaporte» los elimina y conserva el progreso de los capítulos.
+
+## Novedades de la v3.10 (revisión de la usuaria del 26-10-2026)
+
+**Con la cámara, la pinza también pulsa botones.** Al acercar la pinza a un botón, un enlace, una casilla o un deslizador, este se marca en verde; al juntar los dedos se pulsa (o se arrastra el deslizador). La mano dibujada se ve ahora por encima de los paneles, para poder apuntar.
+
+**Bienvenida y pasaporte:**
+- **Mano real con la cámara** (botón «Usar mi mano real»). Con una mano abierta y quieta, el pigmento se sopla solo alrededor de su silueta real. Con dos manos, una queda abierta en la pared y la otra hace pinza y sopla donde está, como un tubo soplador. La imagen se procesa en el dispositivo y no se graba ni se envía.
+- **Nombre o código** en la tapa del pasaporte, para el seguimiento docente. Se recomienda un código.
+- **Registro por etapa** en los cinco capítulos: tiempo de trabajo (solo cuenta con la etapa a la vista y sin terminar), intentos fallidos y pistas usadas.
+- **Valoración por edad:** al completar cada capítulo, el alumnado indica si los retos le han parecido fáciles, justos o difíciles, cuánto le han gustado y, si quiere, un comentario.
+- **Descargas:** «Descargar mi pasaporte» genera un archivo HTML imprimible (con los datos también en formato JSON dentro del archivo); «Descargar los datos (CSV)» genera una tabla para hoja de cálculo. El alumnado los entrega por la vía que indique el docente. No hay servidor: nada se envía automáticamente.
+- **Empezar de cero** (con doble pulsación de confirmación) borra el pasaporte y el progreso de los cinco capítulos en ese navegador, para repetir la experiencia o dejar la tableta lista para otra persona.
+
+**Contexto histórico de cada reto (Prehistoria).** Al entrar por primera vez en cada etapa se abre un panel «Contexto» con la época, la situación histórica y el reto, y puede volver a abrirse con el botón «Contexto». El motor lo admite en los cinco capítulos; de momento solo lo tienen las etapas de la Prehistoria.
+
+**Prehistoria:**
+- **Tallar.** Primero se elige la piedra entre cuatro: nódulo de sílex, canto pequeño, sílex con grietas y arenisca, con la explicación de por qué solo sirve el primero. Los golpes ya no se pasan de la línea, de modo que la forma y la simetría llegan exactamente al 100 %, y solo entonces se completa la talla. Al final, el alumnado traza el eje de simetría con la pinza (o elige entre vertical, horizontal e inclinado).
+- **Pintar.** La mano mide ahora exactamente 4 cuadros (20 cm) desde la línea de la muñeca. La pregunta aclara que se mide la longitud, no la superficie, y se señalan la muñeca y la punta del dedo corazón. Se añaden dos preguntas de tercer ciclo: la superficie que tapa la mano (contando cuadros de 25 cm²) y la pared que queda libre (un panel de 44 × 32 cm menos la mano; la pared representa ahora 44 × 32 cm para que la mano se vea grande). Al final se comenta cuántas manos cabrían sin huecos y por qué en realidad caben menos.
+- **Modelar.** Tras decorar la vasija, se mide su capacidad con jarras de 2 L, 1 L y 0,5 L: se vierte (o se saca, con el cartel «verter/sacar») hasta llenarla justo hasta el borde. La vasija se ve transparente para seguir el nivel del agua. Después se elige su capacidad aproximada.
+- **Orientar.** El corredor empieza cada vez en una posición distinta (marcada con una línea discontinua). Tras orientarlo al este, el alumnado indica cuántos grados lo ha girado, por el camino más corto, y qué tipo de ángulo forma (agudo, recto, obtuso o llano). Un sector azul muestra el giro.
+- **Canarias.** El menú de forma, técnica, orden y esquemas se muestra siempre, también con la cámara. «Borrar» deja la pintadera y el papel como al principio, y hay además «Limpiar solo el papel».
 
 ## Capítulo «Las primeras manos» (Prehistoria)
 
@@ -256,6 +277,7 @@ Su uso con menores debe valorarse con el delegado o la delegada de protección d
 - Encuadre comprobado en móvil vertical, móvil horizontal y tableta.
 - Sin peticiones externas salvo el modelo, cuando falta y está permitido.
 - La cámara se apaga cuando el detector no arranca.
+- v3.10: ver «Novedades de la v3.10». Comprobados el recorrido completo de la Prehistoria con los controles alternativos, la carga del detector de manos en la bienvenida (con cámara simulada), las descargas (HTML y CSV, con el texto del alumnado escapado), «Empezar de cero», la accesibilidad (axe) y la regresión de los cinco capítulos. La pinza sobre botones y la mano real de la bienvenida quedan pendientes de probar con una mano de verdad.
 - v3.9.1: la bienvenida pasa a ser la pantalla de inicio. Comprobada la navegación: raíz, línea del tiempo, recarga, «atrás», vuelta desde los capítulos, Misión Roma directa y modo docente.
 - v3.9: bienvenida y pasaporte del aprendiz. Probados en escritorio y en móvil vertical: soplo con puntero y con teclado, miniatura guardada, lectura del progreso, sello estampado e ideas previas. Sin violaciones de accesibilidad (axe, WCAG 2.2 AA), HTML válido, sin desbordamiento horizontal y sin errores.
 - v3.8: ayudas de juego comunes. Probadas pistas, aviso tras dos errores, celebración, anillos, ayuda tras tres pinzas fallidas, sonido desactivable y nuevo control del faro. Regresión de los cinco capítulos sin errores, axe sin violaciones y HTML válido.

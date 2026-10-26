@@ -12,6 +12,12 @@
     Sin cámara, sin bibliotecas y sin peticiones externas. Solo se guarda en este navegador:
     el dibujo de la mano, las ideas previas elegidas y los sellos ya vistos.
   -->
+  <script type="importmap">
+  {
+    "imports": { "@mediapipe/tasks-vision": "./lib/vision_bundle.mjs" },
+    "integrity": { "./lib/vision_bundle.mjs": "sha384-9MVwqhzThi8MIJU3B3BxQi92VYFPzYDEWSYI5vJig77g7vjdK+y/gG9EQ/sjWmdU" }
+  }
+  </script>
   <style>
     :root{
       --ocre:#c2843a; --ocre-claro:#e3a85c; --almagre:#9b2d20; --noche:#1c1917; --roca:#3a2a1f;
@@ -118,6 +124,24 @@
       #panel-cueva .botones button,#panel-cueva .botones .boton{padding:9px 12px;font-size:.88rem}
       .rotulo p{font-size:.95rem}
     }
+    #video-mano{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+    .bloque-alumno{width:100%} .nota-alumno{margin-top:4px}
+    .campo{display:block;font-weight:700;margin:4px 0 4px}
+    .campo small{font-weight:400;opacity:.85}
+    .tapa input[type=text]{width:100%;font:inherit;font-size:1rem;padding:9px 11px;border-radius:9px;border:2px solid rgba(243,220,180,.55);background:#2a1a12;color:#f8e9cc}
+    .tapa input[type=text]:focus-visible{outline:3px solid var(--agua);outline-offset:2px}
+    .tapa .botones{display:flex;flex-wrap:wrap;gap:8px}
+    .tapa .boton,.tapa button{background:#f3dcb4;color:#3c1610;border-color:#f3dcb4}
+    .tapa .secundario{background:transparent;color:#f3dcb4;border-color:rgba(243,220,180,.6)}
+    #aviso-tapa{min-height:1.2em;font-size:.86rem;color:#ffe2a8}
+    .registro{font-size:.84rem;background:rgba(90,60,30,.08);border-radius:6px;padding:6px 8px}
+    .valora{border:1px dashed rgba(90,60,30,.4);border-radius:8px;padding:8px 10px;margin:4px 0 0}
+    .valora legend{font-weight:700;padding:0 4px}
+    .valora .opciones{margin:4px 0 8px}
+    .valora textarea{width:100%;font:inherit;font-size:.88rem;border-radius:8px;border:1px solid rgba(90,60,30,.4);padding:6px 8px;background:rgba(255,255,255,.7);color:var(--tinta);resize:vertical;min-height:52px}
+    .valora label{font-size:.84rem;font-weight:700;display:block;margin-top:2px}
+    .peligro{border-color:#f87171!important;color:#fecaca!important}
+    .peligro.confirmar{background:#7f1d1d!important;color:#fff!important}
     [hidden]{display:none!important}
   </style>
 </head>
@@ -125,9 +149,10 @@
   <main>
     <section id="cueva" aria-labelledby="t-cueva">
       <canvas id="lienzoRoca" aria-hidden="true"></canvas>
-      <canvas id="lienzoPigmento" role="img" aria-label="Pared de una cueva. Mantén pulsado sobre ella para dejar tu mano en negativo, o usa el botón «Dejar mi mano con el teclado»."></canvas>
+      <canvas id="lienzoPigmento" role="img" aria-label="Pared de una cueva. Mantén pulsado sobre ella para dejar tu mano en negativo, usa tu mano real con la cámara o pulsa «Dejar mi mano con el teclado»."></canvas>
       <canvas id="lienzoMano" aria-hidden="true"></canvas>
       <div id="luz" aria-hidden="true"></div>
+      <video id="video-mano" playsinline muted aria-hidden="true"></video>
       <div class="rotulo">
         <p class="antetitulo">Geometría, patrimonio y realidad aumentada</p>
         <h1 id="t-cueva">Las manos que construyeron la historia</h1>
@@ -138,6 +163,7 @@
         <div id="progreso-soplo" aria-hidden="true"><span></span></div>
         <p id="mensaje-cueva" role="status" aria-live="polite">Apoya tu mano en la pared: mantén pulsado con el dedo o el ratón.</p>
         <div class="botones">
+          <button type="button" id="btn-camara">Usar mi mano real (cámara)</button>
           <button type="button" id="btn-teclado">Dejar mi mano con el teclado</button>
           <a class="boton" id="btn-ir-pasaporte" href="#pasaporte">Ir a mi pasaporte ↓</a>
         </div>
@@ -154,8 +180,17 @@
             <h3 id="t-tapa">PASAPORTE DEL APRENDIZ</h3>
             <div class="marca"><div id="mi-marca">Aquí aparecerá la mano que dejes en la cueva</div>
               <p class="contador" id="contador" aria-live="polite">0 de 5 sellos</p></div>
+            <div class="bloque-alumno">
+              <label class="campo" for="alumno">Nombre o código <small>(el que te indique tu docente)</small></label>
+              <input id="alumno" type="text" maxlength="40" autocomplete="off" spellcheck="false" aria-describedby="nota-alumno">
+              <p class="fuente nota-alumno" id="nota-alumno">Mejor un código que tu nombre completo. Se guarda solo en este navegador y aparece en el pasaporte que descargues.</p>
+            </div>
             <p>Orden recomendado: de la Prehistoria a hoy. Puedes volver a cualquier capítulo cuando quieras.</p>
-            <p class="fuente">El pasaporte se guarda solo en este navegador. Sin nombres ni datos personales.</p>
+            <div class="botones">
+              <button type="button" id="btn-descargar">Descargar mi pasaporte</button>
+              <button type="button" id="btn-csv" class="secundario">Descargar los datos (CSV)</button>
+            </div>
+            <p id="aviso-tapa" role="status" aria-live="polite"></p>
           </article>
         </div>
         <p id="completo" hidden>¡Pasaporte completo! Tus manos han recorrido la historia, desde la primera marca en una cueva hasta la energía del viento.</p>
@@ -166,12 +201,13 @@
   <footer>
     <div class="contenedor">
       <div>
-        <p><strong>Privacidad.</strong> Esta página no usa la cámara. El dibujo de tu mano, tus ideas y los sellos vistos se guardan solo en este navegador. Los capítulos usan la cámara únicamente si eliges construir con las manos, y la imagen nunca se graba ni se envía.</p>
-        <p class="fuente">La mano más antigua fechada en la cueva de El Castillo (Puente Viesgo, Cantabria) tiene al menos 37 300 años: Pike, A. W. G. et al. (2012). U-series dating of Paleolithic art in 11 caves in Spain. <em>Science</em>, 336(6087), 1409-1413. <a href="https://doi.org/10.1126/science.1219957">https://doi.org/10.1126/science.1219957</a>. La mano de esta página es un dibujo.</p>
+        <p><strong>Privacidad.</strong> La cámara solo se enciende si pulsas «Usar mi mano real»: la imagen se procesa en este dispositivo para localizar la mano y nunca se graba ni se envía. El dibujo de tu mano, tu código, tus ideas, tus valoraciones y los datos de cada etapa (tiempo, intentos y pistas) se guardan solo en este navegador. Salen de él únicamente si descargas tu pasaporte para entregarlo.</p>
+        <p class="fuente">La mano más antigua fechada en la cueva de El Castillo (Puente Viesgo, Cantabria) tiene al menos 37 300 años: Pike, A. W. G. et al. (2012). U-series dating of Paleolithic art in 11 caves in Spain. <em>Science</em>, 336(6087), 1409-1413. <a href="https://doi.org/10.1126/science.1219957">https://doi.org/10.1126/science.1219957</a>.</p>
+        <p class="fuente">«Empezar de cero» borra en este navegador el pasaporte y el progreso de los cinco capítulos, para que otra persona (o tú misma) pueda repetir la experiencia desde el principio.</p>
       </div>
       <div class="botones">
         <a class="boton" href="index.html#linea">Ver la línea del tiempo</a>
-        <button type="button" id="btn-borrar">Borrar mi pasaporte</button>
+        <button type="button" id="btn-borrar" class="peligro">Empezar de cero</button>
       </div>
     </div>
   </footer>
@@ -184,6 +220,7 @@
     const leer = (k, def) => { try { const v = localStorage.getItem(k); return v === null ? def : JSON.parse(v); } catch (e) { return def; } };
     const guardar = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
     const K_MANO = "lasManos.pasaporte.mano", K_IDEAS = "lasManos.pasaporte.ideas", K_VISTOS = "lasManos.pasaporte.sellos";
+    const K_ALUMNO = "lasManos.pasaporte.alumno", K_VAL = "lasManos.pasaporte.valoraciones";
 
     // =====================================================================
     // 1. LA PARED DE LA CUEVA: mano en negativo
@@ -247,9 +284,18 @@
       activa = { x, y: y + s * 0.28, s, giro: (Math.random() - 0.5) * 0.5, espejo: Math.random() < 0.4, soplo: 0 };
     }
     function soplar(dt) {
-      const m = activa, cx = m.x, cy = m.y - 0.3 * m.s;
+      const m = activa;
+      soplarEn(m.x, m.y - 0.3 * m.s, m.s, dt);
+      m.soplo = Math.min(1, m.soplo + dt / 2.2);
+      ponerBarra(m.soplo);
+      if (m.soplo >= 1) retirar();
+    }
+    function ponerBarra(f) { $("progreso-soplo").firstElementChild.style.width = Math.round(f * 100) + "%"; }
+    // Soplado alrededor de un centro (cx, cy) para una mano de alto s
+    function soplarEn(cx, cy, s, dt, k = 1) {
+      const m = { s };
       // Gotitas de pigmento: muy densas junto a la mano y cada vez más sueltas hacia fuera, como un soplado real
-      const n = Math.round(11000 * dt);
+      const n = Math.round(11000 * dt * k);
       for (let i = 0; i < n; i++) {
         const a = Math.random() * Math.PI * 2, gauss = Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(Math.PI * Math.random()), r = m.s * (0.1 + Math.abs(gauss) * 0.26);
         const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r * 1.2, t = 0.8 + Math.random() * 3.2;
@@ -257,15 +303,22 @@
         cP.beginPath(); cP.arc(x, y, t, 0, Math.PI * 2); cP.fill();
       }
       // Nubes de pigmento más grandes y tenues, con el mismo reparto gaussiano
-      for (let i = 0; i < Math.round(700 * dt); i++) {
+      for (let i = 0; i < Math.round(700 * dt * k); i++) {
         const a = Math.random() * Math.PI * 2, gauss = Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(Math.PI * Math.random()), r = m.s * (0.12 + Math.abs(gauss) * 0.24);
         cP.globalAlpha = 0.035 + Math.random() * 0.05; cP.fillStyle = "#a8361f";
         cP.beginPath(); cP.arc(cx + Math.cos(a) * r, cy + Math.sin(a) * r * 1.2, 6 + Math.random() * 12, 0, Math.PI * 2); cP.fill();
       }
       cP.globalAlpha = 1;
-      m.soplo = Math.min(1, m.soplo + dt / 2.2);
-      $("progreso-soplo").firstElementChild.style.width = Math.round(m.soplo * 100) + "%";
-      if (m.soplo >= 1) retirar();
+    }
+    // Soplado concentrado en un punto (la pinza de la otra mano hace de tubo soplador)
+    function soplarPunto(px, py, rad, dt) {
+      const n = Math.round(5200 * dt);
+      for (let i = 0; i < n; i++) {
+        const a = Math.random() * Math.PI * 2, g = Math.sqrt(-2 * Math.log(1 - Math.random())), r = rad * 0.45 * g;
+        cP.globalAlpha = 0.07 + Math.random() * 0.16; cP.fillStyle = Math.random() < 0.8 ? "#b23a22" : "#7a2414";
+        cP.beginPath(); cP.arc(px + Math.cos(a) * r, py + Math.sin(a) * r, 0.8 + Math.random() * 3, 0, Math.PI * 2); cP.fill();
+      }
+      cP.globalAlpha = 1;
     }
     function dibujarManoApoyada() {
       cM.clearRect(0, 0, W, H);
@@ -281,15 +334,18 @@
       cP.save(); cP.globalCompositeOperation = "destination-out"; cP.filter = "blur(1.6px)";
       cP.fillStyle = "#000"; cP.strokeStyle = "#000"; trazarMano(cP, m); cP.restore();
       cM.clearRect(0, 0, W, H);
-      guardarMarca(m);
+      const w = m.s * 0.95, h = m.s * 1.2;
+      guardarMarca({ x0: m.x - w / 2, y0: m.y - 0.3 * m.s - h * 0.55, w, h });
+      tras_retirar();
+    }
+    function tras_retirar() {
       manos++;
-      $("indicacion").hidden = true; marcarListo();
+      $("indicacion").hidden = true; marcarListo(); ponerBarra(0);
       $("mensaje-cueva").innerHTML = manos === 1
         ? "<strong>¡Has dejado tu mano en negativo!</strong> Así lo hacían hace al menos 37 300 años en la cueva de El Castillo (Cantabria). De casi nadie conocemos el nombre, pero sus manos siguen ahí. Ahora tu mano viaja por la historia."
         : "<strong>Otra mano más en la pared.</strong> En algunas cuevas hay decenas, de personas distintas. Cuando quieras, abre tu pasaporte.";
     }
-    function guardarMarca(m) {
-      const w = m.s * 0.95, h = m.s * 1.2, x0 = m.x - w / 2, y0 = m.y - 0.3 * m.s - h * 0.55;
+    function guardarMarca({ x0, y0, w, h }) {
       const t = document.createElement("canvas"); t.width = 192; t.height = 240; const c = t.getContext("2d");
       c.drawImage(cvR, x0, y0, w, h, 0, 0, 192, 240); c.drawImage(cvP, x0, y0, w, h, 0, 0, 192, 240);
       try { const url = t.toDataURL("image/jpeg", 0.82); localStorage.setItem(K_MANO, url); ponerMarca(url); } catch (e) { ponerMarca(t.toDataURL("image/jpeg", 0.82)); }
@@ -312,11 +368,123 @@
       $("mensaje-cueva").textContent = "Soplando pigmento alrededor de la mano…";
       if (MOV_REDUCIDO) soplar(2.3);
     });
+    // ---------------------------------------------------------------------
+    // Mano real con la cámara (opcional). Una mano abierta y quieta: el pigmento se sopla solo.
+    // Dos manos: una abierta en la pared y la otra hace pinza, como un tubo soplador.
+    // La imagen se procesa en el dispositivo con el detector de manos autoalojado; no se graba ni se envía.
+    // ---------------------------------------------------------------------
+    const video = $("video-mano");
+    const DEDOS = [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16], [17, 18, 19, 20]];
+    let cam = null, manoCam = null, pinzaCam = null, soploCam = 0, esperaCam = 0, ultimoMsg = "";
+    const pinzaPrev = {};
+    function msgCueva(t) { if (t !== ultimoMsg) { ultimoMsg = t; $("mensaje-cueva").textContent = t; } }
+    function aCueva(nx, ny) {
+      const vw = video.videoWidth || 640, vh = video.videoHeight || 480, s = Math.max(W / vw, H / vh);
+      return { x: (W - vw * s) / 2 + (1 - nx) * vw * s, y: (H - vh * s) / 2 + ny * vh * s };   // en espejo, como un reflejo
+    }
+    function trazarManoReal(c, pts) {
+      const t = Math.hypot(pts[0].x - pts[9].x, pts[0].y - pts[9].y);
+      c.lineCap = "round"; c.lineJoin = "round";
+      c.beginPath(); [0, 1, 2, 5, 9, 13, 17].forEach((k, i) => (i ? c.lineTo(pts[k].x, pts[k].y) : c.moveTo(pts[k].x, pts[k].y))); c.closePath(); c.fill();
+      c.lineWidth = t * 0.3; c.stroke();
+      DEDOS.forEach((f, i) => { c.lineWidth = t * (i === 0 ? 0.26 : i === 4 ? 0.19 : 0.22); c.beginPath(); c.moveTo(pts[f[0]].x, pts[f[0]].y); f.slice(1).forEach((k) => c.lineTo(pts[k].x, pts[k].y)); c.stroke(); });
+      const ux = (pts[0].x - pts[9].x) / t, uy = (pts[0].y - pts[9].y) / t;   // muñeca y arranque del antebrazo
+      c.lineWidth = t * 0.6; c.beginPath(); c.moveTo(pts[0].x, pts[0].y); c.lineTo(pts[0].x + ux * t * 0.7, pts[0].y + uy * t * 0.7); c.stroke();
+    }
+    function cajaMano(pts) {
+      const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y), t = Math.hypot(pts[0].x - pts[9].x, pts[0].y - pts[9].y);
+      const x0 = Math.min(...xs) - t * 0.6, y0 = Math.min(...ys) - t * 0.6, w = Math.max(...xs) - Math.min(...xs) + t * 1.2, h = Math.max(...ys) - Math.min(...ys) + t * 1.2;
+      const lado = Math.max(w, h / 1.25); return { x0: x0 + w / 2 - lado / 2, y0: y0 + h / 2 - lado * 0.625, w: lado, h: lado * 1.25 };
+    }
+    async function activarCamara() {
+      const b = $("btn-camara");
+      if (cam) { apagarCamara(); msgCueva("Cámara apagada. Puedes seguir con el dedo o con el teclado."); return; }
+      b.disabled = true; msgCueva("Preparando la cámara y el detector de manos…");
+      try {
+        if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error("la cámara solo funciona si la página se abre desde https o desde el propio equipo");
+        video.srcObject = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
+        await video.play();
+        const { FilesetResolver, HandLandmarker } = await import("@mediapipe/tasks-vision");
+        const vision = await FilesetResolver.forVisionTasks("./wasm");
+        const op = (delegate) => ({ baseOptions: { modelAssetPath: "./modelo/hand_landmarker.task", delegate }, runningMode: "VIDEO", numHands: 2 });
+        let detector;
+        try { detector = await HandLandmarker.createFromOptions(vision, op("GPU")); } catch (e) { detector = await HandLandmarker.createFromOptions(vision, op("CPU")); }
+        cam = { detector, ultimo: -1, ts: 0 }; soploCam = 0;
+        b.textContent = "Apagar la cámara";
+        msgCueva("Cámara lista. Pon una mano abierta frente a la pantalla y déjala quieta: el pigmento se soplará solo. O usa las dos manos: una abierta y, con la otra, haz pinza para soplar a su alrededor.");
+      } catch (err) {
+        apagarCamara();
+        msgCueva("No se ha podido usar la cámara (" + ((err && err.message) || "error") + "). Puedes dejar la mano con el dedo o con el teclado.");
+      }
+      b.disabled = false;
+    }
+    function apagarCamara() {
+      if (video.srcObject) { video.srcObject.getTracks().forEach((t) => t.stop()); video.srcObject = null; }
+      if (cam && cam.detector) { try { cam.detector.close(); } catch (e) {} }
+      cam = null; manoCam = null; pinzaCam = null; soploCam = 0; ponerBarra(0);
+      $("btn-camara").textContent = "Usar mi mano real (cámara)";
+    }
+    function procesarCamara(dt) {
+      if (!cam || video.readyState < 2) return;
+      if (video.currentTime !== cam.ultimo) {
+        cam.ultimo = video.currentTime;
+        const ts = Math.max(cam.ts + 1, Math.floor(performance.now())); cam.ts = ts;
+        let res; try { res = cam.detector.detectForVideo(video, ts); } catch (e) { return; }
+        const lista = (res.landmarks || []).map((lm, i) => {
+          const pts = lm.map((q) => aCueva(q.x, q.y)), t = Math.hypot(pts[0].x - pts[9].x, pts[0].y - pts[9].y) || 1;
+          const r = Math.hypot(pts[4].x - pts[8].x, pts[4].y - pts[8].y) / t, k = "m" + i;
+          const pinza = pinzaPrev[k] ? r < 0.5 : r < 0.33; pinzaPrev[k] = pinza;
+          return { pts, t, pinza, c: { x: pts.reduce((a, q) => a + q.x, 0) / 21, y: pts.reduce((a, q) => a + q.y, 0) / 21 } };
+        });
+        const abierta = lista.find((m) => !m.pinza) || null, pinzadora = lista.find((m) => m.pinza && m !== abierta) || null;
+        if (abierta && manoCam) { const mv = Math.hypot(abierta.c.x - manoCam.c.x, abierta.c.y - manoCam.c.y) / abierta.t; abierta.quieta = mv < 0.06 ? (manoCam.quieta || 0) + dt : 0; }
+        manoCam = abierta; pinzaCam = pinzadora;
+      }
+      // Tras estampar, hay que retirar la mano antes de dejar otra (el mensaje histórico se mantiene unos segundos)
+      if (esperaCam > 0) {
+        esperaCam -= dt;
+        if (!manoCam && !pinzaCam) { esperaCam = 0; return; }
+        if (esperaCam <= 0) { esperaCam = 0.5; msgCueva("Retira las manos de la cámara para dejar otra mano, o abre tu pasaporte."); }
+        return;
+      }
+      if (!manoCam) { soploCam = 0; ponerBarra(0); msgCueva(pinzaCam ? "Ahora pon la otra mano abierta, como si la apoyaras en la pared." : "No veo ninguna mano abierta. Ponla frente a la pantalla, con los dedos separados."); return; }
+      const s = manoCam.t * 2.3;
+      if (pinzaCam) {
+        // Dos manos: la pinza sopla donde está; solo cuenta si sopla alrededor de la mano abierta
+        const pm = { x: (pinzaCam.pts[4].x + pinzaCam.pts[8].x) / 2, y: (pinzaCam.pts[4].y + pinzaCam.pts[8].y) / 2 };
+        soplarPunto(pm.x, pm.y, manoCam.t * 0.9, dt);
+        const d = Math.hypot(pm.x - manoCam.c.x, pm.y - manoCam.c.y) / manoCam.t;
+        if (d < 2.6) soploCam = Math.min(1, soploCam + dt / 3);
+        msgCueva(d < 2.6 ? "¡Así! Mueve la pinza alrededor de la mano abierta para soplar el pigmento." : "Acerca la pinza a la mano abierta: el pigmento tiene que caer a su alrededor.");
+      } else if ((manoCam.quieta || 0) > 0.6) {
+        soplarEn(manoCam.c.x, manoCam.c.y, s, dt, 0.9); soploCam = Math.min(1, soploCam + dt / 2.4);
+        msgCueva("Sopla, sopla… mantén la mano quieta hasta que se llene la barra.");
+      } else msgCueva(soploCam > 0 ? "Mantén la mano quieta para seguir soplando." : "Deja la mano quieta un momento… (o haz pinza con la otra mano para soplar tú).");
+      ponerBarra(soploCam);
+      if (soploCam >= 1) {
+        const pts = manoCam.pts;
+        cP.save(); cP.globalCompositeOperation = "destination-out"; cP.filter = "blur(1.6px)"; cP.fillStyle = "#000"; cP.strokeStyle = "#000"; trazarManoReal(cP, pts); cP.restore();
+        guardarMarca(cajaMano(pts)); soploCam = 0; esperaCam = 6; tras_retirar(); ultimoMsg = "";
+      }
+    }
+    function dibujarManoCamara() {
+      if (!manoCam && !pinzaCam) return;
+      if (manoCam) { cM.fillStyle = cM.strokeStyle = "rgba(214,170,128,.95)"; cM.shadowColor = "rgba(0,0,0,.45)"; cM.shadowBlur = 18; cM.shadowOffsetY = 6; trazarManoReal(cM, manoCam.pts); cM.shadowColor = "transparent"; }
+      if (pinzaCam) {
+        const p = pinzaCam.pts, pm = { x: (p[4].x + p[8].x) / 2, y: (p[4].y + p[8].y) / 2 };
+        cM.strokeStyle = "rgba(250,247,242,.85)"; cM.lineWidth = 3; cM.lineCap = "round";
+        cM.beginPath(); for (const f of DEDOS) { cM.moveTo(p[0].x, p[0].y); f.forEach((k) => cM.lineTo(p[k].x, p[k].y)); } cM.stroke();
+        cM.beginPath(); cM.arc(pm.x, pm.y, 14, 0, Math.PI * 2); cM.fillStyle = "rgba(178,58,34,.7)"; cM.fill();
+      }
+    }
+    $("btn-camara").addEventListener("click", activarCamara);
+    window.addEventListener("pagehide", apagarCamara);
     let tPrev = performance.now();
     function bucle(t) {
       const dt = Math.min(0.05, (t - tPrev) / 1000); tPrev = t;
       if (activa && (pulsando || automatica)) soplar(dt);
-      dibujarManoApoyada();
+      procesarCamara(dt);
+      dibujarManoApoyada(); dibujarManoCamara();
       requestAnimationFrame(bucle);
     }
     window.addEventListener("resize", ajustar);
@@ -326,23 +494,23 @@
     // 2. EL PASAPORTE: lee el progreso de cada capítulo y estampa sellos
     // =====================================================================
     const CAPS = [
-      { edad: "Prehistoria", fecha: "Hasta la aparición de la escritura, hacia el 3000 a. C.", titulo: "Las primeras manos", url: "prehistoria.html", clave: "lasManos.prehistoria.progreso", color: "#9b2d20",
+      { edad: "Prehistoria", fecha: "Hasta la aparición de la escritura, hacia el 3000 a. C.", titulo: "Las primeras manos", url: "prehistoria.html", etapas: ["Tallar un bifaz", "La mano en la pared", "Modelar una vasija", "Orientar el dolmen", "La pintadera canaria"], clave: "lasManos.prehistoria.progreso", color: "#9b2d20",
         manos: "Tallarás un bifaz, soplarás pigmento en una cueva, modelarás una vasija, orientarás un dolmen y decorarás una pintadera canaria.",
         pregunta: "Si estampas una pintadera sobre barro blando, ¿cómo sale el dibujo?", opciones: ["Igual que en la pintadera", "Al revés, como en un espejo", "No se ve nada"], buena: 1,
         respuesta: "Sale al revés, como en un espejo, y lo que estaba hundido en la pintadera queda en relieve." },
-      { edad: "Edad Antigua", fecha: "Desde la escritura hasta el 476 d. C.", titulo: "Misión Roma · El acueducto", url: "index.html#roma", clave: "misionRoma.v3.progreso", color: "#7a3b12",
+      { edad: "Edad Antigua", fecha: "Desde la escritura hasta el 476 d. C.", titulo: "Misión Roma · El acueducto", url: "index.html#roma", etapas: ["Leer el terreno", "Nivelar el canal", "Construir el pilar", "Cómo lo hacían los romanos", "El agua en Canarias"], clave: "misionRoma.v3.progreso", color: "#7a3b12",
         manos: "Leerás el terreno, nivelarás un canal, levantarás un pilar, medirás con un corobate romano y repartirás el agua en Canarias.",
         pregunta: "¿Cuánto bajaba el canal de un acueducto romano?", opciones: ["Mucho, como un tobogán", "Muy poco: casi no se nota", "Nada: iba plano"], buena: 1,
         respuesta: "Muy poco. En el ejemplo de la actividad, un 0,3 %: menos de 2 cm en casi 6 m. Si fuera plano, el agua no correría." },
-      { edad: "Edad Media", fecha: "Del 476 al 1492", titulo: "El compás y la piedra", url: "edad-media.html", clave: "lasManos.edadMedia.progreso", color: "#1e3a8a",
+      { edad: "Edad Media", fecha: "Del 476 al 1492", titulo: "El compás y la piedra", url: "edad-media.html", etapas: ["Medir con el astrolabio", "Del medio punto al arco apuntado", "Trazar el rosetón", "La lacería de la Alhambra", "El portulano y Canarias"], clave: "lasManos.edadMedia.progreso", color: "#1e3a8a",
         manos: "Medirás el sol con un astrolabio, trazarás arcos y un rosetón, girarás una lacería de la Alhambra y buscarás el rumbo hacia Canarias.",
         pregunta: "Con el compás abierto como el radio, ¿cuántas veces puedes marcarlo sobre su circunferencia?", opciones: ["4 veces", "6 veces", "8 veces"], buena: 1,
         respuesta: "Exactamente 6 veces: los puntos forman un hexágono regular, la base de muchos rosetones." },
-      { edad: "Edad Moderna", fecha: "Del 1492 al 1789", titulo: "Nuevos horizontes", url: "edad-moderna.html", clave: "lasManos.edadModerna.progreso", color: "#14532d",
+      { edad: "Edad Moderna", fecha: "Del 1492 al 1789", titulo: "Nuevos horizontes", url: "edad-moderna.html", etapas: ["Las velas de la carabela", "La perspectiva del Renacimiento", "La ciudadela de Jaca", "La expedición al meridiano", "El ingenio de azúcar"], clave: "lasManos.edadModerna.progreso", color: "#14532d",
         manos: "Cambiarás las velas de una carabela en Gran Canaria, pintarás en perspectiva, trazarás una ciudadela, medirás con triángulos y moverás un ingenio de azúcar.",
         pregunta: "Una vela triangular y otra rectangular tienen la misma base y la misma altura. ¿Cuál tiene más tela?", opciones: ["Tienen la misma", "La rectangular: el doble", "La triangular"], buena: 1,
         respuesta: "La rectangular tiene el doble: el triángulo es la mitad del rectángulo con la misma base y altura." },
-      { edad: "Edad Contemporánea", fecha: "Desde 1789 hasta hoy", titulo: "Hierro, luz y viento", url: "edad-contemporanea.html", clave: "lasManos.edadContemporanea.progreso", color: "#0c4a6e",
+      { edad: "Edad Contemporánea", fecha: "Desde 1789 hasta hoy", titulo: "Hierro, luz y viento", url: "edad-contemporanea.html", etapas: ["El metro", "El Puente de Vizcaya", "El faro de Maspalomas", "La población de Canarias", "Gorona del Viento"], clave: "lasManos.edadContemporanea.progreso", color: "#0c4a6e",
         manos: "Medirás con varas y con metros, reforzarás un puente de hierro, ajustarás el faro de Maspalomas, dibujarás la población de Canarias y equilibrarás la energía de El Hierro.",
         pregunta: "¿Por qué los puentes de hierro están llenos de triángulos?", opciones: ["Por adorno", "Porque el triángulo no se deforma", "Porque así pesan menos"], buena: 1,
         respuesta: "Porque el triángulo no se deforma: si sus lados no cambian, su forma tampoco. Un cuadrado, en cambio, se tuerce." }
@@ -369,8 +537,20 @@
         ICONOS[i] + '</g></svg>';
       return svg;
     }
-    const ideas = leer(K_IDEAS, {}), vistos = leer(K_VISTOS, [false, false, false, false, false]);
+    const ideas = leer(K_IDEAS, {}), vistos = leer(K_VISTOS, [false, false, false, false, false]), valoraciones = leer(K_VAL, {});
     function progreso(clave) { const p = leer(clave, null); return Array.isArray(p) && p.length === 5 ? p.map(Boolean) : [false, false, false, false, false]; }
+    // Registro que guarda cada capítulo: segundos de trabajo, intentos fallidos y pistas por etapa
+    function registroDe(clave) { const r = leer(clave.replace(/progreso$/, "registro"), null); return Array.isArray(r) && r.length === 5 ? r : null; }
+    const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const mmss = (sg) => (sg == null ? "—" : Math.floor(sg / 60) + " min " + String(Math.round(sg % 60)).padStart(2, "0") + " s");
+    const sumar = (r, campo) => (r ? r.reduce((a, x) => a + (x[campo] || 0), 0) : null);
+    const DIFICULTAD = ["Fáciles", "Justos", "Difíciles"], GUSTO = ["Poco", "Bastante", "Mucho"];
+    function valoracionHTML(i) {
+      const v = valoraciones[i] || {};
+      const grupo = (id, txt, lista, campo) => '<p class="pregunta" id="' + id + i + '" style="margin:4px 0 2px">' + txt + '</p><div class="opciones" role="group" aria-labelledby="' + id + i + '">' + lista.map((o, k) => '<button type="button" data-campo="' + campo + '" data-v="' + k + '" aria-pressed="' + (v[campo] === k) + '">' + o + '</button>').join("") + '</div>';
+      return '<fieldset class="valora"><legend>Tu valoración de esta edad</legend>' + grupo("vd", "Los retos me han parecido…", DIFICULTAD, "dif") + grupo("vg", "Me han gustado…", GUSTO, "gusto") +
+        '<label for="com' + i + '">Comentario (opcional)</label><textarea id="com' + i + '" maxlength="200" data-campo="comentario">' + esc(v.comentario || "") + '</textarea></fieldset>';
+    }
     function pintarPasaporte() {
       const libro = $("libro");
       libro.querySelectorAll(".pagina").forEach((p) => p.remove());
@@ -386,12 +566,19 @@
           '<p>' + C.manos + '</p>' +
           '<div class="etapas" role="img" aria-label="' + n + ' de 5 etapas completadas">' + p.map((h) => '<i class="' + (h ? "hecha" : "") + '"></i>').join("") + '<span aria-hidden="true">&nbsp;' + n + ' de 5 etapas</span></div>' +
           '<div class="sello">' + (completo ? sello(i, nuevo) : '<div class="hueco">Sello pendiente: completa las 5 etapas</div>') + '</div>' +
+          (() => { const r = registroDe(C.clave); if (!r || !r.some((x) => x.seg > 0 || x.errores || x.pistas)) return ""; return '<p class="registro">Tiempo: ' + mmss(sumar(r, "seg")) + ' · Intentos fallidos: ' + sumar(r, "errores") + ' · Pistas: ' + sumar(r, "pistas") + '</p>'; })() +
           '<div class="idea"></div>' +
           '<div class="acciones"><a class="boton ' + (n < 5 ? "principal" : "") + '" href="' + C.url + '">' + (n === 0 ? "Entrar en el capítulo" : n < 5 ? "Seguir el capítulo" : "Repasar el capítulo") + '<span class="sr-only">: ' + C.titulo + '</span> →</a></div>';
         const idea = art.querySelector(".idea");
         const elegida = ideas[i];
         if (completo) {
-          idea.innerHTML = '<p class="pregunta">' + C.pregunta + '</p>' + (elegida !== undefined ? '<p style="margin:0 0 6px">Antes pensabas: <em>' + C.opciones[elegida] + '</em>.</p>' : "") + '<p class="descubierto"><strong>Lo has comprobado:</strong> ' + C.respuesta + '</p>';
+          idea.innerHTML = '<p class="pregunta">' + C.pregunta + '</p>' + (elegida !== undefined ? '<p style="margin:0 0 6px">Antes pensabas: <em>' + C.opciones[elegida] + '</em>.</p>' : "") + '<p class="descubierto"><strong>Lo has comprobado:</strong> ' + C.respuesta + '</p>' + valoracionHTML(i);
+          idea.querySelectorAll(".valora button").forEach((b) => b.addEventListener("click", () => {
+            const v = valoraciones[i] || (valoraciones[i] = {}), campo = b.dataset.campo, k = +b.dataset.v;
+            v[campo] = k; guardar(K_VAL, valoraciones);
+            b.parentElement.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(+x.dataset.v === k)));
+          }));
+          idea.querySelector(".valora textarea").addEventListener("input", (e) => { (valoraciones[i] || (valoraciones[i] = {})).comentario = e.target.value.slice(0, 200); guardar(K_VAL, valoraciones); });
         } else {
           idea.innerHTML = '<p class="pregunta" id="q' + i + '">Antes de entrar, ¿qué crees? ' + C.pregunta + '</p><div class="opciones" role="group" aria-labelledby="q' + i + '"></div>';
           const g = idea.querySelector(".opciones");
@@ -416,13 +603,88 @@
     pintarPasaporte();
     // Al volver de un capítulo con «atrás», se actualizan los sellos
     window.addEventListener("pageshow", (e) => { if (e.persisted) pintarPasaporte(); });
+    // ---- Nombre o código para el seguimiento docente ----
+    const campoAlumno = $("alumno");
+    campoAlumno.value = leer(K_ALUMNO, "") || "";
+    campoAlumno.addEventListener("input", () => guardar(K_ALUMNO, campoAlumno.value.trim().slice(0, 40)));
+    const alumno = () => campoAlumno.value.trim().slice(0, 40);
+
+    // ---- Descargar el pasaporte (HTML imprimible con los datos incrustados) y los datos (CSV) ----
+    function datosPasaporte() {
+      return {
+        proyecto: "Las manos que construyeron la historia", version: "3.10", alumno: alumno(), fecha: new Date().toISOString(),
+        capitulos: CAPS.map((C, i) => {
+          const p = progreso(C.clave), r = registroDe(C.clave), v = valoraciones[i] || {};
+          return { edad: C.edad, titulo: C.titulo, completo: p.every(Boolean),
+            idea_previa: ideas[i] !== undefined ? C.opciones[ideas[i]] : null, idea_acertada: ideas[i] !== undefined ? ideas[i] === C.buena : null,
+            valoracion: { dificultad: v.dif !== undefined ? DIFICULTAD[v.dif] : null, gusto: v.gusto !== undefined ? GUSTO[v.gusto] : null, comentario: v.comentario || "" },
+            etapas: C.etapas.map((nombre, k) => ({ nombre, completada: p[k], segundos: r ? Math.round(r[k].seg || 0) : null, intentos_fallidos: r ? r[k].errores || 0 : null, pistas: r ? r[k].pistas || 0 : null, terminada: r ? r[k].fin : null })) };
+        })
+      };
+    }
+    function descargar(nombre, contenido, tipo) {
+      const url = URL.createObjectURL(new Blob([contenido], { type: tipo })), a = document.createElement("a");
+      a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1500);
+    }
+    function nombreArchivo(ext) {
+      const cod = (alumno() || "sin-codigo").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 30) || "sin-codigo";
+      return "pasaporte-" + cod + "-" + new Date().toISOString().slice(0, 10) + "." + ext;
+    }
+    function avisoTapa(t) { $("aviso-tapa").textContent = t; }
+    function exigirCodigo() {
+      if (alumno()) return true;
+      avisoTapa("Escribe primero tu nombre o código, para que tu docente sepa de quién es el pasaporte.");
+      campoAlumno.focus(); return false;
+    }
+    $("btn-descargar").addEventListener("click", () => {
+      if (!exigirCodigo()) return;
+      const d = datosPasaporte(), fecha = new Date().toLocaleString("es-ES");
+      const filas = d.capitulos.map((c) => {
+        const tot = (campo) => c.etapas.every((e) => e[campo] === null) ? "—" : c.etapas.reduce((a, e) => a + (e[campo] || 0), 0);
+        return '<section><h2>' + esc(c.edad) + ' · ' + esc(c.titulo) + (c.completo ? ' <span class="ok">✓ sello conseguido</span>' : '') + '</h2>' +
+          '<table><thead><tr><th>Etapa</th><th>Completada</th><th>Tiempo</th><th>Intentos fallidos</th><th>Pistas</th></tr></thead><tbody>' +
+          c.etapas.map((e) => '<tr><td>' + esc(e.nombre) + '</td><td>' + (e.completada ? "Sí" : "No") + '</td><td>' + mmss(e.segundos) + '</td><td>' + (e.intentos_fallidos ?? "—") + '</td><td>' + (e.pistas ?? "—") + '</td></tr>').join("") +
+          '</tbody><tfoot><tr><th>Total</th><td>' + c.etapas.filter((e) => e.completada).length + ' de 5</td><td>' + (tot("segundos") === "—" ? "—" : mmss(tot("segundos"))) + '</td><td>' + tot("intentos_fallidos") + '</td><td>' + tot("pistas") + '</td></tr></tfoot></table>' +
+          '<p><strong>Idea previa:</strong> ' + (c.idea_previa ? esc(c.idea_previa) + (c.idea_acertada ? " (acertada)" : " (la ha revisado al hacer el capítulo)") : "sin responder") + '</p>' +
+          '<p><strong>Valoración:</strong> retos ' + (c.valoracion.dificultad ? esc(c.valoracion.dificultad.toLowerCase()) : "—") + ' · le han gustado: ' + (c.valoracion.gusto ? esc(c.valoracion.gusto.toLowerCase()) : "—") + (c.valoracion.comentario ? '<br><em>«' + esc(c.valoracion.comentario) + '»</em>' : "") + '</p></section>';
+      }).join("");
+      const html = '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Pasaporte del aprendiz · ' + esc(d.alumno) + '</title>' +
+        '<style>body{font-family:system-ui,sans-serif;max-width:900px;margin:24px auto;padding:0 16px;color:#2b211a;background:#f6efe1}h1{font-family:Georgia,serif;margin:0}h2{font-family:Georgia,serif;font-size:1.15rem;margin:22px 0 6px;border-bottom:2px solid #c2843a}' +
+        'table{border-collapse:collapse;width:100%;font-size:.92rem;background:#fff}th,td{border:1px solid #d8c8a8;padding:5px 8px;text-align:left}thead th,tfoot th{background:#ece1c9}.ok{color:#1d7a46;font-size:.85rem}.nota{font-size:.82rem;opacity:.8}@media print{body{background:#fff}}</style></head><body>' +
+        '<p class="nota">Las manos que construyeron la historia · Geometría, patrimonio histórico y realidad aumentada</p><h1>Pasaporte del aprendiz</h1>' +
+        '<p><strong>Nombre o código:</strong> ' + esc(d.alumno) + ' · <strong>Descargado:</strong> ' + esc(fecha) + ' · <strong>Sellos:</strong> ' + d.capitulos.filter((c) => c.completo).length + ' de 5</p>' + filas +
+        '<p class="nota">Datos registrados en el navegador del dispositivo. El tiempo solo cuenta mientras la etapa está a la vista y sin terminar; es aproximado. «Intentos fallidos» son respuestas o acciones erróneas detectadas por la actividad. Un guion (—) indica que no hay datos: por ejemplo, etapas hechas antes de que existiera este registro.</p>' +
+        '<script type="application/json" id="datos">' + JSON.stringify(d).replace(/</g, "\\u003c") + '<\/script></body></html>';
+      descargar(nombreArchivo("html"), html, "text/html;charset=utf-8");
+      avisoTapa("Pasaporte descargado. Entrégaselo a tu docente como te indique (por ejemplo, en el aula virtual).");
+    });
+    $("btn-csv").addEventListener("click", () => {
+      if (!exigirCodigo()) return;
+      const d = datosPasaporte(), q = (t) => '"' + String(t ?? "").replace(/"/g, '""') + '"';
+      const lineas = [["alumno", "edad", "capitulo", "etapa", "completada", "segundos", "intentos_fallidos", "pistas", "terminada", "idea_previa", "idea_acertada", "dificultad", "gusto", "comentario"].join(";")];
+      d.capitulos.forEach((c) => c.etapas.forEach((e) => lineas.push([d.alumno, c.edad, c.titulo, e.nombre, e.completada ? "si" : "no", e.segundos ?? "", e.intentos_fallidos ?? "", e.pistas ?? "", e.terminada || "", c.idea_previa || "", c.idea_acertada === null ? "" : c.idea_acertada ? "si" : "no", c.valoracion.dificultad || "", c.valoracion.gusto || "", c.valoracion.comentario].map(q).join(";"))));
+      descargar(nombreArchivo("csv"), "\ufeff" + lineas.join("\r\n"), "text/csv;charset=utf-8");
+      avisoTapa("Datos descargados en formato CSV (se abren con una hoja de cálculo).");
+    });
+
+    // ---- Empezar de cero: borra pasaporte y progreso de los cinco capítulos (con confirmación) ----
+    let confirmarHasta = 0;
     $("btn-borrar").addEventListener("click", () => {
-      try { [K_MANO, K_IDEAS, K_VISTOS].forEach((k) => localStorage.removeItem(k)); } catch (e) {}
-      for (const k of Object.keys(ideas)) delete ideas[k];
-      vistos.fill(false);
+      const b = $("btn-borrar");
+      if (performance.now() > confirmarHasta) {
+        confirmarHasta = performance.now() + 6000; b.classList.add("confirmar"); b.textContent = "¿Seguro? Pulsa otra vez para borrarlo todo";
+        setTimeout(() => { if (performance.now() > confirmarHasta) { b.classList.remove("confirmar"); b.textContent = "Empezar de cero"; } }, 6100);
+        return;
+      }
+      confirmarHasta = 0; b.classList.remove("confirmar"); b.textContent = "Empezar de cero";
+      try {
+        for (let k = localStorage.length - 1; k >= 0; k--) { const key = localStorage.key(k); if ((key.startsWith("lasManos.") && key !== "lasManos.sonido") || key.startsWith("misionRoma.")) localStorage.removeItem(key); }
+      } catch (e) {}
+      for (const o of [ideas, valoraciones]) for (const k of Object.keys(o)) delete o[k];
+      vistos.fill(false); campoAlumno.value = "";
       const d = $("mi-marca"); d.style.backgroundImage = ""; d.removeAttribute("role"); d.removeAttribute("aria-label"); d.textContent = "Aquí aparecerá la mano que dejes en la cueva";
-      pintarPasaporte();
-      $("contador").textContent += " · Pasaporte borrado (el progreso de los capítulos se conserva)";
+      pintarPasaporte(); avisoTapa("");
+      $("contador").textContent += " · Todo borrado: puedes empezar de nuevo";
     });
   })();
   </script>

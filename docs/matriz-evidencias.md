@@ -27,6 +27,14 @@ Protocolo ARQ-3D-01, fase 1, adoptada de forma parcial. Para cada elemento recon
 | Pintadera | Medidas de los campos (Ø 5 cm, etc.) y esquemas de la actividad | Rango del catálogo (19 × 22 mm a 41 × 98 mm) | Modelo didáctico |
 | Poblamiento de Canarias | Poblamiento estable hacia los siglos II-III d. C.; fecha en debate | Velasco Vázquez et al. (2020), *Anuario de Estudios Atlánticos*, 66, 1-24, https://doi.org/10.36980/10530.9904; Velasco-Vázquez et al. (2021), *Complutum*, 32(1), 167-189, https://doi.org/10.5209/cmpl.76453 | Interpretado (consenso provisional) |
 | Término «Prehistoria de Canarias» | Debate sobre su uso | Velasco-Vázquez et al. (2021) | Interpretado |
+| Contexto del bifaz (v3.10) | Bifaces en África hace más de 1,5 Ma; en la península ibérica, hacia 1 Ma | Lepre et al. (2011); Vallverdú et al. (2014) | Documentado |
+| Elección de la piedra (v3.10) | El sílex homogéneo se fractura en lascas cortantes; las grietas y las rocas granulosas no sirven para un bifaz | Conocimiento tecnológico general (fractura concoidea) | Modelo didáctico (las cuatro piedras son ejemplos) |
+| Contexto de la mano en negativo (v3.10) | Pigmento soplado con la boca o con un tubo; la finalidad es desconocida; algunos especialistas estiman con las medidas si las manos eran de personas adultas o de niños | Conocimiento general; sin fuente específica en el recurso | Interpretado (pendiente de fuente específica) |
+| Superficie de la mano y pared libre (v3.10) | Superficie medida sobre el dibujo de la actividad; panel de 44 × 32 cm | — | Modelo didáctico |
+| Contexto de la cerámica (v3.10) | El Neolítico trae aldeas y recipientes para almacenar y cocinar; cerámica cardial en la Cova de l'Or hacia el 5300 a. C. | Zilhão (2001) | Documentado (el uso de la vasija de la actividad es general) |
+| Capacidad con jarras (v3.10) | Jarras de medida actuales; capacidad aproximada de la vasija modelada | — | Modelo didáctico |
+| Contexto del dolmen (v3.10) | Dólmenes de Antequera de hace entre 5000 y 6000 años; Viera orientado al equinoccio, Menga a la Peña de los Enamorados | UNESCO (2016); Lozano Rodríguez et al. (2024) para Menga | Documentado para Menga; horquilla aproximada para el conjunto (interpretado) |
+| Contexto de la pintadera (v3.10) | Poblamiento estable hacia los siglos II-III d. C., en debate; más de doscientas pintaderas en El Museo Canario; función debatida | Velasco Vázquez et al. (2020); Cruz de Mercadal et al. (2013) | Documentado; función interpretada |
 
 ## Edad Antigua · «Misión Roma»
 

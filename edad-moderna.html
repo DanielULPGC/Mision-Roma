@@ -38,7 +38,10 @@
     #escena{position:fixed;inset:0;background:linear-gradient(#cfe3ec 0%,#e9dfcc 62%,#b89c78 100%)}
     #video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);opacity:0;transition:opacity .3s}
     #video.visible{opacity:1}
-    #lienzo3d,#lienzoManos,#lienzoEfectos{position:absolute;inset:0;width:100%;height:100%}
+    #lienzo3d{position:absolute;inset:0;width:100%;height:100%}
+    #lienzoManos,#lienzoEfectos{position:fixed;inset:0;width:100%;height:100%}
+    #lienzoEfectos{z-index:25} #lienzoManos{z-index:30}
+    .mano-encima{outline:4px solid var(--ok)!important;outline-offset:3px;box-shadow:0 0 0 8px rgba(74,222,128,.25)!important}
     #lienzo3d{touch-action:none}
     #lienzoManos,#lienzoEfectos{pointer-events:none}
     .etq{position:absolute;transform:translate(-50%,-100%);background:var(--panel);color:var(--texto);font-variant-numeric:tabular-nums;
@@ -88,6 +91,7 @@
     .tarjeta h2{margin:0 0 4px;font-size:1.25rem}
     .tarjeta h3{margin:14px 0 4px;font-size:1rem;color:var(--ocre)}
     .tarjeta p,.tarjeta li{margin:6px 0;font-size:.92rem}
+    #cuerpo-contexto .reto{background:rgba(194,132,58,.16);border-left:4px solid var(--ocre);padding:8px 10px;border-radius:6px}
     .tarjeta .botones{display:flex;flex-direction:column;gap:8px;margin-top:14px}
     .privacidad,.fuente{font-size:.76rem;opacity:.8}
     #portada{background:linear-gradient(rgba(28,25,23,.92),rgba(28,25,23,.97))}
@@ -127,10 +131,11 @@
   <main id="escena">
     <video id="video" playsinline muted aria-hidden="true"></video>
     <canvas id="lienzo3d" role="img" aria-label="Escena 3D de la etapa actual. Los elementos marcados se pueden mover con la pinza, con el dedo o con los controles alternativos."></canvas>
-    <canvas id="lienzoManos" aria-hidden="true"></canvas>
-    <canvas id="lienzoEfectos" aria-hidden="true"></canvas>
     <div id="etiquetas" aria-hidden="true"></div>
   </main>
+
+  <canvas id="lienzoManos" aria-hidden="true"></canvas>
+  <canvas id="lienzoEfectos" aria-hidden="true"></canvas>
 
   <header id="hud">
     <div class="cabecera">
@@ -155,6 +160,7 @@
 
   <nav id="controles" aria-label="Herramientas">
     <div id="alternativos" hidden></div>
+    <button type="button" id="btn-contexto" hidden>Contexto</button>
     <button type="button" id="btn-pista">Pista</button>
     <button type="button" id="btn-saber">Saber más</button>
     <button type="button" id="btn-imagen" aria-pressed="false" hidden>Mostrar mi imagen</button>
@@ -178,6 +184,15 @@
       </div>
       <label class="opcion"><input type="checkbox" id="chk-imagen"> <span>Ver mi imagen de la cámara detrás de la escena (realidad aumentada). Si no lo marcas, solo se ven unas manos dibujadas.</span></label>
       <p class="privacidad">La cámara se usa solo para localizar las manos. La imagen se procesa en este dispositivo: no se graba ni se envía. Tu imagen solo se muestra si marcas la casilla o pulsas «Mostrar mi imagen».</p>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-contexto" role="dialog" aria-modal="true" hidden aria-labelledby="t-contexto">
+    <div class="tarjeta">
+      <p class="antetitulo" id="epoca-contexto"></p>
+      <h2 id="t-contexto">Contexto</h2>
+      <div id="cuerpo-contexto"></div>
+      <div class="botones"><button type="button" class="principal" data-cerrar>¡Manos a la obra!</button></div>
     </div>
   </section>
 
@@ -263,6 +278,7 @@
     let audioCtx = null;
     const ultimoSonido = {};
     let cambiosJuego = 0;        // cambios visibles (mensajes y métricas): indican si una pinza ha tenido efecto
+    let registro = null;         // tiempo, intentos fallidos y pistas por etapa (se crea en la sección 8)
     let erroresEtapa = 0, ultimoError = 0, ultimaActividad = performance.now(), fallosSeguidos = 0, anillosPantalla = [];
     const nivelPista = [], efectos = [];
     const lienzoEf = $("lienzoEfectos"), ctxE = lienzoEf.getContext("2d");
@@ -301,6 +317,7 @@
       // Durante un arrastre los avisos cambian sin parar: solo cuentan como error las respuestas y las acciones sueltas
       if (mal && !captura) {
         sonar("error");
+        if (registro && actual >= 0 && !hechas[actual]) { registro[actual].errores++; guardarRegistro(); }
         const ahora = performance.now();
         if (ahora - ultimoError > 2500) { ultimoError = ahora; if (++erroresEtapa >= 2) $("btn-pista").classList.add("llamativa"); }
       } else if (clase === "status-ok" && !categoria.startsWith("completa-") && !mal) sonar("ok");
@@ -311,6 +328,7 @@
       const lista = etapa.pistas && etapa.pistas.length ? etapa.pistas : [etapa.nota];
       const n = nivelPista[actual] || 0, k = n % lista.length;
       nivelPista[actual] = n + 1;
+      if (registro && !hechas[actual]) { registro[actual].pistas++; guardarRegistro(); }
       verPista("Pista " + (k + 1) + " de " + lista.length + ": " + lista[k]);
       $("btn-pista").classList.remove("llamativa");
       $("btn-pista").textContent = lista.length > 1 ? "Otra pista" : "Pista";
@@ -1680,6 +1698,25 @@
     ETAPAS.forEach((e) => { e.grupo.visible = false; scene.add(e.grupo); });
     const CLAVE = "lasManos.edadModerna.progreso";
     let hechas = [false, false, false, false, false];
+    // Registro para el pasaporte del aprendiz: segundos de trabajo, intentos fallidos y pistas de cada etapa
+    const CLAVE_REG = CLAVE.replace(/progreso$/, "registro");
+    registro = Array.from({ length: 5 }, () => ({ seg: 0, errores: 0, pistas: 0, fin: null }));
+    try { const r = JSON.parse(localStorage.getItem(CLAVE_REG) || "null"); if (Array.isArray(r) && r.length === 5) registro = r.map((x) => Object.assign({ seg: 0, errores: 0, pistas: 0, fin: null }, x)); } catch (e) {}
+    let ultimoGuardado = 0;
+    function guardarRegistro(forzar = true) {
+      const ahora = performance.now(); if (!forzar && ahora - ultimoGuardado < 5000) return; ultimoGuardado = ahora;
+      try { localStorage.setItem(CLAVE_REG, JSON.stringify(registro)); } catch (e) {}
+    }
+    // Solo cuenta el tiempo con la etapa a la vista, sin diálogos abiertos y sin terminar
+    // Se mide con el reloj real (no con el paso del fotograma, que se limita a 0,1 s en equipos lentos)
+    let relojPrevio = performance.now();
+    function contarTiempo() {
+      const ahora = performance.now(), d = Math.min(1, (ahora - relojPrevio) / 1000); relojPrevio = ahora;
+      if (!etapa || !modo || hechas[actual] || document.hidden) return;
+      if (document.querySelector("[role=dialog]:not([hidden])")) return;
+      registro[actual].seg += d; guardarRegistro(false);
+    }
+    window.addEventListener("pagehide", () => guardarRegistro());
     try { const s = JSON.parse(localStorage.getItem(CLAVE) || "null"); if (Array.isArray(s) && s.length === 5) hechas = s.map(Boolean); } catch (e) {}
     const botonesEtapa = [...document.querySelectorAll("#etapas button")];
 
@@ -1698,10 +1735,20 @@
     function completar(i, mensaje) {
       const nueva = !hechas[i];
       estado(mensaje, "status-ok", "completa-" + i);
-      if (nueva) { hechas[i] = true; try { localStorage.setItem(CLAVE, JSON.stringify(hechas)); } catch (e) {} }
+      if (nueva) { hechas[i] = true; try { localStorage.setItem(CLAVE, JSON.stringify(hechas)); } catch (e) {} registro[i].fin = new Date().toISOString(); registro[i].seg = Math.round(registro[i].seg); guardarRegistro(); }
       pintarProgreso();
       $("pista").hidden = true; $("btn-pista").classList.remove("llamativa");
       if (nueva) { sonar("fin"); celebrar(i); if (i < 4) $("btn-siguiente").classList.add("llamativa"); }
+    }
+    const contextosVistos = new Set();
+    // Contexto histórico de la etapa: se muestra la primera vez que se entra y con el botón «Contexto»
+    function mostrarContexto() {
+      if (!etapa || !etapa.contexto) return;
+      const c = etapa.contexto;
+      $("epoca-contexto").textContent = c.epoca; $("t-contexto").textContent = c.titulo;
+      $("cuerpo-contexto").innerHTML = c.texto;   // contenido estático propio, sin datos externos
+      document.querySelectorAll(".panel:not([hidden])").forEach((p) => { if (p.id !== "panel-contexto") p.hidden = true; });
+      abrirPanel("panel-contexto");
     }
     function irA(i, apilar = true) {
       if (!disponible(i) || i === actual) return;
@@ -1713,8 +1760,11 @@
       limpiarEtiquetas();
       alternativos.replaceChildren();
       etapa.alternativos();
+      if (etapa.controlesSiempre) mostrarAlternativo(true);
       categoriaPrevia = "";
       reiniciarAyudas();
+      $("btn-contexto").hidden = !etapa.contexto;
+      if (etapa.contexto && !contextosVistos.has(i)) { contextosVistos.add(i); setTimeout(() => mostrarContexto(), 0); }
       marco = etapa.marco;
       DEC.poner(etapa);
       etapa.entrar();
@@ -1776,6 +1826,7 @@
       if (modo === "manos") indicadorCamara("Cámara: en pausa", "aviso");
       if (video.srcObject) { video.srcObject.getTracks().forEach((t) => t.stop()); video.srcObject = null; }
       if (agarre) { pUp(0, 0); agarre = null; }
+      agarreUI = null; senalarControl(null);
       ctxM.clearRect(0, 0, escena.clientWidth, escena.clientHeight);
     }
     async function existeLocal(ruta) { try { return (await fetch(ruta, { method: "HEAD", cache: "no-store" })).ok; } catch (e) { return false; } }
@@ -1832,6 +1883,25 @@
       ctxM.beginPath(); ctxM.arc(m.x, m.y, cerca ? 17 : 14, 0, Math.PI * 2); ctxM.lineWidth = cerca ? 4 : 3; ctxM.strokeStyle = cerca ? "#4ade80" : "#38bdf8"; ctxM.stroke();
       if (cerrada) { ctxM.fillStyle = cerca ? "rgba(74,222,128,.6)" : "rgba(56,189,248,.6)"; ctxM.fill(); }
     }
+    // ---- Pinza sobre la interfaz ----
+    let agarreUI = null, controlSenalado = null;
+    const SELECTOR_UI = "button, a[href], input[type=range], input[type=checkbox], label, summary";
+    function controlBajo(x, y) {
+      const el = document.elementFromPoint(x, y);
+      if (!el || el === lienzo3d) return null;
+      const c = el.closest(SELECTOR_UI);
+      return c && !c.disabled && !c.closest("[hidden]") ? c : null;
+    }
+    function senalarControl(el) {
+      if (el === controlSenalado) return;
+      if (controlSenalado) controlSenalado.classList.remove("mano-encima");
+      controlSenalado = el; if (el) el.classList.add("mano-encima");
+    }
+    function moverRango(r, x) {
+      const b = r.getBoundingClientRect(), min = parseFloat(r.min), max = parseFloat(r.max), paso = parseFloat(r.step) || 1;
+      const v = clamp(min + ((x - b.left) / b.width) * (max - min), min, max), q = Math.round((v - min) / paso) * paso + min;
+      if (parseFloat(r.value) !== q) { r.value = q; r.dispatchEvent(new Event("input", { bubbles: true })); }
+    }
     function procesarManos() {
       if (!detector || video.readyState < 2 || video.currentTime === lastVideoTime) return;
       lastVideoTime = video.currentTime;
@@ -1841,7 +1911,7 @@
       catch (e) { if (++erroresDeteccion > 15) fallosDeteccion(); return; }
       ctxM.clearRect(0, 0, escena.clientWidth, escena.clientHeight);
       const lista = res.landmarks || [], lados = res.handednesses || res.handedness || [], vistas = new Set();
-      let primeraLibre = null;
+      let primeraLibre = null, uiSenalado = null;
       lista.forEach((mano, i) => {
         const lado = (lados[i] && lados[i][0] && lados[i][0].categoryName) || ("m" + i);
         vistas.add(lado);
@@ -1853,15 +1923,25 @@
         const medio = { x: (pts[4].x + pts[8].x) / 2, y: (pts[4].y + pts[8].y) / 2 };
         const s = suav[lado] || medio; suav[lado] = { x: s.x + (medio.x - s.x) * 0.5, y: s.y + (medio.y - s.y) * 0.5 };
         const pm = suav[lado];
-        if (!agarre && pinza[lado] && !antes && intentarAgarre(pm.x, pm.y)) agarre = { lado, perdidas: 0 };
+        // Pinza sobre la interfaz (botones, enlaces, casillas y deslizadores): se pulsan como con el dedo
+        const ui = agarreUI && agarreUI.lado === lado ? agarreUI.el : controlBajo(pm.x, pm.y);
+        if (ui && !uiSenalado) uiSenalado = ui;
+        if (!agarre && !agarreUI && pinza[lado] && !antes && ui) {
+          if (ui.matches("input[type=range]")) { agarreUI = { lado, el: ui }; moverRango(ui, pm.x); }
+          else { ui.click(); onda(pm.x, pm.y, "ok"); sonar("agarre"); }
+        } else if (agarreUI && agarreUI.lado === lado) {
+          if (pinza[lado]) moverRango(agarreUI.el, pm.x); else { agarreUI = null; }
+        } else if (!agarre && !ui && pinza[lado] && !antes && intentarAgarre(pm.x, pm.y)) agarre = { lado, perdidas: 0 };
         if (agarre && agarre.lado === lado) {
           agarre.perdidas = 0;
           if (pinza[lado]) pMove(pm.x, pm.y); else { pUp(pm.x, pm.y); agarre = null; }
         } else if (!agarre && !primeraLibre) primeraLibre = pm;
-        const cerca = !agarre && anillosPantalla.some((a) => Math.hypot(a.x - pm.x, a.y - pm.y) < 42);
+        const cerca = !agarre && (!!ui || anillosPantalla.some((a) => Math.hypot(a.x - pm.x, a.y - pm.y) < 42));
         dibujarMano(pts, pinza[lado], agarre && agarre.lado === lado, cerca);
       });
       if (!agarre && primeraLibre) pMove(primeraLibre.x, primeraLibre.y);
+      if (agarreUI && !vistas.has(agarreUI.lado)) agarreUI = null;
+      senalarControl(agarre ? null : agarreUI ? agarreUI.el : uiSenalado);
       if (agarre && !vistas.has(agarre.lado) && ++agarre.perdidas > 8) { pUp(0, 0); agarre = null; }
       for (const k of Object.keys(pinza)) if (!vistas.has(k)) { delete pinza[k]; delete suav[k]; }
       const n = lista.length, clave = n + "|" + (agarre ? 1 : 0);
@@ -1891,6 +1971,7 @@
       actualizarEtiquetas();
       renderer.render(scene, camera);
       pintarEfectos(dt);
+      contarTiempo();
       if (cuadros % 60 === 0) revisarInactividad();
       fpsN++;
       const ahora = performance.now();
@@ -1931,6 +2012,7 @@
       abrirPanel("panel-info");
     });
     $("btn-pista").addEventListener("click", mostrarPista);
+    $("btn-contexto").addEventListener("click", mostrarContexto);
     function pintarSonido() { $("btn-sonido").setAttribute("aria-pressed", String(sonidoActivo)); }
     $("btn-sonido").addEventListener("click", () => {
       sonidoActivo = !sonidoActivo; pintarSonido();
