@@ -61,6 +61,10 @@ Los botones «← Línea del tiempo» de los capítulos llevan a la línea del t
 - **Orientar.** El corredor empieza cada vez en una posición distinta (marcada con una línea discontinua). Tras orientarlo al este, el alumnado indica cuántos grados lo ha girado, por el camino más corto, y qué tipo de ángulo forma (agudo, recto, obtuso o llano). Un sector azul muestra el giro.
 - **Canarias.** El menú de forma, técnica, orden y esquemas se muestra siempre, también con la cámara. «Borrar» deja la pintadera y el papel como al principio, y hay además «Limpiar solo el papel».
 
+## Novedades de la v3.11.2 (29-10-2026)
+
+**Mano de la bienvenida.** La mano que se deja en la pared tiene ahora una silueta anatómica, la misma para el ratón, el teclado y la cámara. Se construye a partir de los 21 puntos del modelo de manos: los dedos se estrechan hacia la punta y se abren en abanico, hay membranas entre los dedos, el pulgar nace de la base de la palma y la muñeca se prolonga en un antebrazo que se desvanece, como en las manos en negativo de las cuevas. Cada huella varía un poco en la apertura de los dedos, el pulgar y la longitud de los dedos.
+
 ## Novedades de la v3.11 (propuestas de mejora del 26-10-2026)
 
 **Máquina del tiempo · área del profesorado** (`maquina-del-tiempo.html`). Se enlaza desde la bienvenida y desde la línea del tiempo. Contiene la guía didáctica, la fundamentación curricular, las instrucciones de uso y evaluación (con rúbrica), material de apoyo y ampliación por capítulo y el solucionario de las 25 etapas. El contenido se publica **cifrado** (AES-256-GCM con clave derivada por PBKDF2-SHA-256, 600 000 iteraciones) y solo se descifra en el navegador con la contraseña. En un sitio estático no se puede «ocultar» una página: sin cifrado, cualquiera podría leer el solucionario en el código fuente. El texto en claro y la herramienta de cifrado no están en el repositorio. Para cambiar la contraseña o el contenido, se vuelve a cifrar con `cifrar.mjs` (se entrega aparte).
