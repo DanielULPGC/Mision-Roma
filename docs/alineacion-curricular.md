@@ -8,7 +8,14 @@ Marco: Decreto 211/2022, de 10 de noviembre, por el que se establece la ordenaci
 
 La Consejería los presenta como el Anexo 2 del decreto, pero los nombres de las carpetas dicen «borrador». Antes de usar esta matriz en una programación o en un documento institucional, conviene cotejar cada código con el texto oficial del BOC.
 
-Fecha de consulta: 19-10-2026. Abreviaturas: CM = Conocimiento del Medio Natural, Social y Cultural; MAT = Matemáticas; CE = criterio de evaluación.
+**Cotejo con el BOC (29-10-2026).** Todos los códigos de esta matriz se han cotejado con el texto oficial: BOC n.º 231, de 23 de noviembre de 2022, anuncio 3533, pp. 45514-45859. Existen todos y corresponden al ciclo indicado. Confirma también el reparto por ciclos de la competencia específica 7 de Conocimiento del Medio: desde la Prehistoria hasta la Edad Antigua en el segundo ciclo y desde la Edad Media hasta la actualidad en el tercero. Algunas etiquetas de la matriz son aplicaciones didácticas del saber y no su texto literal:
+- «ángulos complementarios» dentro de II.2.10;
+- «proporcionalidad inversa» dentro de I.4.1;
+- «cuerpos de revolución» dentro de II.2.7, que cita el par círculo-cilindro.
+
+El texto oficial de III.2.2 enumera literalmente «paralelo, perpendicular, secante, tangente», y III.3.1, «giros, traslaciones y simetrías».
+
+Fecha de la primera consulta: 19-10-2026. Abreviaturas: CM = Conocimiento del Medio Natural, Social y Cultural; MAT = Matemáticas; CE = criterio de evaluación.
 
 ## 1. Hallazgo principal: los ciclos
 
@@ -93,6 +100,6 @@ El recurso no registra datos del alumnado: solo guarda en el navegador qué etap
 
 ## 4. Pendiente
 
-- Cotejar los códigos con la versión oficial del BOC.
+- ~~Cotejar los códigos con la versión oficial del BOC.~~ Hecho el 29-10-2026.
 - Concretar la situación de aprendizaje según la normativa organizativa vigente en Canarias.
 - Revisión por el profesorado de las asignaturas implicadas.
