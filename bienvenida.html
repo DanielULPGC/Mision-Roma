@@ -229,6 +229,8 @@
     const cueva = $("cueva"), cvR = $("lienzoRoca"), cvP = $("lienzoPigmento"), cvM = $("lienzoMano");
     const cR = cvR.getContext("2d"), cP = cvP.getContext("2d"), cM = cvM.getContext("2d");
     let W = 0, H = 0, activa = null, pulsando = false, automatica = false, manos = 0;
+    // Los lienzos se dibujan a la resolución real de la pantalla (hasta ×2) para que la mano y el pigmento se vean nítidos
+    const DPR = Math.min(2, window.devicePixelRatio || 1);
     function azar(semilla) { let s = semilla >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
     function pintarRoca() {
       const r = azar(7);
@@ -251,7 +253,7 @@
         let x = r() * W, y = r() * H; cR.lineWidth = 0.8 + r() * 1.6; cR.beginPath(); cR.moveTo(x, y);
         const a0 = r() * Math.PI * 2; for (let j = 0; j < 16; j++) { const a = a0 + (r() - 0.5) * 1.3; x += Math.cos(a) * (8 + r() * 24); y += Math.sin(a) * (8 + r() * 24); cR.lineTo(x, y); }
         cR.globalAlpha = 0.4; cR.strokeStyle = "#1e130b"; cR.stroke();
-        cR.globalAlpha = 0.18; cR.strokeStyle = "#e0c39a"; cR.translate(1, 1.5); cR.stroke(); cR.setTransform(1, 0, 0, 1, 0, 0);
+        cR.globalAlpha = 0.18; cR.strokeStyle = "#e0c39a"; cR.translate(1, 1.5); cR.stroke(); cR.setTransform(DPR, 0, 0, DPR, 0, 0);
       }
       cR.globalAlpha = 1;
     }
@@ -259,9 +261,12 @@
       const nw = cueva.clientWidth, nh = cueva.clientHeight;
       if (Math.abs(nw - W) < 2 && Math.abs(nh - H) < 2) return;
       // Se conserva el pigmento al cambiar el tamaño
-      const copia = W && H ? (() => { const t = document.createElement("canvas"); t.width = W; t.height = H; t.getContext("2d").drawImage(cvP, 0, 0); return t; })() : null;
+      const copia = W && H ? (() => { const t = document.createElement("canvas"); t.width = cvP.width; t.height = cvP.height; t.getContext("2d").drawImage(cvP, 0, 0); return t; })() : null;
       W = nw; H = nh;
-      for (const c of [cvR, cvP, cvM]) { c.width = W; c.height = H; }
+      for (const c of [cvR, cvP, cvM]) { c.width = Math.round(W * DPR); c.height = Math.round(H * DPR); }
+      for (const c of [cR, cP, cM]) c.setTransform(DPR, 0, 0, DPR, 0, 0);
+      if (activa) activa.cache = null;
+      manoPintada = null;
       pintarRoca();
       if (copia) cP.drawImage(copia, 0, 0, W, H);
     }
@@ -274,7 +279,7 @@
     // ---------------------------------------------------------------------
     const lienzoSil = document.createElement("canvas"), cS = lienzoSil.getContext("2d");
     // Grosor (radio, en unidades de la palma) en la base, las dos articulaciones y la punta de cada dedo
-    const RADIOS = [[0.25, 0.21, 0.18, 0.15], [0.19, 0.17, 0.15, 0.125], [0.2, 0.18, 0.16, 0.13], [0.185, 0.165, 0.145, 0.12], [0.16, 0.14, 0.125, 0.105]];
+    const RADIOS = [[0.24, 0.2, 0.17, 0.14], [0.18, 0.16, 0.14, 0.115], [0.185, 0.165, 0.15, 0.12], [0.17, 0.155, 0.135, 0.11], [0.15, 0.13, 0.115, 0.095]];
     const lerp = (a, b, k) => ({ x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k });
     function capsula(c, a, b, ra, rb) {
       const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 1, nx = -dy / d, ny = dx / d;
@@ -283,9 +288,10 @@
       c.beginPath(); c.arc(a.x, a.y, ra, 0, Math.PI * 2); c.fill();
       c.beginPath(); c.arc(b.x, b.y, rb, 0, Math.PI * 2); c.fill();
     }
-    function siluetaMano(pts, rgb, detalle = false) {
-      if (lienzoSil.width !== W || lienzoSil.height !== H) { lienzoSil.width = W; lienzoSil.height = H; }
-      const c = cS; c.clearRect(0, 0, W, H);
+    function siluetaMano(pts, rgb, detalle = false, destino = null) {
+      const lienzo = destino || lienzoSil, c = lienzo.getContext("2d");
+      if (lienzo.width !== Math.round(W * DPR) || lienzo.height !== Math.round(H * DPR)) { lienzo.width = Math.round(W * DPR); lienzo.height = Math.round(H * DPR); }
+      c.setTransform(DPR, 0, 0, DPR, 0, 0); c.clearRect(0, 0, W, H);
       const t = Math.hypot(pts[0].x - pts[9].x, pts[0].y - pts[9].y) || 1, sol = "rgb(" + rgb + ")";
       const ux = (pts[0].x - pts[9].x) / t, uy = (pts[0].y - pts[9].y) / t, vx = -uy, vy = ux;
       const en = (d, l) => ({ x: pts[0].x + ux * d * t + vx * l * t, y: pts[0].y + uy * d * t + vy * l * t });
@@ -311,13 +317,30 @@
       c.beginPath(); [pts[1], lerp(pts[2], pts[3], 0.3), lerp(pts[5], pts[6], 0.08), pts[5]].forEach((q, i) => (i ? c.lineTo(q.x, q.y) : c.moveTo(q.x, q.y))); c.closePath(); c.fill();
       // Dedos: falange a falange, cada vez más finos
       DEDOS.forEach((f, i) => { for (let k = 0; k < 3; k++) capsula(c, pts[f[k]], pts[f[k + 1]], RADIOS[i][k] * t, RADIOS[i][k + 1] * t); });
-      if (detalle) detallesMano(c, pts, t);
-      return lienzoSil;
+      if (detalle) detallesMano(c, pts, t, detalle === "completo" ? lienzo : null);
+      return lienzo;
     }
     // Detalles de la mano apoyada (se ve el dorso): volumen, nudillos, pliegues de las articulaciones y uñas.
     // Se pintan solo dentro de la silueta (source-atop).
-    function detallesMano(c, pts, t) {
+    function detallesMano(c, pts, t, lienzo) {
       c.save(); c.globalCompositeOperation = "source-atop";
+      // Borde interior sombreado: define el contorno de cada dedo (solo en la mano apoyada, que no se mueve)
+      if (lienzo) {
+        const inv = document.createElement("canvas"); inv.width = lienzo.width; inv.height = lienzo.height;
+        const ci = inv.getContext("2d"); ci.fillStyle = "#000"; ci.fillRect(0, 0, inv.width, inv.height);
+        ci.globalCompositeOperation = "destination-out"; ci.drawImage(lienzo, 0, 0);
+        c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
+        c.shadowColor = "rgba(70,36,22,.55)"; c.shadowBlur = 0.07 * t * DPR; c.shadowOffsetX = 100000; c.shadowOffsetY = 0.012 * t * DPR;
+        c.drawImage(inv, -100000, 0); c.restore();
+      }
+      // Tendones extensores: del centro de la muñeca a cada nudillo, con un brillo y una sombra muy suaves
+      const base = lerp(pts[0], pts[9], 0.12);
+      for (const k of [5, 9, 13, 17]) {
+        const a = lerp(base, pts[k], 0.5), b = lerp(base, pts[k], 0.93), dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 1, nx = -dy / d, ny = dx / d, o = 0.012 * t;
+        c.lineCap = "round"; c.lineWidth = 0.035 * t;
+        c.strokeStyle = "rgba(255,238,218,.08)"; c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke();
+        c.strokeStyle = "rgba(110,64,44,.06)"; c.beginPath(); c.moveTo(a.x + nx * o * 2, a.y + ny * o * 2); c.lineTo(b.x + nx * o * 2, b.y + ny * o * 2); c.stroke();
+      }
       const cx = (pts[0].x + pts[5].x + pts[9].x + pts[13].x + pts[17].x) / 5, cy = (pts[0].y + pts[5].y + pts[9].y + pts[13].y + pts[17].y) / 5;
       // Volumen: más claro en el centro del dorso y más oscuro hacia los bordes
       const v = c.createRadialGradient(cx, cy - 0.15 * t, 0.1 * t, cx, cy, 1.9 * t);
@@ -366,21 +389,25 @@
       return q.map(({ x, y }) => { const X = x * e * t, Y = y * t; return { x: m.x + X * cg - Y * sg, y: m.y - 0.05 * m.s + X * sg + Y * cg }; });
     }
     function trazarMano(c, m, rgb, alfa, detalle = false) {
-      c.save(); c.globalAlpha = alfa; c.drawImage(siluetaMano(m.pts || puntosMano(m), rgb, detalle), 0, 0); c.restore();
+      // La mano apoyada no se mueve: su imagen con todos los detalles se calcula una sola vez
+      let img;
+      if (detalle) { if (!m.cache) { m.cache = document.createElement("canvas"); siluetaMano(m.pts, rgb, "completo", m.cache); } img = m.cache; }
+      else img = siluetaMano(m.pts || puntosMano(m), rgb);
+      c.save(); c.globalAlpha = alfa; c.drawImage(img, 0, 0, W, H); c.restore();
     }
     // Estampa la mano en negativo: el pigmento se acumula un poco junto al borde de la mano
     // (el soplo choca contra ella) y donde estaba la mano la roca queda limpia, con el borde suave
     function estamparNegativo(pts) {
       const t = Math.hypot(pts[0].x - pts[9].x, pts[0].y - pts[9].y) || 1;
-      cP.save(); cP.shadowColor = "rgba(150,44,26,.55)"; cP.shadowBlur = 0.16 * t;
-      cP.drawImage(siluetaMano(pts, "150,44,26"), 0, 0); cP.restore();
-      cP.save(); cP.globalCompositeOperation = "destination-out"; cP.filter = "blur(1.6px)";
-      cP.drawImage(siluetaMano(pts, "0,0,0"), 0, 0); cP.restore();
+      cP.save(); cP.shadowColor = "rgba(150,44,26,.55)"; cP.shadowBlur = 0.1 * t * DPR;
+      cP.drawImage(siluetaMano(pts, "150,44,26"), 0, 0, W, H); cP.restore();
+      cP.save(); cP.globalCompositeOperation = "destination-out"; cP.filter = "blur(" + 1.2 * DPR + "px)";
+      cP.drawImage(siluetaMano(pts, "0,0,0"), 0, 0, W, H); cP.restore();
     }
     function nuevaMano(x, y) {
       const s = Math.min(Math.max(Math.min(W, H) * 0.34, 150), 300);
       const m = { x, y: y + s * 0.28, s, giro: (Math.random() - 0.5) * 0.5, espejo: Math.random() < 0.4, soplo: 0,
-        abre: 0.85 + Math.random() * 0.35, pulgar: 0.85 + Math.random() * 0.3, largo: [0, 1, 2, 3, 4].map(() => 0.9 + Math.random() * 0.08) };
+        abre: 1.02 + Math.random() * 0.3, pulgar: 0.85 + Math.random() * 0.3, largo: [0, 1, 2, 3, 4].map(() => 0.9 + Math.random() * 0.08) };
       m.pts = puntosMano(m);
       const xs = m.pts.map((p) => p.x), ys = m.pts.map((p) => p.y);
       m.centro = { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 + 0.06 * s };
@@ -388,7 +415,7 @@
     }
     function soplar(dt) {
       const m = activa;
-      soplarEn(m.centro.x, m.centro.y, m.s, dt);
+      soplarEn(m.centro.x, m.centro.y, m.s, dt); soplarBorde(m.pts, dt);
       m.soplo = Math.min(1, m.soplo + dt / 2.2);
       ponerBarra(m.soplo);
       if (m.soplo >= 1) retirar();
@@ -398,10 +425,10 @@
     function soplarEn(cx, cy, s, dt, k = 1) {
       const m = { s };
       // Gotitas de pigmento: muy densas junto a la mano y cada vez más sueltas hacia fuera, como un soplado real
-      const n = Math.round(11000 * dt * k);
+      const n = Math.round(17000 * dt * k);
       for (let i = 0; i < n; i++) {
         const a = Math.random() * Math.PI * 2, gauss = Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(Math.PI * Math.random()), r = m.s * (0.1 + Math.abs(gauss) * 0.26);
-        const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r * 1.2, t = 0.8 + Math.random() * 3.2;
+        const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r * 1.2, t = 0.5 + Math.random() * Math.random() * 2.6;
         cP.globalAlpha = 0.08 + Math.random() * 0.17; cP.fillStyle = Math.random() < 0.8 ? "#b23a22" : "#7a2414";
         cP.beginPath(); cP.arc(x, y, t, 0, Math.PI * 2); cP.fill();
       }
@@ -413,20 +440,38 @@
       }
       cP.globalAlpha = 1;
     }
-    // Soplado concentrado en un punto (la pinza de la otra mano hace de tubo soplador)
-    function soplarPunto(px, py, rad, dt) {
-      const n = Math.round(5200 * dt);
-      for (let i = 0; i < n; i++) {
-        const a = Math.random() * Math.PI * 2, g = Math.sqrt(-2 * Math.log(1 - Math.random())), r = rad * 0.45 * g;
-        cP.globalAlpha = 0.07 + Math.random() * 0.16; cP.fillStyle = Math.random() < 0.8 ? "#b23a22" : "#7a2414";
-        cP.beginPath(); cP.arc(px + Math.cos(a) * r, py + Math.sin(a) * r, 0.8 + Math.random() * 3, 0, Math.PI * 2); cP.fill();
+    // El soplo choca contra el borde de los dedos: más pigmento justo fuera de su contorno, también entre dedo y dedo.
+    // Así la silueta queda bien definida al retirar la mano.
+    function soplarBorde(pts, dt) {
+      const t = Math.hypot(pts[0].x - pts[9].x, pts[0].y - pts[9].y) || 1, n = Math.round(6500 * dt);
+      for (let j = 0; j < n; j++) {
+        const i = Math.floor(Math.random() * 5), k = Math.floor(Math.random() * 3), f = DEDOS[i], u = Math.random();
+        const a = pts[f[k]], b = pts[f[k + 1]], dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 1;
+        const r = (RADIOS[i][k] * (1 - u) + RADIOS[i][k + 1] * u) * t, off = r + Math.random() * Math.random() * 0.14 * t, lado = Math.random() < 0.5 ? -1 : 1;
+        const x = a.x + dx * u + (-dy / d) * off * lado, y = a.y + dy * u + (dx / d) * off * lado;
+        cP.globalAlpha = 0.08 + Math.random() * 0.16; cP.fillStyle = Math.random() < 0.8 ? "#b23a22" : "#7a2414";
+        cP.beginPath(); cP.arc(x, y, 0.5 + Math.random() * Math.random() * 1.8, 0, Math.PI * 2); cP.fill();
       }
       cP.globalAlpha = 1;
     }
+    // Soplado concentrado en un punto (la pinza de la otra mano hace de tubo soplador)
+    function soplarPunto(px, py, rad, dt) {
+      const n = Math.round(8000 * dt);
+      for (let i = 0; i < n; i++) {
+        const a = Math.random() * Math.PI * 2, g = Math.sqrt(-2 * Math.log(1 - Math.random())), r = rad * 0.45 * g;
+        cP.globalAlpha = 0.07 + Math.random() * 0.16; cP.fillStyle = Math.random() < 0.8 ? "#b23a22" : "#7a2414";
+        cP.beginPath(); cP.arc(px + Math.cos(a) * r, py + Math.sin(a) * r, 0.5 + Math.random() * Math.random() * 2.4, 0, Math.PI * 2); cP.fill();
+      }
+      cP.globalAlpha = 1;
+    }
+    // La mano apoyada solo se vuelve a dibujar cuando cambia (nueva mano o cambio de tamaño): así se mantiene la fluidez
+    let manoPintada = null;
     function dibujarManoApoyada() {
+      if (activa === manoPintada && (!activa || activa.cache)) return;
+      manoPintada = activa;
       cM.clearRect(0, 0, W, H);
       if (!activa) return;
-      cM.save(); cM.shadowColor = "rgba(0,0,0,.45)"; cM.shadowBlur = 18; cM.shadowOffsetY = 6;
+      cM.save(); cM.shadowColor = "rgba(0,0,0,.45)"; cM.shadowBlur = 18 * DPR; cM.shadowOffsetY = 6 * DPR;
       trazarMano(cM, activa, "214,170,128", 0.97, true);
       cM.restore();
     }
@@ -446,8 +491,8 @@
         : "<strong>Otra mano más en la pared.</strong> En algunas cuevas hay decenas, de personas distintas. Cuando quieras, abre tu pasaporte.";
     }
     function guardarMarca({ x0, y0, w, h }) {
-      const t = document.createElement("canvas"); t.width = 192; t.height = 240; const c = t.getContext("2d");
-      c.drawImage(cvR, x0, y0, w, h, 0, 0, 192, 240); c.drawImage(cvP, x0, y0, w, h, 0, 0, 192, 240);
+      const t = document.createElement("canvas"); t.width = 288; t.height = 360; const c = t.getContext("2d");
+      const k = DPR; c.drawImage(cvR, x0 * k, y0 * k, w * k, h * k, 0, 0, 288, 360); c.drawImage(cvP, x0 * k, y0 * k, w * k, h * k, 0, 0, 288, 360);
       try { const url = t.toDataURL("image/jpeg", 0.82); localStorage.setItem(K_MANO, url); ponerMarca(url); } catch (e) { ponerMarca(t.toDataURL("image/jpeg", 0.82)); }
     }
     function ponerMarca(url) { const d = $("mi-marca"); if (!url) return; d.textContent = ""; d.style.backgroundImage = 'url("' + url + '")'; d.setAttribute("role", "img"); d.setAttribute("aria-label", "Tu mano en negativo"); }
@@ -483,7 +528,7 @@
       return { x: (W - vw * s) / 2 + (1 - nx) * vw * s, y: (H - vh * s) / 2 + ny * vh * s };   // en espejo, como un reflejo
     }
     function trazarManoReal(c, pts, rgb, alfa, detalle = false) {
-      c.save(); c.globalAlpha = alfa; c.drawImage(siluetaMano(pts, rgb, detalle), 0, 0); c.restore();
+      c.save(); c.globalAlpha = alfa; c.drawImage(siluetaMano(pts, rgb, detalle), 0, 0, W, H); c.restore();
     }
     function cajaMano(pts) {
       const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y), t = Math.hypot(pts[0].x - pts[9].x, pts[0].y - pts[9].y);
@@ -551,7 +596,7 @@
         if (d < 2.6) soploCam = Math.min(1, soploCam + dt / 3);
         msgCueva(d < 2.6 ? "¡Así! Mueve la pinza alrededor de la mano abierta para soplar el pigmento." : "Acerca la pinza a la mano abierta: el pigmento tiene que caer a su alrededor.");
       } else if ((manoCam.quieta || 0) > 0.6) {
-        soplarEn(manoCam.c.x, manoCam.c.y, s, dt, 0.9); soploCam = Math.min(1, soploCam + dt / 2.4);
+        soplarEn(manoCam.c.x, manoCam.c.y, s, dt, 0.9); soplarBorde(manoCam.pts, dt); soploCam = Math.min(1, soploCam + dt / 2.4);
         msgCueva("Sopla, sopla… mantén la mano quieta hasta que se llene la barra.");
       } else msgCueva(soploCam > 0 ? "Mantén la mano quieta para seguir soplando." : "Deja la mano quieta un momento… (o haz pinza con la otra mano para soplar tú).");
       ponerBarra(soploCam);
@@ -563,7 +608,7 @@
     }
     function dibujarManoCamara() {
       if (!manoCam && !pinzaCam) return;
-      if (manoCam) { cM.save(); cM.shadowColor = "rgba(0,0,0,.45)"; cM.shadowBlur = 18; cM.shadowOffsetY = 6; trazarManoReal(cM, manoCam.pts, "214,170,128", 0.95, true); cM.restore(); }
+      if (manoCam) { cM.save(); cM.shadowColor = "rgba(0,0,0,.45)"; cM.shadowBlur = 18 * DPR; cM.shadowOffsetY = 6 * DPR; trazarManoReal(cM, manoCam.pts, "214,170,128", 0.95, true); cM.restore(); }
       if (pinzaCam) {
         const p = pinzaCam.pts, pm = { x: (p[4].x + p[8].x) / 2, y: (p[4].y + p[8].y) / 2 };
         cM.strokeStyle = "rgba(250,247,242,.85)"; cM.lineWidth = 3; cM.lineCap = "round";
@@ -578,6 +623,8 @@
       const dt = Math.min(0.05, (t - tPrev) / 1000); tPrev = t;
       if (activa && (pulsando || automatica)) soplar(dt);
       procesarCamara(dt);
+      // Con la cámara encendida la mano se mueve: se redibuja en cada fotograma
+      if (cam) { manoPintada = undefined; cM.clearRect(0, 0, W, H); }
       dibujarManoApoyada(); dibujarManoCamara();
       requestAnimationFrame(bucle);
     }
