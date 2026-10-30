@@ -283,7 +283,7 @@
       c.beginPath(); c.arc(a.x, a.y, ra, 0, Math.PI * 2); c.fill();
       c.beginPath(); c.arc(b.x, b.y, rb, 0, Math.PI * 2); c.fill();
     }
-    function siluetaMano(pts, rgb) {
+    function siluetaMano(pts, rgb, detalle = false) {
       if (lienzoSil.width !== W || lienzoSil.height !== H) { lienzoSil.width = W; lienzoSil.height = H; }
       const c = cS; c.clearRect(0, 0, W, H);
       const t = Math.hypot(pts[0].x - pts[9].x, pts[0].y - pts[9].y) || 1, sol = "rgb(" + rgb + ")";
@@ -303,13 +303,52 @@
       // Palma, con los bordes redondeados. Se añade el borde exterior del lado del meñique (eminencia hipotenar)
       const medio = lerp(pts[0], pts[9], 0.5), hip = lerp(pts[0], pts[17], 0.5), dh = Math.hypot(hip.x - medio.x, hip.y - medio.y) || 1;
       hip.x += (hip.x - medio.x) / dh * 0.13 * t; hip.y += (hip.y - medio.y) / dh * 0.13 * t;
-      c.lineWidth = t * 0.2; c.beginPath(); [pts[0], pts[1], pts[2], pts[5], pts[9], pts[13], pts[17], hip].forEach((q, i) => (i ? c.lineTo(q.x, q.y) : c.moveTo(q.x, q.y))); c.closePath(); c.fill(); c.stroke();
+      // Lado del meñique respecto al eje de la mano (cambia en la mano izquierda y en la derecha)
+      const sm = ((pts[17].x - pts[0].x) * vx + (pts[17].y - pts[0].y) * vy) >= 0 ? 1 : -1;
+      c.lineWidth = t * 0.2; c.beginPath(); [en(0.02, -0.27 * sm), pts[1], pts[2], pts[5], pts[9], pts[13], pts[17], hip, en(0.02, 0.3 * sm)].forEach((q, i) => (i ? c.lineTo(q.x, q.y) : c.moveTo(q.x, q.y))); c.closePath(); c.fill(); c.stroke();
       // Membranas entre los dedos y entre el pulgar y el índice
       [[5, 9], [9, 13], [13, 17]].forEach(([a, b]) => { c.beginPath(); [pts[a], lerp(pts[a], pts[a + 1], 0.28), lerp(pts[b], pts[b + 1], 0.28), pts[b]].forEach((q, i) => (i ? c.lineTo(q.x, q.y) : c.moveTo(q.x, q.y))); c.closePath(); c.fill(); });
       c.beginPath(); [pts[1], lerp(pts[2], pts[3], 0.3), lerp(pts[5], pts[6], 0.08), pts[5]].forEach((q, i) => (i ? c.lineTo(q.x, q.y) : c.moveTo(q.x, q.y))); c.closePath(); c.fill();
       // Dedos: falange a falange, cada vez más finos
       DEDOS.forEach((f, i) => { for (let k = 0; k < 3; k++) capsula(c, pts[f[k]], pts[f[k + 1]], RADIOS[i][k] * t, RADIOS[i][k + 1] * t); });
+      if (detalle) detallesMano(c, pts, t);
       return lienzoSil;
+    }
+    // Detalles de la mano apoyada (se ve el dorso): volumen, nudillos, pliegues de las articulaciones y uñas.
+    // Se pintan solo dentro de la silueta (source-atop).
+    function detallesMano(c, pts, t) {
+      c.save(); c.globalCompositeOperation = "source-atop";
+      const cx = (pts[0].x + pts[5].x + pts[9].x + pts[13].x + pts[17].x) / 5, cy = (pts[0].y + pts[5].y + pts[9].y + pts[13].y + pts[17].y) / 5;
+      // Volumen: más claro en el centro del dorso y más oscuro hacia los bordes
+      const v = c.createRadialGradient(cx, cy - 0.15 * t, 0.1 * t, cx, cy, 1.9 * t);
+      v.addColorStop(0, "rgba(255,236,212,.22)"); v.addColorStop(0.55, "rgba(255,236,212,0)"); v.addColorStop(1, "rgba(70,38,24,.32)");
+      c.fillStyle = v; c.fillRect(0, 0, W, H);
+      // Nudillos: ligeras sombras sobre las articulaciones de la base de los dedos
+      for (const k of [5, 9, 13, 17]) {
+        const g = c.createRadialGradient(pts[k].x, pts[k].y, 0, pts[k].x, pts[k].y, 0.16 * t);
+        g.addColorStop(0, "rgba(255,240,222,.1)"); g.addColorStop(1, "rgba(255,240,222,0)");
+        c.fillStyle = g; c.beginPath(); c.arc(pts[k].x, pts[k].y, 0.16 * t, 0, Math.PI * 2); c.fill();
+      }
+      c.strokeStyle = "rgba(110,66,46,.24)"; c.lineCap = "round"; c.lineWidth = Math.max(1, 0.011 * t);
+      DEDOS.forEach((f, i) => {
+        // Pliegues: dos o tres arrugas cortas en cada articulación, perpendiculares al dedo
+        const arts = i === 0 ? [f[2]] : [f[1], f[2]];
+        for (const k of arts) {
+          const a = pts[k - 1], b = pts[k + 1], dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d, r = RADIOS[i][f.indexOf(k)] * t * 0.45;
+          for (const o of (k === f[1] ? [-0.025, 0.025] : [0])) {
+            const px = pts[k].x + ux * o * t, py = pts[k].y + uy * o * t;
+            c.beginPath(); c.moveTo(px - uy * r, py + ux * r); c.quadraticCurveTo(px + ux * 0.02 * t, py + uy * 0.02 * t, px + uy * r, py - ux * r); c.stroke();
+          }
+        }
+        // Uña: un óvalo más claro junto a la punta
+        const tip = pts[f[3]], pre = pts[f[2]], dx = tip.x - pre.x, dy = tip.y - pre.y, d = Math.hypot(dx, dy) || 1, ang = Math.atan2(dy, dx), rt = RADIOS[i][3] * t;
+        const nx = tip.x - (dx / d) * 0.02 * t, ny = tip.y - (dy / d) * 0.02 * t;
+        c.save(); c.translate(nx, ny); c.rotate(ang);
+        c.fillStyle = "rgba(240,206,186,.55)"; c.strokeStyle = "rgba(140,92,70,.22)"; c.lineWidth = Math.max(1, 0.008 * t);
+        c.beginPath(); c.ellipse(0, 0, rt * 0.75, rt * 0.52, 0, 0, Math.PI * 2); c.fill(); c.stroke();
+        c.restore();
+      });
+      c.restore();
     }
     // Mano abierta de referencia (palma de 1 unidad, de la muñeca a la base del dedo corazón), con los dedos en abanico
     const MANO_TIPO = [[0, 0], [0.22, -0.12], [0.42, -0.32], [0.56, -0.52], [0.66, -0.7], [0.3, -0.95], [0.38, -1.32], [0.43, -1.55], [0.47, -1.76],
@@ -326,13 +365,22 @@
       // La muñeca queda un poco por encima del punto pulsado; la mano crece hacia arriba
       return q.map(({ x, y }) => { const X = x * e * t, Y = y * t; return { x: m.x + X * cg - Y * sg, y: m.y - 0.05 * m.s + X * sg + Y * cg }; });
     }
-    function trazarMano(c, m, rgb, alfa) {
-      c.save(); c.globalAlpha = alfa; c.drawImage(siluetaMano(m.pts || puntosMano(m), rgb), 0, 0); c.restore();
+    function trazarMano(c, m, rgb, alfa, detalle = false) {
+      c.save(); c.globalAlpha = alfa; c.drawImage(siluetaMano(m.pts || puntosMano(m), rgb, detalle), 0, 0); c.restore();
+    }
+    // Estampa la mano en negativo: el pigmento se acumula un poco junto al borde de la mano
+    // (el soplo choca contra ella) y donde estaba la mano la roca queda limpia, con el borde suave
+    function estamparNegativo(pts) {
+      const t = Math.hypot(pts[0].x - pts[9].x, pts[0].y - pts[9].y) || 1;
+      cP.save(); cP.shadowColor = "rgba(150,44,26,.55)"; cP.shadowBlur = 0.16 * t;
+      cP.drawImage(siluetaMano(pts, "150,44,26"), 0, 0); cP.restore();
+      cP.save(); cP.globalCompositeOperation = "destination-out"; cP.filter = "blur(1.6px)";
+      cP.drawImage(siluetaMano(pts, "0,0,0"), 0, 0); cP.restore();
     }
     function nuevaMano(x, y) {
       const s = Math.min(Math.max(Math.min(W, H) * 0.34, 150), 300);
       const m = { x, y: y + s * 0.28, s, giro: (Math.random() - 0.5) * 0.5, espejo: Math.random() < 0.4, soplo: 0,
-        abre: 0.85 + Math.random() * 0.35, pulgar: 0.85 + Math.random() * 0.3, largo: [0, 1, 2, 3, 4].map(() => 0.96 + Math.random() * 0.08) };
+        abre: 0.85 + Math.random() * 0.35, pulgar: 0.85 + Math.random() * 0.3, largo: [0, 1, 2, 3, 4].map(() => 0.9 + Math.random() * 0.08) };
       m.pts = puntosMano(m);
       const xs = m.pts.map((p) => p.x), ys = m.pts.map((p) => p.y);
       m.centro = { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 + 0.06 * s };
@@ -379,14 +427,13 @@
       cM.clearRect(0, 0, W, H);
       if (!activa) return;
       cM.save(); cM.shadowColor = "rgba(0,0,0,.45)"; cM.shadowBlur = 18; cM.shadowOffsetY = 6;
-      trazarMano(cM, activa, "214,170,128", 0.97);
+      trazarMano(cM, activa, "214,170,128", 0.97, true);
       cM.restore();
     }
     function retirar() {
       const m = activa; activa = null; pulsando = false; automatica = false;
       // Se recorta la silueta: donde estaba la mano no hay pigmento (negativo), con borde suave
-      cP.save(); cP.globalCompositeOperation = "destination-out"; cP.filter = "blur(1.6px)";
-      trazarMano(cP, m, "0,0,0", 1); cP.restore();
+      estamparNegativo(m.pts);
       cM.clearRect(0, 0, W, H);
       guardarMarca(cajaMano(m.pts));
       tras_retirar();
@@ -435,8 +482,8 @@
       const vw = video.videoWidth || 640, vh = video.videoHeight || 480, s = Math.max(W / vw, H / vh);
       return { x: (W - vw * s) / 2 + (1 - nx) * vw * s, y: (H - vh * s) / 2 + ny * vh * s };   // en espejo, como un reflejo
     }
-    function trazarManoReal(c, pts, rgb, alfa) {
-      c.save(); c.globalAlpha = alfa; c.drawImage(siluetaMano(pts, rgb), 0, 0); c.restore();
+    function trazarManoReal(c, pts, rgb, alfa, detalle = false) {
+      c.save(); c.globalAlpha = alfa; c.drawImage(siluetaMano(pts, rgb, detalle), 0, 0); c.restore();
     }
     function cajaMano(pts) {
       const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y), t = Math.hypot(pts[0].x - pts[9].x, pts[0].y - pts[9].y);
@@ -510,13 +557,13 @@
       ponerBarra(soploCam);
       if (soploCam >= 1) {
         const pts = manoCam.pts;
-        cP.save(); cP.globalCompositeOperation = "destination-out"; cP.filter = "blur(1.6px)"; trazarManoReal(cP, pts, "0,0,0", 1); cP.restore();
+        estamparNegativo(pts);
         guardarMarca(cajaMano(pts)); soploCam = 0; esperaCam = 6; tras_retirar(); ultimoMsg = "";
       }
     }
     function dibujarManoCamara() {
       if (!manoCam && !pinzaCam) return;
-      if (manoCam) { cM.save(); cM.shadowColor = "rgba(0,0,0,.45)"; cM.shadowBlur = 18; cM.shadowOffsetY = 6; trazarManoReal(cM, manoCam.pts, "214,170,128", 0.95); cM.restore(); }
+      if (manoCam) { cM.save(); cM.shadowColor = "rgba(0,0,0,.45)"; cM.shadowBlur = 18; cM.shadowOffsetY = 6; trazarManoReal(cM, manoCam.pts, "214,170,128", 0.95, true); cM.restore(); }
       if (pinzaCam) {
         const p = pinzaCam.pts, pm = { x: (p[4].x + p[8].x) / 2, y: (p[4].y + p[8].y) / 2 };
         cM.strokeStyle = "rgba(250,247,242,.85)"; cM.lineWidth = 3; cM.lineCap = "round";

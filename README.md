@@ -63,7 +63,7 @@ Los botones «← Línea del tiempo» de los capítulos llevan a la línea del t
 
 ## Novedades de la v3.11.2 (29-10-2026)
 
-**Mano de la bienvenida.** La mano que se deja en la pared tiene ahora una silueta anatómica, la misma para el ratón, el teclado y la cámara. Se construye a partir de los 21 puntos del modelo de manos: los dedos se estrechan hacia la punta y se abren en abanico, hay membranas entre los dedos, el pulgar nace de la base de la palma y la muñeca se prolonga en un antebrazo que se desvanece, como en las manos en negativo de las cuevas. Cada huella varía un poco en la apertura de los dedos, el pulgar y la longitud de los dedos.
+**Mano de la bienvenida.** La mano que se deja en la pared tiene ahora una silueta anatómica, la misma para el ratón, el teclado y la cámara. Se construye a partir de los 21 puntos del modelo de manos: los dedos se estrechan hacia la punta y se abren en abanico, hay membranas entre los dedos, el pulgar nace de la base de la palma y la muñeca se prolonga en un antebrazo que se desvanece, como en las manos en negativo de las cuevas. Cada huella varía un poco en la apertura de los dedos, el pulgar y la longitud de los dedos. Desde la v3.11.3, mientras se sopla, la mano apoyada muestra el dorso con volumen, nudillos, pliegues y uñas; al retirarla, el pigmento queda algo más denso junto al borde, como en las manos reales.
 
 ## Novedades de la v3.11 (propuestas de mejora del 26-10-2026)
 
