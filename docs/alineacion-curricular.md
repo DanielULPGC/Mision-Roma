@@ -52,7 +52,7 @@ Sociedades y territorios, bloque 2, «Sociedades en el tiempo», reparte las ép
 | E2 Nivelar el canal | III.2.3 (2.º): avances técnicos | I.1.6 números negativos; I.1.7 porcentajes | Iguala las dos pendientes en −8 % |
 | E3 Construir el pilar | III.2.5 (2.º): patrimonio romano | II.2.7 volumen del prisma; III.1.3 radio y diámetro | 8 sillares de 0,40 m (3,20 m); luz del arco = 2 × radio |
 | E4 Cómo lo hacían los romanos | III.2.2 (2.º): fuentes escritas (Vitruvio) | I.2.11 porcentajes; II.2.2 error y precisión | Nivela el corobate; interpreta una pendiente del 0,3 % |
-| E5 El agua en Canarias | III.2.5 (3.º): patrimonio de Canarias | I.1.7 fracciones y porcentajes (½, ¼; 50 %, 25 %); I.4.1 proporcionalidad | Reparte 1/2, 1/4 y 1/4 con aberturas proporcionales |
+| E5 El agua en Canarias | III.2.5 (3.º): patrimonio de Canarias | I.1.7 fracciones y porcentajes (½, ¼; 50 %, 25 %); I.4.1 proporcionalidad | Asigna 4, 2 y 2 de las 8 bocas iguales (1/2, 1/4 y 1/4) y calcula el reparto de otra cantonera de 12, 16 o 20 bocas |
 
 ### Edad Media · «El compás y la piedra»
 

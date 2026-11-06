@@ -13,7 +13,7 @@
       2. Nivelar el canal (Matemáticas): pendiente en porcentaje y números enteros.  [núcleo v2.x conservado]
       3. Construir (Medida y geometría): sillares, prisma, volumen, arco de medio punto.
       4. Cómo lo hacían los romanos (Historia): el corobate (Vitruvio, VIII, 5) y la pendiente real.
-      5. Transferencia a Canarias: la cantonera y el reparto del agua en proporción (fracciones y porcentajes).
+      5. Transferencia a Canarias: la cantonera y el reparto del agua por bocas iguales (fracciones y porcentajes).
 
     Se conservan de v2.2: RA «espejo» con cámara frontal, pinza normalizada con histéresis, privacidad por
     defecto, apagado de cámara, contexto seguro, SRI, librerías y WASM locales, PERMITIR_MODELO_REMOTO.
@@ -271,7 +271,7 @@
         <li><strong>Nivelar:</strong> ajustaste el pilar para que el agua bajara con la misma pendiente y calculaste cuánto baja en un tramo.</li>
         <li><strong>Construir:</strong> calculaste cuántos sillares hacían falta, levantaste el pilar y comprobaste su volumen.</li>
         <li><strong>Romanos:</strong> nivelaste un corobate y viste lo poco que bajaba un canal de verdad.</li>
-        <li><strong>Canarias:</strong> repartiste el agua de una cantonera en partes proporcionales y calculaste las aberturas sin tantear.</li>
+        <li><strong>Canarias:</strong> repartiste las bocas iguales de una cantonera según los derechos de cada finca y calculaste el reparto de otra sin probar.</li>
       </ol>
       <p>La misma idea une las cinco etapas: el agua solo se mueve sola cuesta abajo, y quien la conduce tiene que medir con mucho cuidado.</p>
       <div class="botones"><button type="button" class="principal" id="btn-ir-media">Continuar en la Edad Media: El compás y la piedra →</button><button type="button" data-cerrar>Volver a la obra</button></div>
@@ -1730,113 +1730,112 @@
     // =====================================================================
     // 7. ETAPA 5 · CANARIAS: la cantonera (fracciones y porcentajes)
     // =====================================================================
+    // Modelo basado en Delgado Quintana (2017): la cantonera es una caja de mampostería que divide
+    // el agua en porciones iguales; cada boca equivale a una azada y cada heredero recibe tantas
+    // bocas como derechos tiene.
     const E5 = (() => {
       const g = new THREE.Group();
-      const OBJ = [1 / 2, 1 / 4, 1 / 4], NOMBRES = ["Finca A", "Finca B", "Finca C"], FRAC = ["1/2", "1/4", "1/4"];
-      const XS = [-1.6, 0, 1.6], ABRIR_MAX = 0.8, ANCHO_BOCA = 0.9;
+      const N_BOCAS = 8, OBJ = [4, 2, 2], NOMBRES = ["Finca A", "Finca B", "Finca C"], LETRA = ["A", "B", "C"], FRAC = ["1/2", "1/4", "1/4"];
+      const XB = Array.from({ length: N_BOCAS }, (_, k) => -2.45 + k * 0.7), XS = [-1.9, 0, 1.9], Z_FINCA = 2.1;
+      const COLORES = [0xd97706, 0x15803d, 0x7c3aed];
+      const MAT_F = COLORES.map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.6 }));
       g.add(suelo(8));
-      // depósito (cantonera) visto de frente
-      const fondo = caja(5.2, 2.6, 0.3, M.piedra); fondo.position.set(0, 1.3, -0.5); g.add(fondo);
-      const muroF = new THREE.Group(); g.add(muroF);
-      // muro frontal con tres bocas: se compone de piezas para dejar los huecos
-      const muroAlto = caja(5.2, 1.6, 0.3, M.piedra); muroAlto.position.set(0, 1.8, 0.3); muroF.add(muroAlto);
-      [-2.3, -0.8, 0.8, 2.3].forEach((x, i) => { const w = i === 0 || i === 3 ? 0.6 : 0.7; const p = caja(w, 1.0, 0.3, M.piedra); p.position.set(x, 0.5, 0.3); muroF.add(p); });
-      const aguaDep = caja(4.9, 1.7, 0.6, M.aguaM); aguaDep.position.set(0, 1.0, -0.1); g.add(aguaDep);
-      // acequia de entrada (desde la galería o el naciente)
-      const entrada = caja(2.4, 0.16, 0.4, M.canal); entrada.position.set(-3.4, 2.9, 0); entrada.rotation.z = -0.25; g.add(entrada);
-      // tablas que regulan cada boca (suben para abrir)
-      const tablas = XS.map((x) => { const t = caja(ANCHO_BOCA + 0.1, 1.0, 0.08, M.madera); g.add(t); return t; });
-      const zonas = XS.map((x) => { const z = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.2, 1), new THREE.MeshBasicMaterial({ visible: false })); z.position.set(x, 1.0, 0.5); g.add(z); return z; });
-      // acequias de salida
-      XS.forEach((x) => { const c = caja(0.5, 0.12, 1.2, M.canal); c.position.set(x, 0.06, 0.95); g.add(c); });
-      const N_GOTAS = 60, agua = crearAgua(N_GOTAS, 0.06); g.add(agua);
-      const gotas = Array.from({ length: N_GOTAS }, (_, i) => ({ s: (i * 0.137) % 1, canal: i % 3 }));
-      let ab = [0.4, 0.4, 0.4], arrastre = null, hecho = false, faseE5 = "repartir", respE5 = [], abFinal = null;
+      // caja de la cantonera vista de frente
+      const fondo = caja(5.8, 1.9, 0.3, M.piedra); fondo.position.set(0, 0.95, -0.55); g.add(fondo);
+      const aguaDep = caja(5.5, 1.1, 0.6, M.aguaM); aguaDep.position.set(0, 0.85, -0.15); g.add(aguaDep);
+      // muro frontal: parte alta continua y pilares entre bocas iguales
+      const muroAlto = caja(5.8, 0.9, 0.3, M.piedra); muroAlto.position.set(0, 1.45, 0.3); g.add(muroAlto);
+      for (let k = 0; k <= N_BOCAS; k++) { const x = -2.8 + k * 0.7; const p = caja(0.3, 1.0, 0.3, M.piedra); p.position.set(x, 0.5, 0.3); g.add(p); }
+      // acequia de entrada
+      const entrada = caja(2.4, 0.16, 0.4, M.canal); entrada.position.set(-3.6, 2.1, -0.2); entrada.rotation.z = -0.25; g.add(entrada);
+      // canalillo de cada boca y piedra de color que indica a qué finca va su agua
+      let dest = [0, 1, 2, 0, 1, 2, 0, 1], arrastre = null, hecho = false, faseE5 = "repartir", respE5 = [], N2 = 12;
+      const canalillos = XB.map((x) => { const c = caja(0.32, 0.08, 0.5, M.canal); c.position.set(x, 0.04, 0.7); g.add(c); return c; });
+      const piedras = XB.map((x, k) => { const p = caja(0.34, 0.22, 0.12, MAT_F[dest[k]]); p.position.set(x, 0.2, 0.98); g.add(p); return p; });
+      const zonas = XB.map((x) => { const z = new THREE.Mesh(new THREE.BoxGeometry(0.62, 1.4, 1.2), new THREE.MeshBasicMaterial({ visible: false })); z.position.set(x, 0.6, 0.6); g.add(z); return z; });
+      // acequias de las tres fincas
+      XS.forEach((x, i) => { const c = caja(1.3, 0.12, 0.5, MAT_F[i]); c.position.set(x, 0.06, Z_FINCA); g.add(c); });
+      const N_GOTAS = 64, agua = crearAgua(N_GOTAS, 0.055); g.add(agua);
+      const gotas = Array.from({ length: N_GOTAS }, (_, i) => ({ s: (i * 0.137) % 1, boca: i % N_BOCAS }));
       const ctrls = [];
-      const tabsE5 = tablillasP(g, 3, 3.45, 3.9, 0.62, 1.2, 0.6);
-      // Regla graduada junto a cada boca, desde el suelo: 0 a 80 cm, con marca cada 10 cm (la abertura es el hueco bajo la tabla)
-      const matRegla = new THREE.MeshBasicMaterial({ color: 0xf8f1e0 }), matMarca = new THREE.MeshBasicMaterial({ color: 0x1c1917 });
-      XS.forEach((x) => {
-        const r = caja(0.06, ABRIR_MAX + 0.04, 0.02, matRegla); r.position.set(x + ANCHO_BOCA / 2 + 0.12, ABRIR_MAX / 2, 0.56); g.add(r);
-        for (let k = 0; k <= 8; k++) { const m = caja(k % 2 ? 0.05 : 0.09, 0.012, 0.03, matMarca); m.position.set(x + ANCHO_BOCA / 2 + 0.12, k * 0.1, 0.57); g.add(m); }
-      });
+      const tabsE5 = tablillasP(g, 3, 3.75, 3.4, 0.62, 1.6, 0.6);
+      function cuentas() { const c = [0, 0, 0]; dest.forEach((d) => c[d]++); return c; }
       function responderE5(i) {
         if (faseE5 !== "pregunta" || !respE5[i]) return;
         const mal = respE5[i][1];
         if (mal) { estado(mal, "status-error", "e5-mal-" + i); return; }
         faseE5 = "hecho"; hecho = true; tabsE5.ocultar(); reAltE5();
-        completar(4, "¡Correcto! Las bocas de B y C se abren la mitad que la de A: así A recibe 2 de cada 4 partes (1/2 = 50 %) y B y C, 1 parte cada una (1/4 = 25 %). Es una proporción: lo que importa es la relación entre las aberturas.");
+        completar(4, "¡Correcto! Con " + N2 + " bocas iguales, A recibe la mitad (" + N2 / 2 + " bocas = 50 %) y B y C, un cuarto cada una (" + N2 / 4 + " bocas = 25 %). Las bocas son iguales: cada heredero recibe tantas como derechos tiene.");
         abrirPanel("panel-final");
       }
+      function cambiar(k) { if (hecho || faseE5 !== "repartir") return; dest[k] = (dest[k] + 1) % 3; geom(); }
       function reAltE5() { if (actual !== 4) return; alternativos.replaceChildren(); construirAltE5(); }
       function construirAltE5() {
         ctrls.length = 0;
-        NOMBRES.forEach((n, i) => ctrls.push(filaRango(n + " (cm)", 0, 80, 5, ab[i] * 100, (v) => { if (faseE5 !== "repartir") return; ab[i] = Math.round(v / 5) * 5 / 100; geom(); }, (v) => "abertura " + Math.round(v) + " centímetros de 80")));
+        const fila = document.createElement("div"); fila.className = "fila";
+        const l = document.createElement("span"); l.textContent = "Destino de cada boca:"; fila.appendChild(l);
+        XB.forEach((_, k) => {
+          const b = document.createElement("button"); b.type = "button";
+          b.addEventListener("click", () => cambiar(k));
+          fila.appendChild(b); ctrls.push(b);
+        });
+        alternativos.appendChild(fila);
         if (faseE5 === "pregunta") filaBotones(respE5.map((o, i) => [o[0], () => responderE5(i)]));
+        geom();
       }
-
-      function repartos() { const t = ab.reduce((a, b) => a + b, 0); return t > 0 ? ab.map((a) => a / t) : [0, 0, 0]; }
       function geom() {
-        tablas.forEach((t, i) => t.position.set(XS[i], 0.5 + ab[i], 0.48));
-        const r = repartos();
+        piedras.forEach((p, k) => (p.material = MAT_F[dest[k]]));
+        ctrls.forEach((b, k) => { b.textContent = "Boca " + (k + 1) + ": " + LETRA[dest[k]]; b.setAttribute("aria-label", "Boca " + (k + 1) + ", va a la finca " + LETRA[dest[k]] + ". Pulsa para cambiar"); b.disabled = hecho || faseE5 !== "repartir"; });
+        const c = cuentas();
         if (actual !== 4) return;
-        metricas(r.map((p, i) => NOMBRES[i] + ": " + Math.round(p * 100) + " % · meta " + FRAC[i]).concat(["Aberturas: " + ab.map((a) => fmt(a * 100, 0)).join(" · ") + " cm"]));
-        ctrls.forEach((c, i) => c.poner(ab[i] * 100));
+        metricas(c.map((n, i) => NOMBRES[i] + ": " + n + " de " + N_BOCAS + " bocas (" + Math.round(n / N_BOCAS * 100) + " %) · derecho " + FRAC[i]));
         if (hecho || faseE5 !== "repartir") return;
-        const ok = r.every((p, i) => Math.abs(p - OBJ[i]) < 0.005) && ab.some((a) => a > 0.02);
-        if (ok) {
-          faseE5 = "pregunta"; abFinal = ab.map((a) => Math.round(a * 100));
-          // Se pregunta con otra abertura de A, para comprobar que se ha entendido la proporción y no se ha acertado por tanteo
-          const A2 = abFinal[0] === 60 ? 40 : 60, B2 = A2 / 2;
-          respE5 = barajar([["B y C: " + B2 + " cm cada una", null], ["B y C: " + A2 / 4 + " cm cada una", "Así B y C recibirían menos de un cuarto. La boca de cada una debe ser la mitad que la de A."], ["B y C: " + A2 + " cm cada una", "Si las tres bocas se abren igual, cada finca recibe un tercio, no la mitad y dos cuartos."]]);
+        if (c.every((n, i) => n === OBJ[i])) {
+          faseE5 = "pregunta";
+          // Otra cantonera con distinto número de bocas: se comprueba que se ha entendido la fracción y no se ha acertado probando
+          N2 = [12, 16, 20][(Math.random() * 3) | 0];
+          respE5 = barajar([
+            ["A: " + N2 / 2 + " · B: " + N2 / 4 + " · C: " + N2 / 4, null],
+            ["A: 4 · B: 2 · C: 2", "Eso es lo que hiciste con 8 bocas, pero esta cantonera tiene " + N2 + ". Calcula la mitad y la cuarta parte de " + N2 + "."],
+            ["A: " + N2 / 4 + " · B: " + N2 / 2 + " · C: " + N2 / 4, "Revisa los derechos: la mitad del agua es de la finca A, no de la B."]
+          ]);
           tabsE5.poner(respE5); reAltE5();
-          estado("¡Reparto justo con " + abFinal.join(", ") + " cm! Ahora sin tantear: si la boca de A estuviera abierta " + A2 + " cm, ¿cuánto habría que abrir las de B y C para repartir igual (1/2, 1/4 y 1/4)? Haz pinza sobre una tablilla.", "status-ok", "e5-pregunta");
-        } else if (ab.every((a) => a < 0.02)) estado("Todas las bocas están cerradas: el agua no sale. Sube alguna tabla.", "status-error", "e5-cerrado");
-        else estado("Sube o baja las tablas (cada boca se abre de 0 a 80 cm): la finca A debe recibir la mitad del agua y las fincas B y C, un cuarto cada una. Fíjate en los centímetros de cada boca.", "status-warn", "e5-ajuste");
+          estado("¡Reparto justo: 4, 2 y 2 bocas! Ahora sin probar: otra cantonera tiene " + N2 + " bocas iguales y los mismos derechos (1/2, 1/4 y 1/4). ¿Cuántas bocas corresponden a cada finca? Haz pinza sobre una tablilla.", "status-ok", "e5-pregunta");
+        } else estado("Haz pinza sobre una boca para cambiar a qué finca va su agua. La finca A tiene derecho a la mitad del agua; las fincas B y C, a un cuarto cada una.", "status-warn", "e5-ajuste");
       }
-      geom();
       return {
-        nombre: "El agua en Canarias", grupo: g, marco: { ancho: 7.6, alto: 4.8, cy: 1.5 }, fondo: "barranco",
-        pistas: ["Haz pinza sobre la tabla de una boca y sube o baja la mano: la regla blanca y el cartel azul indican cuántos centímetros está abierta (de 0 a 80 cm).", "Para repartir 1/2, 1/4 y 1/4, la boca de A debe abrirse el doble que las de B y C. Por ejemplo, 40, 20 y 20 cm."],
-        agarres() { return faseE5 === "repartir" ? XS.map((x, i) => [x, 0.5 + ab[i], 0.6]) : []; },
-        contexto: { epoca: "Canarias · de la época moderna a hoy", titulo: "Repartir el agua con justicia",
-          texto: "<p>En Canarias el agua es escasa y muy valiosa. Durante siglos se ha llevado por <strong>acequias</strong>, canales que también tienen que bajar siempre, como los romanos.</p><p>Comunidades de regantes llamadas <strong>heredades</strong>, como la de Arucas y Firgas, en el norte de Gran Canaria, reparten el agua entre quienes tienen derecho a ella. Para dividirla usan depósitos como la <strong>cantonera</strong>: el agua entra y sale por varias bocas, y el tamaño de cada boca decide qué parte recibe cada finca.</p><p class=\"reto\"><strong>Tu reto:</strong> abre las bocas para que la finca A reciba la mitad del agua y las fincas B y C, un cuarto cada una. Cada boca se abre de 0 a 80 cm. Al final tendrás que demostrar que sabes calcular las aberturas sin tantear.</p>" },
-        nota: "Cantonera simplificada: el caudal de cada boca se toma proporcional a su abertura; las tablas encajan cada 5 cm. Fincas y cifras inventadas.",
+        nombre: "El agua en Canarias", grupo: g, marco: { ancho: 7.8, alto: 4.6, cy: 1.4 }, fondo: "barranco",
+        pistas: ["Todas las bocas son iguales: cada una es una azada de agua. Haz pinza sobre una boca para cambiar su finca (A, B o C); el color de la piedra lo indica.", "Cuenta las bocas: la finca A necesita la mitad de las 8 y las fincas B y C, la cuarta parte cada una."],
+        agarres() { return faseE5 === "repartir" ? XB.map((x) => [x, 0.45, 0.9]) : []; },
+        contexto: { epoca: "Canarias · de la conquista a hoy", titulo: "Repartir el agua con justicia",
+          texto: "<p>En Canarias el agua es escasa y muy valiosa. Durante siglos se ha llevado por <strong>acequias</strong>, canales que también tienen que bajar siempre, como los romanos.</p><p>Tras la conquista, quienes tenían derecho al agua se organizaron en <strong>heredades</strong>, como la Heredad de Aguas de Arucas y Firgas, en el norte de Gran Canaria. Los derechos se medían en <strong>azadas</strong>. Para repartir el agua se usa la <strong>cantonera</strong>, una caja de piedra con varias <strong>bocas iguales</strong>: cada boca es una azada, y cada heredero recibe tantas bocas como derechos tiene.</p><p class=\"reto\"><strong>Tu reto:</strong> esta cantonera tiene 8 bocas iguales. Decide a qué finca va el agua de cada boca para que la finca A reciba la mitad y las fincas B y C, un cuarto cada una. Al final tendrás que calcularlo para otra cantonera sin probar.</p>" },
+        nota: "Cantonera simplificada: ocho bocas iguales, cada una equivale a una azada; en las cantoneras reales había también bocas de media o de doble capacidad. Fincas y cifras inventadas.",
         entrar() {
-          etiqueta("cantonera", "", () => [0, 2.95]);
-          etiqueta("agua de la galería", "agua", () => [-2.7, 3.4]);
-          NOMBRES.forEach((n, i) => etiqueta(n + " · " + FRAC[i], "geo abajo", () => [XS[i], -0.1, 1.5]));
-          // Marcador de la abertura de cada boca, en centímetros, sobre la cantonera
-          XS.forEach((x, i) => { const e = etiqueta("", "agua", () => { e.texto = "abierta " + Math.round(ab[i] * 100) + " cm"; return [x, 2.75, 0.6]; }); });
-          etiqueta("regla: 0 a 80 cm", "", () => [XS[2] + ANCHO_BOCA / 2 + 0.2, ABRIR_MAX + 0.22, 0.6]);
+          etiqueta("cantonera · 8 bocas iguales", "", () => [0, 2.15]);
+          etiqueta("agua de la galería", "agua", () => [-3.0, 2.6]);
+          NOMBRES.forEach((n, i) => etiqueta(n + " · " + FRAC[i], "geo abajo", () => [XS[i], -0.1, Z_FINCA + 0.2]));
+          XB.forEach((x, k) => { const e = etiqueta("", "agua", () => { e.texto = LETRA[dest[k]]; return [x, 1.15, 0.5]; }); });
           tabsE5.etiquetas();
-          geom(); if (hecho) estado("Reparto conseguido: 1/2, 1/4 y 1/4.", "status-ok", "e5-ok");
-          else if (faseE5 === "pregunta") estado("Si la boca de A estuviera abierta otra medida, ¿cuánto habría que abrir las de B y C? Haz pinza sobre una tablilla.", "status-warn", "e5-pregunta-ini");
+          geom(); if (hecho) estado("Reparto conseguido: 4, 2 y 2 bocas (1/2, 1/4 y 1/4).", "status-ok", "e5-ok");
+          else if (faseE5 === "pregunta") estado("Otra cantonera tiene " + N2 + " bocas iguales. ¿Cuántas corresponden a cada finca? Haz pinza sobre una tablilla.", "status-warn", "e5-pregunta-ini");
         },
         alternativos() { construirAltE5(); },
         down(x, y) {
           if (faseE5 === "pregunta") { const t = tabsE5.tocar(x, y); if (t !== null) responderE5(t); return false; }
-          const i = zonas.findIndex((z) => toca(x, y, z));
-          if (i < 0 || hecho) return false;
-          arrastre = { i, y0: y, v0: ab[i], ppm: pixelesPorMetro() }; return true;
+          const k = zonas.findIndex((z) => toca(x, y, z));
+          if (k < 0 || hecho) return false;
+          cambiar(k); return false;
         },
-        // La tabla encaja en ranuras de 5 cm; ganancia 0,25 para afinar con la pinza
-        move(x, y) {
-          if (!arrastre) return;
-          const v = Math.round(clamp(arrastre.v0 + 0.25 * (arrastre.y0 - y) / arrastre.ppm, 0, ABRIR_MAX) * 20) / 20;
-          if (v !== ab[arrastre.i]) { ab[arrastre.i] = v; geom(); }
-        },
-        up() { arrastre = null; },
+        move() {},
+        up() {},
         tick(dt) {
-          const r = repartos();
-          // cada gota elige canal según el reparto actual y avanza hacia su finca
+          // cada gota sale por una boca y avanza hacia la acequia de la finca elegida
           for (let i = 0; i < N_GOTAS; i++) {
             const gt = gotas[i];
             gt.s += dt * VEL_AGUA * 0.9;
-            if (gt.s >= 1) { gt.s -= 1; const u = Math.random(); gt.canal = u < r[0] ? 0 : u < r[0] + r[1] ? 1 : 2; }
-            const abierto = ab[gt.canal] > 0.02;
-            if (!abierto) { situarGota(agua, i, 0, -5, 0); continue; }
-            situarGota(agua, i, XS[gt.canal] + (((i * 31) % 5) - 2) * 0.06, 0.16, 0.45 + gt.s * 1.1);
+            if (gt.s >= 1) gt.s -= 1;
+            const xb = XB[gt.boca], xf = XS[dest[gt.boca]] + (((i * 31) % 5) - 2) * 0.12, s = gt.s;
+            situarGota(agua, i, xb + (xf - xb) * Math.max(0, (s - 0.35) / 0.65), 0.14, 0.45 + s * (Z_FINCA - 0.45));
           }
           agua.instanceMatrix.needsUpdate = true;
         }
@@ -2147,10 +2146,10 @@
        <h3>¿Cuánto bajaba un canal?</h3><p>Muy poco: normalmente menos de 1 metro por cada 100 metros de avance. Vitruvio dejó escrita una cifra, pero los especialistas todavía discuten cuál era exactamente. Aquí usamos 0,3 % como ejemplo.</p>
        <h3>Patrimonio</h3><p>El acueducto de Segovia forma parte del Patrimonio Mundial de la UNESCO desde 1985, junto con el casco antiguo de la ciudad. La palabra <em>acueducto</em> viene del latín <em>aquae ductus</em>, «conducción de agua».</p>
        <p class="fuente">Vitruvio, <em>De architectura</em>, VIII, 5-6.</p>`,
-      `<h3>El agua en Canarias</h3><p>En las islas el agua se ha llevado durante siglos por <strong>acequias</strong>, canales que también tienen que bajar siempre, como los romanos. Comunidades de regantes llamadas <strong>heredades</strong>, como la de Arucas y Firgas, en el norte de Gran Canaria, reparten el agua entre quienes tienen derecho a ella.</p>
-       <h3>La cantonera</h3><p>Es un depósito de obra donde llega el agua y se reparte por varias salidas o <strong>bocas</strong>. Las bocas tienen el tamaño adecuado para medir el caudal, y una tabla cerca de la salida permite regularlo.</p>
+      `<h3>El agua en Canarias</h3><p>En las islas el agua se ha llevado durante siglos por <strong>acequias</strong>, canales que también tienen que bajar siempre, como los romanos. Comunidades de regantes llamadas <strong>heredades</strong>, como la de Arucas y Firgas, en el norte de Gran Canaria, reparten el agua entre quienes tienen derecho a ella. Sus orígenes se remontan a los años posteriores a la conquista; la propia Heredad de Arucas y Firgas sitúa su fundación en 1505.</p>
+       <h3>La cantonera</h3><p>Es una caja de mampostería que divide el agua de la acequia en <strong>porciones iguales</strong>: cada boca representa una <strong>azada</strong>, y cada heredero recibe tantas bocas como derechos tiene. Había también bocas de media o de doble capacidad. La azada no es una medida fija: su volumen ha cambiado con el tiempo y de una heredad a otra.</p>
        <h3>Lo que une las cinco etapas</h3><p>Romanos y regantes canarios resolvieron el mismo problema con sus manos: conducir el agua cuesta abajo y medirla con cuidado. En la cantonera, además, hay que repartirla en partes justas: fracciones y porcentajes.</p>
-       <p class="fuente">Definición de <em>cantonera</em>: Tesoro de los diccionarios históricos de la lengua española (RAE). Fincas y cifras de esta etapa inventadas.</p>`
+       <p class="fuente">Delgado Quintana, G. (2017), «La construcción del territorio por el Patrimonio Hidráulico: las Heredades», <em>XXII Coloquio de Historia Canario-Americana</em> · Nuez Yánez, J. S. y Carnero Lorenzo, F. (2003), <em>Revista de Historia Económica</em>, 21(2), 373-398, doi:10.1017/S0212610900010417 · Definición de <em>cantonera</em>: Tesoro de los diccionarios históricos de la lengua española (RAE). Fincas y cifras de esta etapa inventadas.</p>`
     ];
     let focoPrevio = null;
     function abrirPanel(id) { focoPrevio = document.activeElement; const p = $(id); p.hidden = false; p.querySelector("button").focus(); }
